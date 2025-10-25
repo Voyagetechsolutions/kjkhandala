@@ -14,16 +14,248 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      bookings: {
+        Row: {
+          booking_reference: string
+          created_at: string | null
+          id: string
+          passenger_email: string | null
+          passenger_id_number: string | null
+          passenger_name: string
+          passenger_phone: string
+          payment_reference: string | null
+          schedule_id: string
+          seat_number: string
+          status: Database["public"]["Enums"]["booking_status"] | null
+          total_amount: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          booking_reference: string
+          created_at?: string | null
+          id?: string
+          passenger_email?: string | null
+          passenger_id_number?: string | null
+          passenger_name: string
+          passenger_phone: string
+          payment_reference?: string | null
+          schedule_id: string
+          seat_number: string
+          status?: Database["public"]["Enums"]["booking_status"] | null
+          total_amount: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          booking_reference?: string
+          created_at?: string | null
+          id?: string
+          passenger_email?: string | null
+          passenger_id_number?: string | null
+          passenger_name?: string
+          passenger_phone?: string
+          payment_reference?: string | null
+          schedule_id?: string
+          seat_number?: string
+          status?: Database["public"]["Enums"]["booking_status"] | null
+          total_amount?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      buses: {
+        Row: {
+          created_at: string | null
+          id: string
+          layout_columns: number
+          layout_rows: number
+          name: string
+          number_plate: string
+          seating_capacity: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          layout_columns?: number
+          layout_rows?: number
+          name: string
+          number_plate: string
+          seating_capacity: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          layout_columns?: number
+          layout_rows?: number
+          name?: string
+          number_plate?: string
+          seating_capacity?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          full_name: string
+          id: string
+          id_number: string | null
+          phone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          full_name: string
+          id: string
+          id_number?: string | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          full_name?: string
+          id?: string
+          id_number?: string | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      routes: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          destination: string
+          duration_hours: number | null
+          id: string
+          origin: string
+          price: number
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          destination: string
+          duration_hours?: number | null
+          id?: string
+          origin: string
+          price: number
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          destination?: string
+          duration_hours?: number | null
+          id?: string
+          origin?: string
+          price?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      schedules: {
+        Row: {
+          available_seats: number
+          bus_id: string
+          created_at: string | null
+          departure_date: string
+          departure_time: string
+          id: string
+          route_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          available_seats: number
+          bus_id: string
+          created_at?: string | null
+          departure_date: string
+          departure_time: string
+          id?: string
+          route_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          available_seats?: number
+          bus_id?: string
+          created_at?: string | null
+          departure_date?: string
+          departure_time?: string
+          id?: string
+          route_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedules_bus_id_fkey"
+            columns: ["bus_id"]
+            isOneToOne: false
+            referencedRelation: "buses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedules_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_booking_reference: { Args: never; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "passenger"
+      booking_status: "pending" | "confirmed" | "cancelled"
+      seat_status: "available" | "booked" | "selected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +382,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "passenger"],
+      booking_status: ["pending", "confirmed", "cancelled"],
+      seat_status: ["available", "booked", "selected"],
+    },
   },
 } as const
