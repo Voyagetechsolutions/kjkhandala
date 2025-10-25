@@ -1,8 +1,11 @@
 import { Button } from "@/components/ui/button";
-import { Bus, User, Menu } from "lucide-react";
+import { Bus, User, Menu, LogOut } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Navbar() {
+  const { user, isAdmin, signOut } = useAuth();
+
   return (
     <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
       <div className="container mx-auto px-4">
@@ -21,20 +24,38 @@ export default function Navbar() {
             <Link to="/routes" className="text-sm font-medium hover:text-primary transition-colors">
               Routes
             </Link>
-            <Link to="/my-bookings" className="text-sm font-medium hover:text-primary transition-colors">
-              My Bookings
-            </Link>
+            {user && (
+              <Link to="/my-bookings" className="text-sm font-medium hover:text-primary transition-colors">
+                My Bookings
+              </Link>
+            )}
+            {isAdmin && (
+              <Link to="/admin" className="text-sm font-medium hover:text-primary transition-colors">
+                Admin
+              </Link>
+            )}
           </div>
 
           {/* Auth Buttons */}
           <div className="hidden md:flex items-center gap-3">
-            <Button variant="ghost" size="sm">
-              <User className="h-4 w-4 mr-2" />
-              Login
-            </Button>
-            <Button size="sm">
-              Sign Up
-            </Button>
+            {user ? (
+              <Button variant="ghost" size="sm" onClick={() => signOut()}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
+            ) : (
+              <>
+                <Link to="/auth">
+                  <Button variant="ghost" size="sm">
+                    <User className="h-4 w-4 mr-2" />
+                    Login
+                  </Button>
+                </Link>
+                <Link to="/auth">
+                  <Button size="sm">Sign Up</Button>
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}

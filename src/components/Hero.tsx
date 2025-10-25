@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Bus, MapPin, Calendar } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Link } from "react-router-dom";
 
 export default function Hero() {
   return (
@@ -66,9 +67,11 @@ export default function Hero() {
               </div>
             </div>
 
-            <Button className="w-full mt-6" size="lg">
-              Search Available Buses
-            </Button>
+            <Link to="/routes">
+              <Button className="w-full mt-6" size="lg">
+                Search Available Buses
+              </Button>
+            </Link>
           </div>
         </Card>
 
