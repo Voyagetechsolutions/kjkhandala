@@ -40,7 +40,7 @@ export default function SeatSelection() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  
+
   const [schedule, setSchedule] = useState<ScheduleDetails | null>(null);
   const [bookedSeats, setBookedSeats] = useState<string[]>([]);
   const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
@@ -62,7 +62,7 @@ export default function SeatSelection() {
       navigate("/auth");
       return;
     }
-    
+
     fetchScheduleDetails();
   }, [scheduleId, user]);
 
@@ -103,18 +103,23 @@ export default function SeatSelection() {
 
   const generateSeats = () => {
     if (!schedule) return [];
-    
+    // Enforce minimum 60 seats, allow admin to set higher
+    const seatingCapacity = Math.max(60, Number(schedule.buses?.seating_capacity || 60));
+    let rows = schedule.buses?.layout_rows || Math.ceil(seatingCapacity / 4);
+    let cols = schedule.buses?.layout_columns || Math.ceil(seatingCapacity / rows);
+    if (rows * cols < seatingCapacity) {
+      cols = Math.ceil(Math.sqrt(seatingCapacity));
+      rows = Math.ceil(seatingCapacity / cols);
+    }
     const seats = [];
-    const rows = schedule.buses.layout_rows;
-    const cols = schedule.buses.layout_columns;
-    
     for (let row = 1; row <= rows; row++) {
       for (let col = 1; col <= cols; col++) {
         const seatNumber = `${row}${String.fromCharCode(64 + col)}`;
         seats.push(seatNumber);
+        if (seats.length >= seatingCapacity) break;
       }
+      if (seats.length >= seatingCapacity) break;
     }
-    
     return seats;
   };
 
@@ -123,7 +128,7 @@ export default function SeatSelection() {
 
     try {
       const validated = bookingSchema.parse(formData);
-      
+
       setBooking(true);
 
       // Generate booking reference
@@ -180,7 +185,7 @@ export default function SeatSelection() {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      
+
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           {/* Trip Info */}
@@ -208,7 +213,7 @@ export default function SeatSelection() {
             {/* Seat Map */}
             <Card className="p-6">
               <h2 className="text-xl font-semibold mb-6">Select Your Seat</h2>
-              
+
               {/* Legend */}
               <div className="flex gap-6 mb-6 text-sm">
                 <div className="flex items-center gap-2">
@@ -261,7 +266,7 @@ export default function SeatSelection() {
             {/* Passenger Details */}
             <Card className="p-6">
               <h2 className="text-xl font-semibold mb-6">Passenger Details</h2>
-              
+
               <div className="space-y-4 mb-6">
                 <div className="space-y-2">
                   <Label htmlFor="name">Full Name *</Label>
@@ -330,7 +335,7 @@ export default function SeatSelection() {
           </div>
         </div>
       </main>
-      
+
       <Footer />
     </div>
   );

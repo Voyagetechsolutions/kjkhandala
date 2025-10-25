@@ -46,7 +46,7 @@ export default function AdminBuses() {
       navigate("/");
       return;
     }
-    
+
     if (isAdmin) {
       fetchBuses();
     }
@@ -72,7 +72,7 @@ export default function AdminBuses() {
     const busData = {
       name: formData.name,
       number_plate: formData.number_plate,
-      seating_capacity: parseInt(formData.seating_capacity),
+      seating_capacity: Math.max(60, parseInt(formData.seating_capacity || "60", 10)),
       layout_rows: parseInt(formData.layout_rows),
       layout_columns: parseInt(formData.layout_columns),
     };
@@ -182,8 +182,9 @@ export default function AdminBuses() {
                   <Input
                     id="capacity"
                     type="number"
+                    min={60}
                     value={formData.seating_capacity}
-                    onChange={(e) => setFormData({ ...formData, seating_capacity: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, seating_capacity: Math.max(60, Number(e.target.value || 60)).toString() })}
                     required
                   />
                 </div>
