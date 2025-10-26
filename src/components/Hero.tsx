@@ -1,107 +1,105 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Bus, MapPin, Calendar } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Link } from "react-router-dom";
+import { Phone, MapPin, Building2 } from "lucide-react";
 import HeroCarousel from "./HeroCarousel";
 
 export default function Hero() {
-  return (
-    <div className="relative min-h-[80vh] flex items-center justify-center bg-white">
-      {/* Slideshow */}
-      <div className="absolute inset-0 opacity-30">
-        <HeroCarousel />
-      </div>
+  const navigate = useNavigate();
 
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="text-center text-gray-900 mb-12 space-y-6">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <Bus className="h-12 w-12" />
-            <h1 className="text-5xl md:text-7xl font-bold">KJ Khandana Travel and Tours</h1>
-          </div>
-          <p className="text-xl md:text-2xl text-gray-700 max-w-2xl mx-auto">
-            Your journey begins here. Book comfortable bus travel across Botswana with ease.
+  return (
+    <div className="bg-background">
+      {/* Hero Banner */}
+      <div className="relative min-h-[500px] flex items-center justify-center bg-gradient-to-br from-primary via-primary-hover to-secondary overflow-hidden">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNiIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiIG9wYWNpdHk9Ii4xIi8+PC9nPjwvc3ZnPg==')] opacity-10" />
+        
+        <div className="container mx-auto px-4 relative z-10 text-center">
+          <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 animate-fade-in">
+            Welcome to KJ Khandala
+          </h1>
+          <p className="text-xl text-white/90 max-w-2xl mx-auto animate-fade-in">
+            South Africa's favourite premium coach solution since 1984
           </p>
         </div>
+      </div>
 
-        {/* Search Card */}
-        <Card className="max-w-4xl mx-auto p-6 md:p-8 shadow-2xl">
-          <div className="space-y-4">
-            <h2 className="text-2xl font-semibold text-foreground mb-6">Find Your Route</h2>
+      {/* Three Cards Section */}
+      <div className="container mx-auto px-4 py-16">
+        <div className="grid md:grid-cols-3 gap-6">
+          {/* Online Bookings */}
+          <Card className="p-6 text-center hover:shadow-elegant transition-shadow">
+            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <MapPin className="h-6 w-6 text-primary" />
+            </div>
+            <h3 className="text-xl font-semibold mb-3">Online Bookings</h3>
+            <p className="text-muted-foreground mb-6">
+              Book your KJ Khandala bus tickets online from the comfort of your own home.
+            </p>
+            <Button onClick={() => navigate("/routes")} className="w-full">
+              Book Online Now
+            </Button>
+          </Card>
 
-            <div className="grid md:grid-cols-3 gap-4">
-              {/* From */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  From
-                </label>
-                <select
-                  className="w-full px-4 py-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
-                  title="From city"
-                  aria-label="From city"
-                >
-                  <option>Select city</option>
-                  <option>Gaborone</option>
-                  <option>Francistown</option>
-                  <option>Maun</option>
-                </select>
-              </div>
+          {/* Phone Bookings */}
+          <Card className="p-6 text-center hover:shadow-elegant transition-shadow">
+            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <Phone className="h-6 w-6 text-primary" />
+            </div>
+            <h3 className="text-xl font-semibold mb-3">Phone Bookings</h3>
+            <p className="text-muted-foreground mb-6">
+              Our call centre operates 24 hours a day, 365 days a year, for around-the-clock support.
+            </p>
+            <Button asChild variant="secondary" className="w-full">
+              <a href="tel:+26771799129">Call +267 71 799 129</a>
+            </Button>
+          </Card>
 
-              {/* To */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  To
-                </label>
-                <select
-                  className="w-full px-4 py-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
-                  title="To city"
-                  aria-label="To city"
-                >
-                  <option>Select destination</option>
-                  <option>Durban</option>
-                  <option>Johannesburg</option>
-                  <option>Pretoria</option>
-                </select>
-              </div>
+          {/* Booking Offices */}
+          <Card className="p-6 text-center hover:shadow-elegant transition-shadow">
+            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <Building2 className="h-6 w-6 text-primary" />
+            </div>
+            <h3 className="text-xl font-semibold mb-3">Booking Offices</h3>
+            <p className="text-muted-foreground mb-6">
+              Book your KJ Khandala bus tickets in person at one of our many booking offices.
+            </p>
+            <Button onClick={() => navigate("/booking-offices")} variant="outline" className="w-full">
+              Find a location
+            </Button>
+          </Card>
+        </div>
+      </div>
 
-              {/* Date */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Travel Date
-                </label>
-                <input
-                  type="date"
-                  className="w-full px-4 py-3 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
-                  title="Travel date"
-                  aria-label="Travel date"
-                  placeholder="Select travel date"
-                />
-              </div>
+      {/* Our Popular Routes Section */}
+      <div className="bg-muted/30 py-16">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">Our Popular Routes</h2>
+          
+          <div className="grid md:grid-cols-2 gap-8 items-center">
+            {/* Slideshow */}
+            <div>
+              <HeroCarousel />
             </div>
 
-            <Link to="/routes">
-              <Button className="w-full mt-6" size="lg">
-                Search Available Buses
+            {/* About Text */}
+            <div className="space-y-4">
+              <p className="text-lg leading-relaxed">
+                Since 1984, KJ Khandala has brought you South Africa's favourite premium coach solution, 
+                connecting cities as old as the country itself and towns as brilliantly curious as the 
+                cultures that connect us.
+              </p>
+              <p className="text-lg leading-relaxed">
+                KJ Khandala will continue to be the safe and reliable premium coach traveling partner with 
+                high standards and morals. When luxury yearns for affordability, our liners shine the brightest. 
+                Our coaches are built to 5-star specifications and an experience defined by professionalism, 
+                punctuality and good ol' fashioned politeness.
+              </p>
+              <Button onClick={() => navigate("/routes")} size="lg" className="mt-6">
+                View All Routes
               </Button>
-            </Link>
+            </div>
           </div>
-        </Card>
-
-        {/* Features */}
-        <div className="grid md:grid-cols-3 gap-6 mt-16 max-w-4xl mx-auto">
-          {[
-            { icon: "🎫", title: "Easy Booking", desc: "Book in minutes" },
-            { icon: "💳", title: "Secure Payment", desc: "Safe & encrypted" },
-            { icon: "📱", title: "E-Tickets", desc: "Instant confirmation" }
-          ].map((feature, i) => (
-            <Card key={i} className="p-6 text-center bg-white/95 backdrop-blur hover:shadow-lg transition-shadow">
-              <div className="text-4xl mb-3">{feature.icon}</div>
-              <h3 className="font-semibold text-lg mb-1">{feature.title}</h3>
-              <p className="text-sm text-muted-foreground">{feature.desc}</p>
-            </Card>
-          ))}
         </div>
       </div>
     </div>

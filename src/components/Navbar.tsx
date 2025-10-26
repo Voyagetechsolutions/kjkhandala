@@ -24,6 +24,15 @@ export default function Navbar() {
             <Link to="/routes" className="text-sm font-medium hover:text-primary transition-colors">
               Routes
             </Link>
+            <Link to="/our-coaches" className="text-sm font-medium hover:text-primary transition-colors">
+              Our Coaches
+            </Link>
+            <Link to="/booking-offices" className="text-sm font-medium hover:text-primary transition-colors">
+              Booking Offices
+            </Link>
+            <Link to="/contact" className="text-sm font-medium hover:text-primary transition-colors">
+              Contact
+            </Link>
             {user && (
               <Link to="/my-bookings" className="text-sm font-medium hover:text-primary transition-colors">
                 My Bookings

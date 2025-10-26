@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Bus, LayoutDashboard, Route, Calendar, Ticket, LogOut } from "lucide-react";
+import { Bus, LayoutDashboard, Route, Calendar, Ticket, LogOut, Building2 } from "lucide-react";
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -18,6 +18,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { path: "/admin/buses", icon: Bus, label: "Buses" },
     { path: "/admin/schedules", icon: Calendar, label: "Schedules" },
     { path: "/admin/bookings", icon: Ticket, label: "Bookings" },
+    { path: "/admin/offices", icon: Building2, label: "Booking Offices" },
   ];
 
   return (

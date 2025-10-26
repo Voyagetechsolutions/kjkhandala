@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      booking_offices: {
+        Row: {
+          active: boolean | null
+          contact_number: string
+          created_at: string | null
+          id: string
+          location: string
+          name: string
+          operating_hours: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          contact_number: string
+          created_at?: string | null
+          id?: string
+          location: string
+          name: string
+          operating_hours: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          contact_number?: string
+          created_at?: string | null
+          id?: string
+          location?: string
+          name?: string
+          operating_hours?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       bookings: {
         Row: {
           booking_reference: string
@@ -145,6 +178,7 @@ export type Database = {
           id: string
           origin: string
           price: number
+          route_type: Database["public"]["Enums"]["route_type"]
           updated_at: string | null
         }
         Insert: {
@@ -155,6 +189,7 @@ export type Database = {
           id?: string
           origin: string
           price: number
+          route_type?: Database["public"]["Enums"]["route_type"]
           updated_at?: string | null
         }
         Update: {
@@ -165,6 +200,7 @@ export type Database = {
           id?: string
           origin?: string
           price?: number
+          route_type?: Database["public"]["Enums"]["route_type"]
           updated_at?: string | null
         }
         Relationships: []
@@ -255,6 +291,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "passenger"
       booking_status: "pending" | "confirmed" | "cancelled"
+      route_type: "local" | "cross_border"
       seat_status: "available" | "booked" | "selected"
     }
     CompositeTypes: {
@@ -385,6 +422,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "passenger"],
       booking_status: ["pending", "confirmed", "cancelled"],
+      route_type: ["local", "cross_border"],
       seat_status: ["available", "booked", "selected"],
     },
   },

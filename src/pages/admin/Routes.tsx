@@ -24,6 +24,7 @@ interface Route {
   price: number;
   duration_hours: number;
   active: boolean;
+  route_type: string;
 }
 
 export default function AdminRoutes() {
@@ -38,6 +39,7 @@ export default function AdminRoutes() {
     destination: "",
     price: "",
     duration_hours: "",
+    route_type: "local" as "local" | "cross_border",
   });
 
   useEffect(() => {
@@ -73,6 +75,7 @@ export default function AdminRoutes() {
       destination: formData.destination,
       price: parseFloat(formData.price),
       duration_hours: parseFloat(formData.duration_hours),
+      route_type: formData.route_type,
       active: true,
     };
 
@@ -101,7 +104,7 @@ export default function AdminRoutes() {
 
     setDialogOpen(false);
     setEditingRoute(null);
-    setFormData({ origin: "", destination: "", price: "", duration_hours: "" });
+    setFormData({ origin: "", destination: "", price: "", duration_hours: "", route_type: "local" });
     fetchRoutes();
   };
 
@@ -126,6 +129,7 @@ export default function AdminRoutes() {
       destination: route.destination,
       price: route.price.toString(),
       duration_hours: route.duration_hours.toString(),
+      route_type: (route.route_type || "local") as "local" | "cross_border",
     });
     setDialogOpen(true);
   };
@@ -146,7 +150,7 @@ export default function AdminRoutes() {
             <DialogTrigger asChild>
               <Button onClick={() => {
                 setEditingRoute(null);
-                setFormData({ origin: "", destination: "", price: "", duration_hours: "" });
+                setFormData({ origin: "", destination: "", price: "", duration_hours: "", route_type: "local" });
               }}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add Route
@@ -176,7 +180,7 @@ export default function AdminRoutes() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="price">Price (BWP)</Label>
+                  <Label htmlFor="price">Price (P)</Label>
                   <Input
                     id="price"
                     type="number"
@@ -197,6 +201,19 @@ export default function AdminRoutes() {
                     required
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="route_type">Route Type</Label>
+                  <select
+                    id="route_type"
+                    value={formData.route_type}
+                    onChange={(e) => setFormData({ ...formData, route_type: e.target.value as "local" | "cross_border" })}
+                    className="w-full px-4 py-2 border border-input rounded-lg bg-background"
+                    required
+                  >
+                    <option value="local">Local Route</option>
+                    <option value="cross_border">Cross-Border Route</option>
+                  </select>
+                </div>
                 <Button type="submit" className="w-full">
                   {editingRoute ? "Update Route" : "Create Route"}
                 </Button>
@@ -214,8 +231,8 @@ export default function AdminRoutes() {
                     {route.origin} → {route.destination}
                   </h3>
                   <div className="text-sm text-muted-foreground space-y-1">
-                    <p>Price: P{route.price}</p>
-                    <p>Duration: {route.duration_hours} hours</p>
+                    <p>Price: P{route.price} • Duration: {route.duration_hours}h</p>
+                    <p>Type: {route.route_type === 'local' ? 'Local' : 'Cross-Border'}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">

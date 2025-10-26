@@ -103,22 +103,15 @@ export default function SeatSelection() {
 
   const generateSeats = () => {
     if (!schedule) return [];
-    // Enforce minimum 60 seats, allow admin to set higher
-    const seatingCapacity = Math.max(60, Number(schedule.buses?.seating_capacity || 60));
-    let rows = schedule.buses?.layout_rows || Math.ceil(seatingCapacity / 4);
-    let cols = schedule.buses?.layout_columns || Math.ceil(seatingCapacity / rows);
-    if (rows * cols < seatingCapacity) {
-      cols = Math.ceil(Math.sqrt(seatingCapacity));
-      rows = Math.ceil(seatingCapacity / cols);
-    }
     const seats = [];
+    const rows = schedule.buses?.layout_rows || 10;
+    const cols = schedule.buses?.layout_columns || 4;
+    
     for (let row = 1; row <= rows; row++) {
       for (let col = 1; col <= cols; col++) {
         const seatNumber = `${row}${String.fromCharCode(64 + col)}`;
         seats.push(seatNumber);
-        if (seats.length >= seatingCapacity) break;
       }
-      if (seats.length >= seatingCapacity) break;
     }
     return seats;
   };
