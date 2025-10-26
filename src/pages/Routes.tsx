@@ -63,11 +63,12 @@ export default function Routes() {
 
       if (error) throw error;
       setSchedules(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { message: string };
       toast({
         variant: "destructive",
         title: "Error loading routes",
-        description: error.message,
+        description: err.message,
       });
     } finally {
       setLoading(false);
@@ -167,7 +168,7 @@ export default function Routes() {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      
+
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Available Routes</h1>
@@ -185,6 +186,8 @@ export default function Routes() {
               onChange={(e) => setSelectedDate(e.target.value)}
               min={new Date().toISOString().split('T')[0]}
               className="px-4 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring"
+              title="Select date to filter routes"
+              placeholder="Select date"
             />
             {selectedDate && (
               <Button
@@ -214,7 +217,7 @@ export default function Routes() {
           </TabsContent>
         </Tabs>
       </main>
-      
+
       <Footer />
     </div>
   );

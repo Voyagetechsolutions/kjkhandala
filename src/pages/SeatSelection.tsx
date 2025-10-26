@@ -1,167 +1,39 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
 import { Loader2, Bus as BusIcon, MapPin } from "lucide-react";
-import { z } from "zod";
-
-const bookingSchema = z.object({
-  passengerName: z.string().min(2).max(100),
-  passengerPhone: z.string().min(8).max(20),
-  passengerEmail: z.string().email().optional().or(z.literal("")),
-  passengerIdNumber: z.string().max(50).optional(),
-});
-
-interface ScheduleDetails {
-  id: string;
-  departure_date: string;
-  departure_time: string;
-  routes: {
-    origin: string;
-    destination: string;
-    price: number;
-  };
-  buses: {
-    name: string;
-    layout_rows: number;
-    layout_columns: number;
-  };
-}
 
 export default function SeatSelection() {
-  const { scheduleId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { toast } = useToast();
-
-  const [schedule, setSchedule] = useState<ScheduleDetails | null>(null);
+  const { schedule, form, passengers } = location.state || {};
   const [bookedSeats, setBookedSeats] = useState<string[]>([]);
-  const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
+  const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [booking, setBooking] = useState(false);
-  const [formData, setFormData] = useState({
-    passengerName: "",
-    passengerPhone: "",
-    passengerEmail: "",
-    passengerIdNumber: "",
-  });
 
   useEffect(() => {
-    if (!user) {
-      toast({
-        title: "Please sign in",
-        description: "You need to be signed in to book tickets.",
-      });
-      navigate("/auth");
+    if (!schedule || !form || !passengers) {
+      navigate("/book");
       return;
     }
-
-    fetchScheduleDetails();
-  }, [scheduleId, user]);
-
-  const fetchScheduleDetails = async () => {
-    try {
-      const { data: scheduleData, error: scheduleError } = await supabase
-        .from("schedules")
-        .select(`
-          *,
-          routes (origin, destination, price),
-          buses (name, layout_rows, layout_columns)
-        `)
-        .eq("id", scheduleId)
-        .single();
-
-      if (scheduleError) throw scheduleError;
-      setSchedule(scheduleData);
-
-      const { data: bookingsData, error: bookingsError } = await supabase
-        .from("bookings")
-        .select("seat_number")
-        .eq("schedule_id", scheduleId)
-        .neq("status", "cancelled");
-
-      if (bookingsError) throw bookingsError;
-      setBookedSeats(bookingsData.map((b) => b.seat_number));
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message,
-      });
-      navigate("/routes");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const generateSeats = () => {
-    if (!schedule) return [];
-    const seats = [];
-    const rows = schedule.buses?.layout_rows || 10;
-    const cols = schedule.buses?.layout_columns || 4;
-    
-    for (let row = 1; row <= rows; row++) {
-      for (let col = 1; col <= cols; col++) {
-        const seatNumber = `${row}${String.fromCharCode(64 + col)}`;
-        seats.push(seatNumber);
-      }
-    }
-    return seats;
-  };
-
-  const handleBooking = async () => {
-    if (!selectedSeat || !user || !schedule) return;
-
-    try {
-      const validated = bookingSchema.parse(formData);
-
-      setBooking(true);
-
-      // Generate booking reference
-      const bookingRef = `VB${Date.now().toString().slice(-8)}`;
-
+    // Fetch booked seats for this schedule
+    const fetchBookedSeats = async () => {
       const { data, error } = await supabase
         .from("bookings")
-        .insert({
-          schedule_id: scheduleId,
-          user_id: user.id,
-          passenger_name: validated.passengerName,
-          passenger_phone: validated.passengerPhone,
-          passenger_email: validated.passengerEmail || null,
-          passenger_id_number: validated.passengerIdNumber || null,
-          seat_number: selectedSeat,
-          total_amount: schedule.routes.price,
-          status: "confirmed",
-          booking_reference: bookingRef,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      toast({
-        title: "Booking Successful!",
-        description: `Your booking reference is ${bookingRef}`,
-      });
-
-      navigate(`/booking-confirmation/${data.id}`);
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Booking failed",
-        description: error.message || "Please try again",
-      });
-    } finally {
-      setBooking(false);
-    }
-  };
+        .select("seat_number")
+        .eq("schedule_id", schedule.id)
+        .neq("status", "cancelled");
+      if (!error && data) {
+        setBookedSeats(data.map((b: { seat_number: string }) => b.seat_number));
+      }
+      setLoading(false);
+    };
+    fetchBookedSeats();
+  }, [schedule, form, passengers, navigate]);
 
   if (loading) {
     return (
@@ -170,18 +42,44 @@ export default function SeatSelection() {
       </div>
     );
   }
+  if (!schedule || !form || !passengers) return null;
 
-  if (!schedule) return null;
+  const rows = schedule.buses?.layout_rows || 10;
+  const cols = schedule.buses?.layout_columns || 4;
+  const totalSeats = passengers.length;
+
+  const generateSeats = () => {
+    const seats = [];
+    for (let row = 1; row <= rows; row++) {
+      for (let col = 1; col <= cols; col++) {
+        const seatNumber = `${row}${String.fromCharCode(65 + col)}`;
+        seats.push(seatNumber);
+      }
+    }
+    return seats;
+  };
+
+  const handleSeatClick = (seat: string) => {
+    if (bookedSeats.includes(seat)) return;
+    if (selectedSeats.includes(seat)) {
+      setSelectedSeats(selectedSeats.filter((s) => s !== seat));
+    } else if (selectedSeats.length < totalSeats) {
+      setSelectedSeats([...selectedSeats, seat]);
+    }
+  };
+
+  const handleContinue = () => {
+    if (selectedSeats.length !== totalSeats) return;
+    navigate("/book/payment", { state: { schedule, form, passengers, selectedSeats } });
+  };
 
   const seats = generateSeats();
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
-          {/* Trip Info */}
           <Card className="p-6 mb-8">
             <div className="flex items-center gap-4">
               <BusIcon className="h-8 w-8 text-primary" />
@@ -189,7 +87,7 @@ export default function SeatSelection() {
                 <div className="flex items-center gap-2 mb-1">
                   <MapPin className="h-4 w-4" />
                   <span className="font-semibold">{schedule.routes.origin}</span>
-                  <span>→</span>
+                  <span>&rarr;</span>
                   <span className="font-semibold">{schedule.routes.destination}</span>
                 </div>
                 <p className="text-sm text-muted-foreground">
@@ -201,13 +99,9 @@ export default function SeatSelection() {
               </div>
             </div>
           </Card>
-
           <div className="grid lg:grid-cols-2 gap-8">
-            {/* Seat Map */}
             <Card className="p-6">
-              <h2 className="text-xl font-semibold mb-6">Select Your Seat</h2>
-
-              {/* Legend */}
+              <h2 className="text-xl font-semibold mb-6">Select {totalSeats} Seat(s)</h2>
               <div className="flex gap-6 mb-6 text-sm">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 bg-background border-2 border-border rounded"></div>
@@ -222,23 +116,19 @@ export default function SeatSelection() {
                   <span>Booked</span>
                 </div>
               </div>
-
-              {/* Seats Grid */}
               <div className="space-y-2">
-                {Array.from({ length: schedule.buses.layout_rows }).map((_, rowIdx) => (
+                {Array.from({ length: rows }).map((_, rowIdx) => (
                   <div key={rowIdx} className="flex gap-2 justify-center">
-                    {Array.from({ length: schedule.buses.layout_columns }).map((_, colIdx) => {
+                    {Array.from({ length: cols }).map((_, colIdx) => {
                       const seatNumber = `${rowIdx + 1}${String.fromCharCode(65 + colIdx)}`;
                       const isBooked = bookedSeats.includes(seatNumber);
-                      const isSelected = selectedSeat === seatNumber;
-
+                      const isSelected = selectedSeats.includes(seatNumber);
                       return (
                         <button
                           key={seatNumber}
-                          onClick={() => !isBooked && setSelectedSeat(seatNumber)}
+                          onClick={() => handleSeatClick(seatNumber)}
                           disabled={isBooked}
-                          className={`
-                            w-12 h-12 rounded border-2 text-sm font-medium transition-all
+                          className={`w-12 h-12 rounded border-2 text-sm font-medium transition-all
                             ${isBooked
                               ? "bg-muted text-muted-foreground border-muted cursor-not-allowed"
                               : isSelected
@@ -255,80 +145,33 @@ export default function SeatSelection() {
                 ))}
               </div>
             </Card>
-
-            {/* Passenger Details */}
-            <Card className="p-6">
-              <h2 className="text-xl font-semibold mb-6">Passenger Details</h2>
-
-              <div className="space-y-4 mb-6">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name *</Label>
-                  <Input
-                    id="name"
-                    value={formData.passengerName}
-                    onChange={(e) => setFormData({ ...formData, passengerName: e.target.value })}
-                    maxLength={100}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number *</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={formData.passengerPhone}
-                    onChange={(e) => setFormData({ ...formData, passengerPhone: e.target.value })}
-                    maxLength={20}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email (Optional)</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.passengerEmail}
-                    onChange={(e) => setFormData({ ...formData, passengerEmail: e.target.value })}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="idNumber">ID/Passport Number (Optional)</Label>
-                  <Input
-                    id="idNumber"
-                    value={formData.passengerIdNumber}
-                    onChange={(e) => setFormData({ ...formData, passengerIdNumber: e.target.value })}
-                    maxLength={50}
-                  />
-                </div>
-              </div>
-
-              {selectedSeat && (
-                <div className="bg-muted p-4 rounded-lg mb-6">
-                  <p className="text-sm font-medium mb-2">Booking Summary</p>
-                  <div className="space-y-1 text-sm">
-                    <p>Seat: <span className="font-semibold">{selectedSeat}</span></p>
-                    <p>Price: <span className="font-semibold">P{schedule.routes.price}</span></p>
+            <Card className="p-6 flex flex-col justify-between">
+              <h2 className="text-xl font-semibold mb-6">Selected Seats</h2>
+              <div className="mb-4">
+                {selectedSeats.length === 0 ? (
+                  <div className="text-muted-foreground">No seats selected yet.</div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedSeats.map((seat) => (
+                      <span key={seat} className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium">
+                        {seat}
+                      </span>
+                    ))}
                   </div>
-                </div>
-              )}
-
+                )}
+              </div>
               <Button
-                onClick={handleBooking}
-                disabled={!selectedSeat || !formData.passengerName || !formData.passengerPhone || booking}
-                className="w-full"
+                onClick={handleContinue}
+                disabled={selectedSeats.length !== totalSeats}
+                className="w-full mt-4"
                 size="lg"
               >
-                {booking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Confirm Booking
+                Continue to Payment
               </Button>
             </Card>
           </div>
         </div>
       </main>
-
       <Footer />
     </div>
   );

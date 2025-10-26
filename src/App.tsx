@@ -20,6 +20,10 @@ import AdminBuses from "./pages/admin/Buses";
 import AdminSchedules from "./pages/admin/Schedules";
 import AdminBookings from "./pages/admin/Bookings";
 import AdminOffices from "./pages/admin/OfficesAdmin";
+import TripSearch from "./pages/TripSearch";
+import PassengerDetails from "./pages/PassengerDetails";
+import Payment from "./pages/Payment";
+import ETicket from "./pages/ETicket";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +50,11 @@ const App = () => (
             <Route path="/admin/schedules" element={<AdminSchedules />} />
             <Route path="/admin/bookings" element={<AdminBookings />} />
             <Route path="/admin/offices" element={<AdminOffices />} />
+            <Route path="/book" element={<TripSearch />} />
+            <Route path="/book/passengers" element={<PassengerDetails />} />
+            <Route path="/book/seats" element={<SeatSelection />} />
+            <Route path="/book/payment" element={<Payment />} />
+            <Route path="/book/eticket" element={<ETicket />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

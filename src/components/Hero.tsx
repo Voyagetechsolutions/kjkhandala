@@ -1,27 +1,97 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Phone, MapPin, Building2 } from "lucide-react";
+import { Phone, MapPin, Building2, Calendar } from "lucide-react";
 import HeroCarousel from "./HeroCarousel";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Hero() {
   const navigate = useNavigate();
+
+  // State for dynamic routes
+  const [routes, setRoutes] = useState<{ id: string; origin: string; destination: string; route_type: string }[]>([]);
+  const [loadingRoutes, setLoadingRoutes] = useState(true);
+
+  // State for dynamic locations
+  const [locations, setLocations] = useState<string[]>([]);
+  const [form, setForm] = useState({
+    origin: "",
+    destination: "",
+    date: "",
+    seats: 1,
+    returnDate: "",
+  });
+
+  useEffect(() => {
+    // Fetch routes for the 'Our Popular Routes' section
+    const fetchRoutes = async () => {
+      setLoadingRoutes(true);
+      const { data, error } = await supabase
+        .from("routes")
+        .select("id, origin, destination, route_type")
+        .eq("active", true)
+        .order("origin");
+      if (!error && data) {
+        setRoutes(data);
+      }
+      setLoadingRoutes(false);
+    };
+    fetchRoutes();
+  }, []);
+
+  useEffect(() => {
+    // Fetch unique origins and destinations for the booking form
+    const fetchLocations = async () => {
+      const { data, error } = await supabase
+        .from("routes")
+        .select("origin, destination")
+        .eq("active", true);
+      if (!error && data) {
+        // Use correct type for data
+        const locs = [
+          ...new Set([
+            ...data.map((r: { origin: string; destination: string }) => r.origin),
+            ...data.map((r: { origin: string; destination: string }) => r.destination),
+          ]),
+        ];
+        setLocations(locs.filter(Boolean));
+      }
+    };
+    fetchLocations();
+  }, []);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Redirect to /book (TripSearch) with form data as state
+    navigate("/book", { state: { form } });
+  };
 
   return (
     <div className="bg-background">
       {/* Hero Banner */}
       <div className="relative min-h-[500px] flex items-center justify-center bg-gradient-to-br from-primary via-primary-hover to-secondary overflow-hidden">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNiIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiIG9wYWNpdHk9Ii4xIi8+PC9nPjwvc3ZnPg==')] opacity-10" />
-        
+
         <div className="container mx-auto px-4 relative z-10 text-center">
           <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 animate-fade-in">
             Welcome to KJ Khandala
           </h1>
           <p className="text-xl text-white/90 max-w-2xl mx-auto animate-fade-in">
-            South Africa's favourite premium coach solution since 1984
+            Botswana's favourite premium coach solution since 1984
           </p>
         </div>
+      </div>
+
+      {/* Booking/Search Form */}
+      <div className="container mx-auto px-4 -mt-16 relative z-20 flex justify-center">
+        <Button
+          size="lg"
+          className="text-lg px-8 py-4 shadow-lg"
+          onClick={() => navigate("/book")}
+        >
+          Book a Trip
+        </Button>
       </div>
 
       {/* Three Cards Section */}
@@ -75,30 +145,55 @@ export default function Hero() {
       <div className="bg-muted/30 py-16">
         <div className="container mx-auto px-4">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">Our Popular Routes</h2>
-          
           <div className="grid md:grid-cols-2 gap-8 items-center">
             {/* Slideshow */}
             <div>
               <HeroCarousel />
             </div>
 
-            {/* About Text */}
+            {/* Popular Routes List */}
             <div className="space-y-4">
-              <p className="text-lg leading-relaxed">
-                Since 1984, KJ Khandala has brought you South Africa's favourite premium coach solution, 
-                connecting cities as old as the country itself and towns as brilliantly curious as the 
-                cultures that connect us.
-              </p>
-              <p className="text-lg leading-relaxed">
-                KJ Khandala will continue to be the safe and reliable premium coach traveling partner with 
-                high standards and morals. When luxury yearns for affordability, our liners shine the brightest. 
-                Our coaches are built to 5-star specifications and an experience defined by professionalism, 
-                punctuality and good ol' fashioned politeness.
-              </p>
-              <Button onClick={() => navigate("/routes")} size="lg" className="mt-6">
-                View All Routes
-              </Button>
+              <h4 className="text-xl font-semibold mb-2">Popular Routes</h4>
+              {loadingRoutes ? (
+                <div className="text-muted-foreground">Loading routes...</div>
+              ) : routes.length === 0 ? (
+                <div className="text-muted-foreground">No routes available.</div>
+              ) : (
+                <ul className="space-y-2">
+                  {routes.slice(0, 6).map((route) => (
+                    <li key={route.id} className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      <span className="font-medium">{route.origin}</span>
+                      <span className="text-muted-foreground">→</span>
+                      <span className="font-medium">{route.destination}</span>
+                      <span className="ml-2 px-2 py-0.5 rounded text-xs bg-primary/10 text-primary">
+                        {route.route_type === 'local' ? 'Local' : 'Cross-Border'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Our Story Section */}
+      <div className="container mx-auto px-4 py-16">
+        <div className="grid md:grid-cols-2 gap-8 items-center">
+          {/* Slideshow on the left */}
+          <div>
+            <HeroCarousel />
+          </div>
+          {/* Story Text on the right */}
+          <div>
+            <h2 className="text-3xl md:text-4xl font-bold mb-6">Our Story</h2>
+            <p className="text-lg leading-relaxed mb-4">
+              Since 1984, KJ Khandala has brought you South Africa's favourite premium coach solution, connecting cities as old as the country itself and towns as brilliantly curious as the cultures that connect us.
+            </p>
+            <p className="text-lg leading-relaxed">
+              KJ Khandala will continue to be the safe and reliable premium coach traveling partner with high standards and morals. When luxury yearns for affordability, our liners shine the brightest. Our coaches are built to 5-star specifications and an experience defined by professionalism, punctuality and good ol' fashioned politeness.
+            </p>
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -42,18 +42,7 @@ export default function AdminRoutes() {
     route_type: "local" as "local" | "cross_border",
   });
 
-  useEffect(() => {
-    if (!loading && (!user || !isAdmin)) {
-      navigate("/");
-      return;
-    }
-    
-    if (isAdmin) {
-      fetchRoutes();
-    }
-  }, [user, isAdmin, loading]);
-
-  const fetchRoutes = async () => {
+  const fetchRoutes = useCallback(async () => {
     const { data, error } = await supabase
       .from("routes")
       .select("*")
@@ -65,7 +54,17 @@ export default function AdminRoutes() {
     }
 
     setRoutes(data || []);
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    if (!loading && (!user || !isAdmin)) {
+      navigate("/");
+      return;
+    }
+    if (isAdmin) {
+      fetchRoutes();
+    }
+  }, [user, isAdmin, loading, navigate, fetchRoutes]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -205,6 +204,7 @@ export default function AdminRoutes() {
                   <Label htmlFor="route_type">Route Type</Label>
                   <select
                     id="route_type"
+                    title="Route Type"
                     value={formData.route_type}
                     onChange={(e) => setFormData({ ...formData, route_type: e.target.value as "local" | "cross_border" })}
                     className="w-full px-4 py-2 border border-input rounded-lg bg-background"

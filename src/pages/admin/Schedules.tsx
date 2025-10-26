@@ -10,9 +10,18 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
+export interface Schedule {
+  id: string;
+  route_id: string;
+  bus_id: string;
+  departure_date: string;
+  departure_time: string;
+  available_seats: number;
+}
+
 export default function AdminSchedules() {
-  const [schedules, setSchedules] = useState<any[]>([]);
-  const [editing, setEditing] = useState<any | null>(null);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [editing, setEditing] = useState<Schedule | null>(null);
   const [form, setForm] = useState({
     route_id: "",
     bus_id: "",
@@ -44,7 +53,7 @@ export default function AdminSchedules() {
     load();
   };
 
-  const onEdit = (s: any) => {
+  const onEdit = (s: Schedule) => {
     setEditing(s);
     setForm({
       route_id: s.route_id,
