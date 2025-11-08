@@ -25,9 +25,9 @@ Once project is ready:
 
 Example:
 ```
-VITE_SUPABASE_URL=https://abcdefgh.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (keep secret!)
+VITE_SUPABASE_URL=https://miejkfzzbxirgpdmffsh.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pZWprZnp6YnhpcmdwZG1mZnNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI1Mjk2NjUsImV4cCI6MjA3ODEwNTY2NX0.xTbi9JIVwsM6YVssnnL_nkIxbTE41c5TsqSCANjN3yo
+SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pZWprZnp6YnhpcmdwZG1mZnNoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjUyOTY2NSwiZXhwIjoyMDc4MTA1NjY1fQ.mz1_lRkwfYLP6ZaZfkW3_wGiJfpRjLk4byZzhcrSsiU
 ```
 
 ---
