@@ -1,0 +1,20 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "C:\\Users\\Mthokozisi\\Downloads\\KJ khandala\\voyage-onboard-now\\backend\\logs\\.c09a701576c360a40df8295aab7d6f6d45e05ea9-audit.json",
+    "files": [
+        {
+            "date": 1762519215742,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\KJ khandala\\voyage-onboard-now\\backend\\logs\\warn-2025-11-07.log",
+            "hash": "f0ca861905641f7edb21c7aacc8bc6c8a5ba99da9c5bdcef4db5cc8d1a854fcb"
+        },
+        {
+            "date": 1762621771465,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\KJ khandala\\voyage-onboard-now\\backend\\logs\\warn-2025-11-08.log",
+            "hash": "fb4d0100b544b4ae133ceba3ff87e3a2550a36aad603711d30073a3399aff708"
+        }
+    ],
+    "hashType": "sha256"
+}

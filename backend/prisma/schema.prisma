@@ -1,0 +1,1333 @@
+// =====================================================
+// KJ KHANDALA BUS COMPANY - COMPLETE PRISMA SCHEMA
+// All Dashboards: Operations, Finance, HR, Maintenance
+// PostgreSQL Database with Row Level Security
+// =====================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================================================
+// ENUMS
+// =====================================================
+
+enum UserRole {
+  SUPER_ADMIN
+  OPERATIONS_MANAGER
+  TICKETING_AGENT
+  FINANCE_MANAGER
+  MAINTENANCE_MANAGER
+  HR_MANAGER
+  DRIVER
+  PASSENGER
+}
+
+enum TripStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DELAYED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  CHECKED_IN
+  COMPLETED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum BusStatus {
+  ACTIVE
+  MAINTENANCE
+  OUT_OF_SERVICE
+  RETIRED
+}
+
+enum DriverStatus {
+  ACTIVE
+  ON_LEAVE
+  SUSPENDED
+  INACTIVE
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  SUSPENDED
+  TERMINATED
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum WorkOrderStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum WorkOrderPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum InspectionStatus {
+  PASSED
+  FAILED
+  NEEDS_ATTENTION
+}
+
+// =====================================================
+// USER & AUTHENTICATION
+// =====================================================
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  phone     String?
+  role      UserRole @default(PASSENGER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  bookings              Booking[]
+  expensesSubmitted     Expense[]              @relation("SubmittedExpenses")
+  expensesApproved      Expense[]              @relation("ApprovedExpenses")
+  workOrdersCreated     WorkOrder[]            @relation("CreatedWorkOrders")
+  workOrdersAssigned    WorkOrder[]            @relation("AssignedWorkOrders")
+  incomeRecords         Income[]
+  invoicesCreated       Invoice[]
+  refundsProcessed      Refund[]               @relation("ProcessedRefunds")
+  evaluationsCreated    PerformanceEvaluation[]
+  incidentsReported     Incident[]
+  notifications         Notification[]
+  documentsVerified  DriverDocument[] @relation("DocumentVerifier")
+  attendance         Attendance[] @relation("EmployeeAttendance")
+  maintenancePerformed PreventiveMaintenance[] @relation("MaintenancePerformer")
+  servicePerformed   ServiceHistory[] @relation("ServicePerformer")
+  commissionsReceived CommissionPayment[] @relation("CommissionEmployee")
+  collectionsCollected Collection[] @relation("Collector")
+  collectionsDeposited Collection[] @relation("Depositor")
+  payrollProcessed     Payroll[]
+  leaveRequestsApproved LeaveRequest[] @relation("ApprovedLeaveRequests")
+  
+  // New relations
+  manifests            Manifest[]
+
+
+  @@map("users")
+}
+
+// =====================================================
+// OPERATIONS - ROUTES & TRIPS
+// =====================================================
+
+model Route {
+  id          String   @id @default(uuid())
+  name        String
+  origin      String
+  destination String
+  distance    Float // in km
+  duration    Int // in minutes
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  shifts             DriverShift[]
+
+  // Relations
+  stops Stop[]
+  trips Trip[]
+
+  @@map("routes")
+}
+
+model Stop {
+  id        String   @id @default(uuid())
+  routeId   String
+  name      String
+  order     Int
+  latitude  Float?
+  longitude Float?
+  createdAt DateTime @default(now())
+
+  // Relations
+  route Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@map("stops")
+}
+
+model Bus {
+  id                 String    @id @default(uuid())
+  registrationNumber String    @unique
+  model              String
+  capacity           Int
+  status             BusStatus @default(ACTIVE)
+  yearOfManufacture  Int?
+  lastServiceDate    DateTime?
+  nextServiceDate    DateTime?
+  mileage            Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  trips              Trip[]
+  maintenanceRecords MaintenanceRecord[]
+  workOrders         WorkOrder[]
+  inspections        Inspection[]
+  repairs            Repair[]
+  maintenanceCosts   MaintenanceCost[]
+  incidents          Incident[]
+  shifts             DriverShift[]
+  breakdownReports   BreakdownReport[]
+  preventiveMaintenance PreventiveMaintenance[]
+  serviceHistory     ServiceHistory[]
+  liveLocations      LiveLocation[]
+
+  @@map("buses")
+}
+
+model Driver {
+  id            String       @id @default(uuid())
+  firstName     String
+  lastName      String
+  name          String? // Full name for convenience
+  licenseNumber String       @unique
+  licenseExpiry DateTime? // License expiration date
+  phone         String
+  email         String?
+  status        DriverStatus @default(ACTIVE)
+  hireDate      DateTime
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  // Relations
+  trips              Trip[]
+  fuelLogs           FuelLog[]
+  incidents          Incident[]
+  shifts             DriverShift[]
+  documents          DriverDocument[]
+  breakdownReports   BreakdownReport[]
+  liveLocations      LiveLocation[]
+  driverLocation     DriverLocation?
+  speedingIncidents  SpeedingIncident[]
+
+  @@index([licenseExpiry])
+  @@map("drivers")
+}
+
+model Trip {
+  id            String     @id @default(uuid())
+  routeId       String
+  busId         String
+  driverId      String?
+  departureDate DateTime // Legacy field for date only
+  departureTime DateTime // Full datetime for departure
+  arrivalTime   DateTime? // Full datetime for arrival
+  fare          Float
+  status        TripStatus @default(SCHEDULED)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  breakdownReports   BreakdownReport[]
+  liveLocations      LiveLocation[]
+  speedingIncidents  SpeedingIncident[]
+  collections        Collection[]
+
+  // Relations
+  route     Route      @relation(fields: [routeId], references: [id])
+  bus       Bus        @relation(fields: [busId], references: [id])
+  driver    Driver?    @relation(fields: [driverId], references: [id])
+  bookings  Booking[]
+  incidents Incident[]
+  seatHolds SeatHold[]
+  manifest  Manifest?
+
+  @@index([departureTime])
+  @@index([status])
+  @@map("trips")
+}
+
+model Booking {
+  id            String        @id @default(uuid())
+  tripId        String
+  passengerId   String
+  seatNumber    String
+  fare          Float
+  status        BookingStatus @default(PENDING)
+  paymentStatus PaymentStatus @default(PENDING)
+  paymentMethod String?
+  paymentRef    String?
+  bookingDate   DateTime      @default(now())
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  trip      Trip     @relation(fields: [tripId], references: [id])
+  passenger User     @relation(fields: [passengerId], references: [id])
+  refund    Refund?
+  paymentTransactions PaymentTransaction[]
+
+  @@map("bookings")
+}
+
+// =====================================================
+// FINANCE MANAGEMENT
+// =====================================================
+
+model Income {
+  id          String   @id @default(uuid())
+  date        DateTime
+  amount      Float
+  category    String // ticket_sales, charter, advertising, etc.
+  source      String
+  description String?
+  route       String? // For ticket sales
+  vendor      String? // Who paid
+  reference   String?
+  notes       String?
+  recordedBy  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  recorder User @relation(fields: [recordedBy], references: [id])
+
+  @@index([date])
+  @@index([source])
+  @@index([category])
+  @@map("income")
+}
+
+model Expense {
+  id            String        @id @default(uuid())
+  date          DateTime
+  amount        Float
+  category      String // fuel, maintenance, salaries, utilities, etc.
+  description   String
+  vendor        String? // Who was paid
+  receipt       String? // file path
+  status        ExpenseStatus @default(PENDING)
+  submittedById String
+  approvedById  String?
+  approvedAt    DateTime?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  submittedBy User  @relation("SubmittedExpenses", fields: [submittedById], references: [id])
+  approvedBy  User? @relation("ApprovedExpenses", fields: [approvedById], references: [id])
+
+  @@index([date])
+  @@index([category])
+  @@index([status])
+  @@map("expenses")
+}
+
+model Payroll {
+  id            String    @id @default(uuid())
+  employeeId    String
+  employeeName  String? // Denormalized
+  department    String?
+  month         String // YYYY-MM format
+  basicSalary   Float // Base salary
+  allowances    Float     @default(0) // Housing, transport, etc.
+  grossSalary   Float // basicSalary + allowances + bonuses
+  grossPay      Float? // Alias for grossSalary for compatibility
+  deductions    Float     @default(0) // Tax, pension, etc.
+  bonuses       Float     @default(0)
+  netSalary     Float // grossSalary - deductions
+  totalAmount   Float? // Alias for netSalary
+  paymentDate   DateTime?
+  paymentMethod String?
+  status        String    @default("pending") // pending, processed, paid
+  processedById String
+  processedAt   DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  employee  Employee @relation(fields: [employeeId], references: [id])
+  processor User     @relation(fields: [processedById], references: [id])
+
+  @@index([employeeId])
+  @@index([month])
+  @@index([status])
+  @@map("payroll")
+}
+
+model FuelLog {
+  id             String    @id @default(uuid())
+  date           DateTime
+  driverId       String
+  driver         String? // Denormalized driver name
+  busId          String?
+  bus            String? // Denormalized bus number
+  route          String?
+  quantity       Float // Liters
+  liters         Float? // Alias for quantity
+  pricePerLiter  Float?
+  totalCost      Float // Total amount
+  amount         Float? // Alias for totalCost
+  station        String
+  estimated      Float? // Estimated fuel needed
+  variance       Float? // Actual vs estimated
+  odometer       Int?
+  receipt        String? // file path
+  status         String    @default("pending") // pending, approved, disputed, rejected
+  approvedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  driverRelation Driver @relation(fields: [driverId], references: [id])
+
+  @@index([date])
+  @@index([driverId])
+  @@index([status])
+  @@map("fuel_logs")
+}
+
+model Invoice {
+  id            String    @id @default(uuid())
+  invoiceNo     String?   @unique // Custom invoice number
+  invoiceNumber String?   @unique // Alias for invoiceNo
+  date          DateTime  @default(now())
+  client        String // Client name
+  clientName    String? // Alias
+  clientEmail   String?
+  service       String? // Service description
+  description   String?
+  amount        Float // Total amount
+  paid          Float     @default(0) // Amount paid
+  balance       Float? // Remaining balance
+  dueDate       DateTime
+  daysPastDue   Int? // Calculated field
+  status        String    @default("pending") // pending, sent, paid, overdue, cancelled
+  items         Json? // array of invoice items
+  notes         String?
+  createdById   String
+  sentAt        DateTime?
+  paidAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  creator User @relation(fields: [createdById], references: [id])
+
+  @@index([date])
+  @@index([status])
+  @@index([dueDate])
+  @@map("invoices")
+}
+
+model Refund {
+  id               String    @id @default(uuid())
+  bookingId        String    @unique
+  bookingRef       String? // Denormalized booking reference
+  requestDate      DateTime  @default(now())
+  passenger        String? // Passenger name
+  passengerEmail   String?
+  route            String?
+  travelDate       DateTime?
+  ticketAmount     Float? // Original ticket price
+  requestedAmount  Float // Amount requested for refund
+  amount           Float // Final refund amount
+  approvedAmount   Float? // Amount approved
+  penalty          Float     @default(0)
+  daysBeforeTravel Int? // Days before travel date
+  reason           String
+  status           String    @default("pending") // pending, approved, rejected, processed
+  processedById    String?
+  processedAt      DateTime?
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  booking   Booking @relation(fields: [bookingId], references: [id])
+  processor User?   @relation("ProcessedRefunds", fields: [processedById], references: [id])
+
+  @@index([requestDate])
+  @@index([status])
+  @@map("refunds")
+}
+
+model Account {
+  id             String          @id @default(uuid())
+  name           String
+  bank           String? // Bank name
+  bankName       String? // Alias
+  accountNumber  String          @unique
+  balance        Float           @default(0)
+  type           String // checking, savings, petty_cash, cash
+  lastReconciled DateTime?
+  status         String          @default("active") // active, reconciled, pending
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  // Relations
+  transactions Transaction[]
+
+  @@index([type])
+  @@index([status])
+  @@map("accounts")
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  accountId   String
+  date        DateTime
+  description String
+  type        String // credit, debit
+  amount      Float
+  matched     Boolean  @default(false)
+  reference   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([date])
+  @@index([matched])
+  @@map("transactions")
+}
+
+// =====================================================
+// HR MANAGEMENT
+// =====================================================
+
+model Employee {
+  id           String         @id @default(uuid())
+  employeeId   String?        @unique // Custom employee number like EMP-001
+  firstName    String
+  lastName     String
+  email        String         @unique
+  phone        String
+  position     String
+  department   String
+  hireDate     DateTime
+  salary       Float
+  status       EmployeeStatus @default(ACTIVE)
+  dateOfBirth  DateTime?
+  address      String?
+  emergencyContact String?
+  emergencyPhone String?
+  employmentType String?      @default("full_time") // full_time, part_time, contract
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  // Relations
+  leaveRequests   LeaveRequest[]
+  certifications  Certification[]
+  evaluations     PerformanceEvaluation[]
+  payroll         Payroll[]
+
+  @@index([department])
+  @@index([status])
+  @@index([email])
+  @@map("employees")
+}
+
+model LeaveRequest {
+  id          String      @id @default(uuid())
+  employeeId  String
+  employeeName String? // Denormalized
+  leaveType   String // annual, sick, emergency, unpaid
+  type        String? // Alias for leaveType for compatibility
+  startDate   DateTime
+  endDate     DateTime
+  days        Int
+  reason      String
+  status      LeaveStatus @default(PENDING)
+  approvedById String?
+  approvedAt  DateTime?
+  requestDate DateTime  @default(now()) // When request was made
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  approvedBy User?    @relation("ApprovedLeaveRequests", fields: [approvedById], references: [id])
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([startDate])
+  @@map("leave_requests")
+}
+
+model Certification {
+  id           String   @id @default(uuid())
+  employeeId   String
+  employeeName String? // Denormalized for easier querying
+  type         String? // license, medical, contract, etc.
+  name         String
+  number       String? // Certificate/license number
+  issuedBy     String
+  issueDate    DateTime
+  expiryDate   DateTime?
+  document     String? // file path
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([expiryDate])
+  @@index([type])
+  @@map("certifications")
+}
+
+model JobPosting {
+  id           String   @id @default(uuid())
+  title        String
+  department   String
+  location     String?  @default("Gaborone")
+  employmentType String? @default("Full-time")
+  description  String
+  requirements String
+  salary       String?
+  status       String   @default("active") // active, closed
+  createdById  String
+  postedDate   DateTime @default(now())
+  closingDate  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  applications Application[]
+
+  @@index([status])
+  @@index([department])
+  @@map("job_postings")
+}
+
+model Application {
+  id          String   @id @default(uuid())
+  jobId       String
+  jobTitle    String? // Denormalized for easier querying
+  name        String
+  email       String
+  phone       String
+  experience  String? // Years of experience
+  resume      String // file path
+  coverLetter String?
+  status      String   @default("pending") // pending, screening, interview, rejected, hired
+  notes       String?
+  requestDate DateTime @default(now()) // When they applied
+  appliedAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  job JobPosting @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([status])
+  @@map("applications")
+}
+
+model PerformanceEvaluation {
+  id           String   @id @default(uuid())
+  employeeId   String
+  employeeName String? // Denormalized
+  department   String?
+  evaluatorId  String
+  period       String // Q1-2024, 2024, etc.
+  productivity Float?  // Individual scores
+  punctuality  Float?
+  teamwork     Float?
+  overall      Float   // Overall rating
+  rating       Int     // 1-5 for compatibility
+  strengths    String?
+  improvements String?
+  goals        String?
+  comments     String?
+  status       String  @default("completed")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  employee  Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  evaluator User     @relation(fields: [evaluatorId], references: [id])
+
+  @@index([employeeId])
+  @@index([period])
+  @@map("performance_evaluations")
+}
+
+// =====================================================
+// MAINTENANCE MANAGEMENT
+// =====================================================
+
+model WorkOrder {
+  id            String            @id @default(uuid())
+  busId         String
+  title         String
+  description   String
+  priority      WorkOrderPriority @default(MEDIUM)
+  status        WorkOrderStatus   @default(PENDING)
+  assignedToId  String?
+  estimatedCost Float?
+  actualCost    Float?
+  cost          Float? // Alias for actualCost
+  scheduledDate DateTime?
+  completedDate DateTime?
+  createdById   String
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  // Relations
+  bus        Bus   @relation(fields: [busId], references: [id])
+  assignedTo User? @relation("AssignedWorkOrders", fields: [assignedToId], references: [id])
+  createdBy  User  @relation("CreatedWorkOrders", fields: [createdById], references: [id])
+
+  @@index([busId])
+  @@index([status])
+  @@index([priority])
+  @@index([assignedToId])
+  @@map("work_orders")
+}
+
+model MaintenanceSchedule {
+  id              String    @id @default(uuid())
+  busId           String
+  serviceType     String // oil_change, tire_rotation, inspection, etc.
+  intervalKm      Int? // service every X km
+  intervalDays    Int? // service every X days
+  lastServiceDate DateTime?
+  nextServiceDate DateTime
+  status          String    @default("scheduled") // scheduled, completed, overdue
+  notes           String?
+  cost            Float?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([busId])
+  @@index([nextServiceDate])
+  @@index([status])
+  @@map("maintenance_schedules")
+}
+
+model Inspection {
+  id          String           @id @default(uuid())
+  busId       String
+  date        DateTime
+  inspectorId String
+  status      InspectionStatus
+  checklist   Json // inspection checklist items
+  issues      String?
+  photos      Json? // array of photo URLs
+  notes       String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relations
+  bus Bus @relation(fields: [busId], references: [id])
+
+  @@index([busId])
+  @@index([date])
+  @@index([status])
+  @@map("inspections")
+}
+
+model Repair {
+  id          String   @id @default(uuid())
+  busId       String
+  date        DateTime
+  description String
+  partsCost   Float    @default(0)
+  laborCost   Float    @default(0)
+  mechanicId  String?
+  status      String   @default("completed")
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  bus Bus @relation(fields: [busId], references: [id])
+
+  @@index([busId])
+  @@index([date])
+  @@index([status])
+  @@map("repairs")
+}
+
+model InventoryItem {
+  id           String   @id @default(uuid())
+  name         String
+  category     String // tires, oil, filters, parts, etc.
+  quantity     Int
+  unitPrice    Float
+  reorderLevel Int
+  supplier     String?
+  location     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  movements StockMovement[]
+
+  @@index([category])
+  @@index([quantity])
+  @@map("inventory_items")
+}
+
+model StockMovement {
+  id        String   @id @default(uuid())
+  itemId    String
+  quantity  Int // positive for addition, negative for usage
+  reason    String // purchase, usage, return, adjustment
+  userId    String
+  createdAt DateTime @default(now())
+
+  // Relations
+  item InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("stock_movements")
+}
+
+model MaintenanceRecord {
+  id          String   @id @default(uuid())
+  busId       String
+  date        DateTime
+  type        String // preventive, corrective, inspection
+  description String
+  cost        Float
+  mileage     Int?
+  technician  String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  bus Bus @relation(fields: [busId], references: [id])
+
+  @@index([busId])
+  @@index([date])
+  @@index([type])
+  @@map("maintenance_records")
+}
+
+model MaintenanceCost {
+  id        String   @id @default(uuid())
+  busId     String
+  date      DateTime
+  category  String // parts, labor, external_service
+  amount    Float
+  description String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  bus Bus @relation(fields: [busId], references: [id])
+
+  @@index([busId])
+  @@index([date])
+  @@index([category])
+  @@map("maintenance_costs")
+}
+
+// =====================================================
+// OPERATIONS MANAGEMENT
+// =====================================================
+
+model Incident {
+  id            String    @id @default(uuid())
+  tripId        String?
+  busId         String?
+  driverId      String?
+  type          String // breakdown, accident, driver_emergency, passenger_emergency, route_blockage, overspeed, unauthorized_stop, delay
+  severity      String    @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  description   String
+  location      String?
+  coordinates   Json? // {latitude, longitude}
+  status        String    @default("OPEN") // OPEN, INVESTIGATING, RESOLVED, CLOSED
+  resolution    String?
+  reportedById  String
+  resolvedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  trip     Trip?   @relation(fields: [tripId], references: [id])
+  bus      Bus?    @relation(fields: [busId], references: [id])
+  driver   Driver? @relation(fields: [driverId], references: [id])
+  reporter User    @relation(fields: [reportedById], references: [id])
+
+  @@index([tripId])
+  @@index([busId])
+  @@index([driverId])
+  @@index([status])
+  @@index([severity])
+  @@index([type])
+  @@index([createdAt])
+  @@map("incidents")
+}
+
+// =====================================================
+// AUDIT & LOGS
+// =====================================================
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  changes   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+// =====================================================
+// BUSINESS LOGIC MODELS
+// =====================================================
+
+model SeatHold {
+  id             String   @id @default(uuid())
+  tripId         String   @map("trip_id")
+  seatNumber     String   @map("seat_number")
+  heldBySession  String   @map("held_by_session")
+  expiresAt      DateTime @map("expires_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, seatNumber])
+  @@index([expiresAt])
+  @@index([tripId])
+  @@map("seat_holds")
+}
+
+model PaymentTransaction {
+  id              String   @id @default(uuid())
+  bookingId       String   @map("booking_id")
+  amount          Decimal  @db.Decimal(10, 2)
+  paymentMethod   String   @map("payment_method")
+  status          String
+  transactionDate DateTime @default(now()) @map("transaction_date")
+  reference       String?
+  gatewayResponse Json?    @map("gateway_response")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([status])
+  @@index([transactionDate])
+  @@map("payment_transactions")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  type      String
+  title     String
+  message   String
+  data      Json?
+  read      Boolean  @default(false)
+  sentAt    DateTime? @map("sent_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read, createdAt])
+  @@map("notifications")
+}
+
+// =====================================================
+// HR MODULE
+// =====================================================
+
+model DriverShift {
+  id               String    @id @default(uuid())
+  driverId         String    @map("driver_id")
+  shiftType        String    @map("shift_type")
+  startTime        DateTime  @map("start_time")
+  endTime          DateTime  @map("end_time")
+  actualStartTime  DateTime? @map("actual_start_time")
+  actualEndTime    DateTime? @map("actual_end_time")
+  busId            String?   @map("bus_id")
+  routeId          String?   @map("route_id")
+  status           String    @default("SCHEDULED")
+  checkInLocation  String?   @map("check_in_location")
+  checkOutLocation String?   @map("check_out_location")
+  hoursWorked      Decimal?  @map("hours_worked") @db.Decimal(5, 2)
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  driver Driver? @relation(fields: [driverId], references: [id])
+  bus    Bus?    @relation(fields: [busId], references: [id])
+  route  Route?  @relation(fields: [routeId], references: [id])
+
+  @@index([driverId])
+  @@index([startTime])
+  @@map("driver_shifts")
+}
+
+model DriverDocument {
+  id             String    @id @default(uuid())
+  driverId       String    @map("driver_id")
+  documentType   String    @map("document_type")
+  documentNumber String    @map("document_number")
+  issueDate      DateTime  @map("issue_date")
+  expiryDate     DateTime  @map("expiry_date")
+  fileUrl        String    @map("file_url")
+  status         String    @default("ACTIVE")
+  verifiedBy     String?   @map("verified_by")
+  verifiedAt     DateTime? @map("verified_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  driver   Driver @relation(fields: [driverId], references: [id])
+  verifier User?  @relation("DocumentVerifier", fields: [verifiedBy], references: [id])
+
+  @@index([driverId])
+  @@index([expiryDate])
+  @@map("driver_documents")
+}
+
+model Attendance {
+  id         String   @id @default(uuid())
+  employeeId String   @map("employee_id")
+  date       DateTime @db.Date
+  status     String
+  notes      String?
+  recordedAt DateTime @default(now()) @map("recorded_at")
+
+  employee User @relation("EmployeeAttendance", fields: [employeeId], references: [id])
+
+  @@unique([employeeId, date])
+  @@index([employeeId, date])
+  @@map("attendance")
+}
+
+// =====================================================
+// MAINTENANCE MODULE
+// =====================================================
+
+model BreakdownReport {
+  id              String    @id @default(uuid())
+  busId           String    @map("bus_id")
+  driverId        String    @map("driver_id")
+  tripId          String?   @map("trip_id")
+  location        String
+  description     String
+  severity        String
+  photos          Json?
+  reportedAt      DateTime  @default(now()) @map("reported_at")
+  status          String    @default("REPORTED")
+  resolvedAt      DateTime? @map("resolved_at")
+  resolutionNotes String?   @map("resolution_notes")
+
+  bus    Bus     @relation(fields: [busId], references: [id])
+  driver Driver  @relation(fields: [driverId], references: [id])
+  trip   Trip?   @relation(fields: [tripId], references: [id])
+
+  @@index([busId])
+  @@index([status])
+  @@map("breakdown_reports")
+}
+
+model PreventiveMaintenance {
+  id                String    @id @default(uuid())
+  busId             String    @map("bus_id")
+  maintenanceType   String    @map("maintenance_type")
+  scheduledDate     DateTime  @map("scheduled_date") @db.Date
+  completedDate     DateTime? @map("completed_date") @db.Date
+  estimatedDuration Int?      @map("estimated_duration")
+  actualDuration    Int?      @map("actual_duration")
+  description       String?
+  cost              Decimal?  @db.Decimal(10, 2)
+  status            String    @default("SCHEDULED")
+  completedBy       String?   @map("completed_by")
+  notes             String?
+  partsUsed         Json?     @map("parts_used")
+  nextDueDate       DateTime? @map("next_due_date") @db.Date
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  bus       Bus   @relation(fields: [busId], references: [id])
+  performer User? @relation("MaintenancePerformer", fields: [completedBy], references: [id])
+
+  @@index([busId])
+  @@index([nextDueDate])
+  @@map("preventive_maintenance")
+}
+
+model ServiceHistory {
+  id          String   @id @default(uuid())
+  busId       String   @map("bus_id")
+  serviceType String   @map("service_type")
+  serviceDate DateTime @map("service_date") @db.Date
+  description String?
+  cost        Decimal? @db.Decimal(10, 2)
+  performedBy String?  @map("performed_by")
+  partsUsed   Json?    @map("parts_used")
+  mileage     Int?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  bus       Bus   @relation(fields: [busId], references: [id])
+  performer User? @relation("ServicePerformer", fields: [performedBy], references: [id])
+
+  @@index([busId])
+  @@index([serviceDate])
+  @@map("service_history")
+}
+
+model Part {
+  id            String   @id @default(uuid())
+  partNumber    String   @unique @map("part_number")
+  partName      String   @map("part_name")
+  category      String
+  quantity      Int      @default(0)
+  unitPrice     Decimal  @map("unit_price") @db.Decimal(10, 2)
+  supplier      String?
+  minStockLevel Int      @default(10) @map("min_stock_level")
+  status        String   @default("IN_STOCK")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  usage  PartUsage[]
+  orders PartOrder[]
+
+  @@index([category])
+  @@index([quantity])
+  @@map("parts")
+}
+
+model PartUsage {
+  id      String   @id @default(uuid())
+  partId  String   @map("part_id")
+  quantity Int
+  usedFor String   @map("used_for")
+  usedAt  DateTime @default(now()) @map("used_at")
+
+  part Part @relation(fields: [partId], references: [id])
+
+  @@index([partId])
+  @@map("part_usage")
+}
+
+model PartOrder {
+  id               String    @id @default(uuid())
+  partId           String    @map("part_id")
+  quantity         Int
+  unitPrice        Decimal   @map("unit_price") @db.Decimal(10, 2)
+  totalCost        Decimal   @map("total_cost") @db.Decimal(10, 2)
+  supplier         String?
+  orderDate        DateTime  @map("order_date") @db.Date
+  receivedDate     DateTime? @map("received_date") @db.Date
+  receivedQuantity Int?      @map("received_quantity")
+  status           String    @default("ORDERED")
+
+  part Part @relation(fields: [partId], references: [id])
+
+  @@index([status])
+  @@map("part_orders")
+}
+
+// =====================================================
+// TRACKING MODULE
+// =====================================================
+
+model LiveLocation {
+  id        String   @id @default(uuid())
+  tripId    String   @map("trip_id")
+  driverId  String   @map("driver_id")
+  busId     String   @map("bus_id")
+  latitude  Decimal  @db.Decimal(10, 8)
+  longitude Decimal  @db.Decimal(11, 8)
+  speed     Decimal? @db.Decimal(5, 2)
+  heading   Decimal? @db.Decimal(5, 2)
+  accuracy  Decimal? @db.Decimal(5, 2)
+  timestamp DateTime @default(now())
+
+  trip   Trip   @relation(fields: [tripId], references: [id])
+  driver Driver @relation(fields: [driverId], references: [id])
+  bus    Bus    @relation(fields: [busId], references: [id])
+
+  @@index([tripId, timestamp])
+  @@index([busId, timestamp])
+  @@map("live_locations")
+}
+
+model DriverLocation {
+  driverId    String   @id @map("driver_id")
+  latitude    Decimal  @db.Decimal(10, 8)
+  longitude   Decimal  @db.Decimal(11, 8)
+  lastUpdated DateTime @default(now()) @map("last_updated")
+
+  driver Driver @relation(fields: [driverId], references: [id])
+
+  @@map("driver_locations")
+}
+
+model SpeedingIncident {
+  id         String   @id @default(uuid())
+  tripId     String   @map("trip_id")
+  driverId   String   @map("driver_id")
+  speed      Decimal  @db.Decimal(5, 2)
+  speedLimit Decimal  @map("speed_limit") @db.Decimal(5, 2)
+  timestamp  DateTime @default(now())
+
+  trip   Trip   @relation(fields: [tripId], references: [id])
+  driver Driver @relation(fields: [driverId], references: [id])
+
+  @@index([driverId])
+  @@map("speeding_incidents")
+}
+
+// =====================================================
+// FINANCE MODULE
+// =====================================================
+
+model Reconciliation {
+  id               String   @id @default(uuid())
+  date             DateTime @unique @db.Date
+  totalRevenue     Decimal  @map("total_revenue") @db.Decimal(12, 2)
+  totalRefunds     Decimal  @map("total_refunds") @db.Decimal(12, 2)
+  totalExpenses    Decimal  @map("total_expenses") @db.Decimal(12, 2)
+  netRevenue       Decimal  @map("net_revenue") @db.Decimal(12, 2)
+  byPaymentMethod  Json?    @map("by_payment_method")
+  transactionCount Int?     @map("transaction_count")
+  expenseCount     Int?     @map("expense_count")
+  status           String   @default("PENDING")
+  reconciledAt     DateTime? @map("reconciled_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@index([date])
+  @@map("reconciliations")
+}
+
+model Collection {
+  id             String    @id @default(uuid())
+  collectedBy    String    @map("collected_by")
+  amount         Decimal   @db.Decimal(10, 2)
+  originalAmount Decimal?  @map("original_amount") @db.Decimal(10, 2)
+  currency       String    @default("BWP")
+  paymentMethod  String    @map("payment_method")
+  tripId         String?   @map("trip_id")
+  notes          String?
+  collectedAt    DateTime  @default(now()) @map("collected_at")
+  depositedBy    String?   @map("deposited_by")
+  depositedAt    DateTime? @map("deposited_at")
+  bankAccount    String?   @map("bank_account")
+  status         String    @default("COLLECTED")
+
+  collector User  @relation("Collector", fields: [collectedBy], references: [id])
+  depositor User? @relation("Depositor", fields: [depositedBy], references: [id])
+  trip      Trip? @relation(fields: [tripId], references: [id])
+
+  @@index([collectedBy])
+  @@index([collectedAt])
+  @@map("collections")
+}
+
+model CommissionPayment {
+  id         String   @id @default(uuid())
+  employeeId String   @map("employee_id")
+  period     Json
+  amount     Decimal  @db.Decimal(10, 2)
+  paidAt     DateTime @default(now()) @map("paid_at")
+  status     String   @default("PAID")
+
+  employee User @relation("CommissionEmployee", fields: [employeeId], references: [id])
+
+  @@index([employeeId])
+  @@map("commission_payments")
+}
+
+model ExchangeRate {
+  id        String   @id @default(uuid())
+  rates     Json
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@map("exchange_rates")
+}
+
+// =====================================================
+// QUEUES
+// =====================================================
+
+model EmailQueue {
+  id        String    @id @default(uuid())
+  toEmail   String    @map("to_email")
+  subject   String
+  body      String
+  status    String    @default("PENDING")
+  attempts  Int       @default(0)
+  sentAt    DateTime? @map("sent_at")
+  error     String?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([status])
+  @@map("email_queue")
+}
+
+model SmsQueue {
+  id        String    @id @default(uuid())
+  phone     String
+  message   String
+  status    String    @default("PENDING")
+  attempts  Int       @default(0)
+  sentAt    DateTime? @map("sent_at")
+  error     String?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([status])
+  @@map("sms_queue")
+}
+
+model Manifest {
+  id          String   @id @default(uuid())
+  tripId      String   @unique @map("trip_id")
+  data        Json
+  generatedAt DateTime @map("generated_at")
+  generatedBy String   @map("generated_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [generatedBy], references: [id])
+
+  @@map("manifests")
+}

@@ -1,0 +1,9 @@
+// Export all operations pages for easier importing
+export { default as OperationsDashboard } from './OperationsDashboard';
+export { default as TripManagement } from './TripManagement';
+export { default as FleetOperations } from './FleetOperations';
+export { default as DriverOperations } from './DriverOperations';
+export { default as IncidentManagement } from './IncidentManagement';
+export { default as DelayManagement } from './DelayManagement';
+export { default as OperationsReports } from './OperationsReports';
+export { default as TerminalOperations } from './TerminalOperations';

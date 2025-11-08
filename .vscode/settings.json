@@ -1,0 +1,22 @@
+{
+  "typescript.tsdk": "frontend/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "eslint.workingDirectories": ["frontend", "backend"],
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/frontend/node_modules": true,
+    "**/backend/node_modules": true,
+    "**/mobile/driver/node_modules": true,
+    "**/mobile/passenger/node_modules": true
+  },
+  "cSpell.words": [
+    "dvllpqinpoxoscpgigmw",
+    "eticket",
+    "favourite",
+    "Khandala",
+    "ozow",
+    "payfast",
+    "VITE",
+    "XVCJ"
+  ]
+}
