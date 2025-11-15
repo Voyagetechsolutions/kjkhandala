@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Bell, Mail, MessageSquare, Smartphone, Save, Volume2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface NotificationPreferences {
   email: {
@@ -72,16 +73,17 @@ const NotificationSettings = () => {
 
   const fetchPreferences = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/users/notification-preferences', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.data) {
-          setPreferences(data.data);
-        }
-      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('notification_preferences')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) throw error;
+      setPreferences(data);
     } catch (error) {
       console.error('Failed to fetch preferences:', error);
     } finally {
@@ -93,21 +95,21 @@ const NotificationSettings = () => {
     setSaving(true);
     setMessage(null);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/users/notification-preferences', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(preferences)
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (response.ok) {
-        setMessage({ type: 'success', text: 'Notification preferences saved successfully!' });
-      } else {
-        setMessage({ type: 'error', text: 'Failed to save preferences' });
-      }
+      const { error } = await supabase
+        .from('notification_preferences')
+        .upsert({
+          user_id: user.id,
+          email: preferences.email,
+          sms: preferences.sms,
+          inApp: preferences.inApp,
+          push: preferences.push
+        });
+
+      if (error) throw error;
+      setMessage({ type: 'success', text: 'Notification preferences saved successfully!' });
     } catch (error) {
       setMessage({ type: 'error', text: 'An error occurred' });
     } finally {

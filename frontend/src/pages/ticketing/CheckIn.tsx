@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import TicketingLayout from '@/components/ticketing/TicketingLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +14,9 @@ import { toast } from 'sonner';
 import { CheckCircle2, XCircle, Search, User, Briefcase, CreditCard, AlertCircle } from 'lucide-react';
 
 export default function CheckIn() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : TicketingLayout;
   const queryClient = useQueryClient();
   const [ticketNumber, setTicketNumber] = useState('');
   const [checkInResult, setCheckInResult] = useState<any>(null);
@@ -19,11 +24,19 @@ export default function CheckIn() {
 
   const checkInMutation = useMutation({
     mutationFn: async (ticketNum: string) => {
-      const response = await api.post('/ticketing/check-in', { ticketNumber: ticketNum });
-      return response.data;
+      const { error } = await supabase
+        .from('bookings')
+        .update({ check_in_status: 'CHECKED_IN', checked_in_at: new Date().toISOString() })
+        .eq('booking_reference', ticketNum);
+      if (error) throw error;
+      const response = await supabase
+        .from('bookings')
+        .select('*, passenger(*)')
+        .eq('booking_reference', ticketNum);
+      return response.data[0];
     },
     onSuccess: (data) => {
-      setCheckInResult(data.booking);
+      setCheckInResult(data);
       setError('');
       queryClient.invalidateQueries({ queryKey: ['ticketing-dashboard'] });
       toast.success('Passenger checked in successfully!');
@@ -51,7 +64,7 @@ export default function CheckIn() {
   };
 
   return (
-    <TicketingLayout>
+    <Layout>
       <div className="max-w-2xl mx-auto space-y-6">
         <div>
           <h1 className="text-3xl font-bold mb-2">Passenger Check-In</h1>
@@ -204,6 +217,6 @@ export default function CheckIn() {
           </Card>
         </div>
       </div>
-    </TicketingLayout>
+    </Layout>
   );
 }

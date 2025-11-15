@@ -1,31 +1,23 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import AdminLayout from "@/components/admin/AdminLayout";
+import LiveOperationsMap from "@/components/admin/LiveOperationsMap";
 import { Card } from "@/components/ui/card";
 import { DollarSign, Users, Bus, Ticket } from "lucide-react";
 
 export default function AdminDashboard() {
   const { user, isAdmin, loading } = useAuth();
   const navigate = useNavigate();
+  
+  // All hooks before conditional returns
   const [stats, setStats] = useState({
     totalBookings: 0,
     totalRevenue: 0,
     totalBuses: 0,
     totalRoutes: 0,
   });
-
-  useEffect(() => {
-    if (!loading && (!user || !isAdmin)) {
-      navigate("/");
-      return;
-    }
-    
-    if (isAdmin) {
-      fetchStats();
-    }
-  }, [user, isAdmin, loading]);
 
   const fetchStats = async () => {
     try {
@@ -48,6 +40,18 @@ export default function AdminDashboard() {
     }
   };
 
+  useEffect(() => {
+    if (!loading && (!user || !isAdmin)) {
+      navigate("/");
+      return;
+    }
+    
+    if (isAdmin) {
+      fetchStats();
+    }
+  }, [user, isAdmin, loading]);
+
+  // Conditional returns after all hooks
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
@@ -103,6 +107,9 @@ export default function AdminDashboard() {
             </div>
           </Card>
         </div>
+
+        {/* Live Operations Map */}
+        <LiveOperationsMap />
       </div>
     </AdminLayout>
   );

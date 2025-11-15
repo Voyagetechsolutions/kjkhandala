@@ -1,8 +1,7 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
-import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import FinanceLayout from '@/components/finance/FinanceLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -18,43 +17,82 @@ import {
 import { Badge } from '@/components/ui/badge';
 
 export default function FinanceDashboard() {
-  const { user, userRoles, loading } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!loading && (!user || !userRoles?.includes('FINANCE_MANAGER'))) {
-      navigate('/');
-      return;
-    }
-  }, [user, userRoles, loading, navigate]);
-
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  }
-
-  if (!userRoles?.includes('FINANCE_MANAGER')) return null;
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : FinanceLayout;
 
   const { data: income = [] } = useQuery({
     queryKey: ['finance-income'],
     queryFn: async () => {
-      const response = await api.get('/finance/income');
-      return Array.isArray(response.data) ? response.data : (response.data?.income || []);
+      const { data, error } = await supabase
+        .from('income_records')
+        .select('*')
+        .eq('status', 'confirmed')
+        .order('date', { ascending: false });
+      if (error) throw error;
+      return data || [];
     },
   });
 
   const { data: expenses = [] } = useQuery({
     queryKey: ['finance-expenses'],
     queryFn: async () => {
-      const response = await api.get('/finance/expenses');
-      return Array.isArray(response.data) ? response.data : (response.data?.expenses || []);
+      const { data, error } = await supabase
+        .from('expense_records')
+        .select('*')
+        .in('status', ['approved', 'paid'])
+        .order('date', { ascending: false });
+      if (error) throw error;
+      return data || [];
     },
   });
 
   const { data: invoices = [] } = useQuery({
     queryKey: ['finance-invoices'],
     queryFn: async () => {
-      const response = await api.get('/finance/invoices');
-      return Array.isArray(response.data) ? response.data : (response.data?.invoices || []);
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('*')
+        .order('date', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: refunds = [] } = useQuery({
+    queryKey: ['finance-refunds'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('refund_requests')
+        .select('*')
+        .eq('status', 'pending');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: fuelLogs = [] } = useQuery({
+    queryKey: ['finance-fuel'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fuel_logs')
+        .select('*')
+        .eq('status', 'approved')
+        .gte('date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: payrollData = [] } = useQuery({
+    queryKey: ['finance-payroll'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('payroll')
+        .select('*')
+        .gte('pay_period_start', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
+      if (error) throw error;
+      return data || [];
     },
   });
 
@@ -62,13 +100,17 @@ export default function FinanceDashboard() {
   const thisMonth = new Date().toISOString().slice(0, 7);
   const thisYear = new Date().getFullYear().toString();
 
-  const todayRevenue = income.filter((i: any) => i.date?.startsWith(today)).reduce((sum: number, i: any) => sum + parseFloat(i.amount || 0), 0);
+  const todayRevenue = income.filter((i: any) => i.date === today).reduce((sum: number, i: any) => sum + parseFloat(i.amount || 0), 0);
   const monthRevenue = income.filter((i: any) => i.date?.startsWith(thisMonth)).reduce((sum: number, i: any) => sum + parseFloat(i.amount || 0), 0);
   const yearRevenue = income.filter((i: any) => i.date?.startsWith(thisYear)).reduce((sum: number, i: any) => sum + parseFloat(i.amount || 0), 0);
 
-  const todayExpenses = expenses.filter((e: any) => e.date?.startsWith(today)).reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0);
+  const todayExpenses = expenses.filter((e: any) => e.date === today).reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0);
   const monthExpenses = expenses.filter((e: any) => e.date?.startsWith(thisMonth)).reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0);
   const yearExpenses = expenses.filter((e: any) => e.date?.startsWith(thisYear)).reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0);
+
+  const ticketSales = income.filter((i: any) => i.source === 'ticket_sales' && i.date?.startsWith(thisMonth)).reduce((sum: number, i: any) => sum + parseFloat(i.amount || 0), 0);
+  const fuelCost = fuelLogs.reduce((sum: number, f: any) => sum + parseFloat(f.total_cost || 0), 0);
+  const payrollCost = payrollData.reduce((sum: number, p: any) => sum + parseFloat(p.net_salary || 0), 0);
 
   const profitLoss = monthRevenue - monthExpenses;
   const profitMargin = monthRevenue > 0 ? ((profitLoss / monthRevenue) * 100).toFixed(1) : 0;
@@ -85,22 +127,26 @@ export default function FinanceDashboard() {
   };
 
   const overdueInvoices = invoices.filter((inv: any) => {
-    const dueDate = new Date(inv.dueDate);
-    return dueDate < new Date() && inv.status === 'pending';
+    const dueDate = new Date(inv.due_date);
+    return dueDate < new Date() && inv.status !== 'paid';
   });
+
+  const pendingRefunds = refunds.length;
+  const totalRefundAmount = refunds.reduce((sum: number, r: any) => sum + parseFloat(r.refunded_amount || 0), 0);
 
   const alerts = [
     overdueInvoices.length > 0 && { id: 1, type: 'warning', message: `${overdueInvoices.length} overdue invoices`, priority: 'high' },
+    pendingRefunds > 0 && { id: 2, type: 'info', message: `${pendingRefunds} pending refund requests`, priority: 'medium' },
   ].filter(Boolean);
 
   const routeRevenue = income.reduce((acc: any[], inc: any) => {
-    if (inc.route) {
-      const existing = acc.find(r => r.route === inc.route);
+    if (inc.route_id) {
+      const existing = acc.find(r => r.route_id === inc.route_id);
       if (existing) {
         existing.revenue += parseFloat(inc.amount || 0);
-        existing.trips += 1;
+        existing.count += 1;
       } else {
-        acc.push({ route: inc.route, revenue: parseFloat(inc.amount || 0), trips: 1 });
+        acc.push({ route_id: inc.route_id, revenue: parseFloat(inc.amount || 0), count: 1 });
       }
     }
     return acc;
@@ -109,7 +155,7 @@ export default function FinanceDashboard() {
   const topRoutes = routeRevenue.sort((a, b) => b.revenue - a.revenue).slice(0, 3);
 
   return (
-    <FinanceLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -180,7 +226,7 @@ export default function FinanceDashboard() {
               <Ticket className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">P 1.1M</div>
+              <div className="text-2xl font-bold">P {(ticketSales / 1000).toFixed(0)}K</div>
               <p className="text-xs text-muted-foreground">This month</p>
             </CardContent>
           </Card>
@@ -191,7 +237,7 @@ export default function FinanceDashboard() {
               <Fuel className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">P 285K</div>
+              <div className="text-2xl font-bold">P {(fuelCost / 1000).toFixed(0)}K</div>
               <p className="text-xs text-muted-foreground">This month</p>
             </CardContent>
           </Card>
@@ -202,7 +248,7 @@ export default function FinanceDashboard() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">P 195K</div>
+              <div className="text-2xl font-bold">P {(payrollCost / 1000).toFixed(0)}K</div>
               <p className="text-xs text-muted-foreground">This month</p>
             </CardContent>
           </Card>
@@ -225,7 +271,7 @@ export default function FinanceDashboard() {
                   <div className="flex-1">
                     <p className="text-sm">{alert.message}</p>
                   </div>
-                  <Badge className={alert.priority === 'high' ? 'bg-red-500' : 'bg-yellow-500'}>
+                  <Badge className={alert.priority === 'high' ? 'bg-red-500' : alert.priority === 'medium' ? 'bg-yellow-500' : 'bg-blue-500'}>
                     {alert.priority}
                   </Badge>
                 </div>
@@ -242,18 +288,22 @@ export default function FinanceDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {topRoutes.map((route, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <div className="font-medium">{route.route}</div>
-                    <div className="text-sm text-muted-foreground">{route.trips} trips completed</div>
+              {topRoutes.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No route data available</p>
+              ) : (
+                topRoutes.map((route, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <div className="font-medium">Route #{route.route_id?.slice(0, 8)}</div>
+                      <div className="text-sm text-muted-foreground">{route.count} transactions</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-green-600">P {route.revenue.toLocaleString()}</div>
+                      <div className="text-xs text-muted-foreground">Revenue</div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-bold text-green-600">P {route.revenue.toLocaleString()}</div>
-                    <div className="text-xs text-muted-foreground">Revenue</div>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
@@ -268,18 +318,18 @@ export default function FinanceDashboard() {
             <div className="grid md:grid-cols-2 gap-4">
               <div className="p-4 border rounded-lg">
                 <div className="text-sm text-muted-foreground">Pending Refunds</div>
-                <div className="text-2xl font-bold text-red-600">P 45,200</div>
-                <div className="text-xs text-muted-foreground">12 requests</div>
+                <div className="text-2xl font-bold text-red-600">P {totalRefundAmount.toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground">{pendingRefunds} requests</div>
               </div>
               <div className="p-4 border rounded-lg">
                 <div className="text-sm text-muted-foreground">Overdue Invoices</div>
-                <div className="text-2xl font-bold text-orange-600">P 125,000</div>
-                <div className="text-xs text-muted-foreground">5 invoices</div>
+                <div className="text-2xl font-bold text-orange-600">P {overdueInvoices.reduce((sum: number, inv: any) => sum + parseFloat(inv.balance || 0), 0).toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground">{overdueInvoices.length} invoices</div>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
-    </FinanceLayout>
+    </Layout>
   );
 }

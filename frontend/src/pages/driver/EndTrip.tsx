@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import api from '@/lib/api';
 import DriverLayout from '@/components/driver/DriverLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,18 +21,24 @@ export default function EndTrip() {
   const [isDrawing, setIsDrawing] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const { data } = useQuery({
-    queryKey: ['driver-trip'],
-    queryFn: async () => {
-      const response = await api.get('/driver/my-trip');
-      return response.data;
+  const { data } = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase
+        .from('trips')
+        .select('id')
+        .eq('status', 'in_progress');
+      if (error) throw error;
+      return data;
     },
   });
 
   const endTripMutation = useMutation({
-    mutationFn: async (tripData: any) => {
-      const response = await api.post(`/driver/end-trip/${data.trip.id}`, tripData);
-      return response.data;
+    mutationFn: async (data: any) => {
+      const { error } = await supabase
+        .from('trips')
+        .update({ status: 'completed', actual_arrival: new Date().toISOString() })
+        .eq('id', data.tripId);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success('Trip completed successfully!');

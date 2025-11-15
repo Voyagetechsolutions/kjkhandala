@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import OperationsLayout from '@/components/operations/OperationsLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,11 +27,82 @@ export default function OperationsDashboard() {
   const { data: dashboard, isLoading } = useQuery({
     queryKey: ['operations-dashboard'],
     queryFn: async () => {
-      const response = await api.get('/operations/dashboard');
-      return response.data;
+      const today = new Date();
+      const todayStart = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+      const todayEnd = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+      
+      // Fetch trips summary
+      const { data: trips, error: tripsError } = await supabase
+        .from('trips')
+        .select('id, status, scheduled_departure')
+        .gte('scheduled_departure', todayStart)
+        .lte('scheduled_departure', todayEnd);
+      
+      if (tripsError) throw tripsError;
+      
+      const tripsSummary = {
+        total: trips?.length || 0,
+        departed: trips?.filter(t => t.status === 'DEPARTED' || t.status === 'IN_PROGRESS').length || 0,
+        delayed: trips?.filter(t => t.status === 'DELAYED').length || 0,
+        cancelled: trips?.filter(t => t.status === 'CANCELLED').length || 0,
+        arrived: trips?.filter(t => t.status === 'COMPLETED').length || 0,
+      };
+      
+      // Fetch fleet status
+      const { data: buses, error: busesError } = await supabase
+        .from('buses')
+        .select('id, status');
+      
+      if (busesError) throw busesError;
+      
+      const fleetStatus = {
+        active: buses?.filter(b => b.status === 'active').length || 0,
+        inMaintenance: buses?.filter(b => b.status === 'maintenance').length || 0,
+        parked: buses?.filter(b => b.status === 'inactive' || b.status === 'parked').length || 0,
+        offRoute: 0,
+      };
+      
+      // Fetch driver status
+      const { data: drivers, error: driversError } = await supabase
+        .from('drivers')
+        .select('id, status');
+      
+      if (driversError) throw driversError;
+      
+      const driverStatus = {
+        onDuty: drivers?.filter(d => d.status === 'active').length || 0,
+        offDuty: drivers?.filter(d => d.status === 'inactive').length || 0,
+        requireReplacement: 0,
+      };
+      
+      // Fetch revenue snapshot
+      const { data: bookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('total_amount, payment_status, created_at')
+        .gte('created_at', todayStart)
+        .lte('created_at', todayEnd);
+      
+      if (bookingsError) throw bookingsError;
+      
+      const revenueSnapshot = {
+        ticketsSold: bookings?.filter(b => b.payment_status === 'paid').length || 0,
+        revenueCollected: bookings?.filter(b => b.payment_status === 'paid').reduce((sum, b) => sum + Number(b.total_amount || 0), 0) || 0,
+        unpaidReserved: bookings?.filter(b => b.payment_status !== 'paid').reduce((sum, b) => sum + Number(b.total_amount || 0), 0) || 0,
+      };
+      
+      // Generate alerts
+      const alerts: any[] = [];
+      if (tripsSummary.delayed > 0) {
+        alerts.push({ priority: 'high', message: `${tripsSummary.delayed} trip(s) are delayed` });
+      }
+      if (fleetStatus.inMaintenance > 5) {
+        alerts.push({ priority: 'medium', message: `${fleetStatus.inMaintenance} buses in maintenance` });
+      }
+      
+      return { tripsSummary, fleetStatus, driverStatus, revenueSnapshot, alerts };
     },
-    refetchInterval: 30000, // Refetch every 30 seconds
-    enabled: !loading && userRoles?.includes('OPERATIONS_MANAGER'), // Only fetch if authorized
+    refetchInterval: 30000,
+    enabled: !loading && userRoles?.includes('OPERATIONS_MANAGER'),
   });
 
   useEffect(() => {
@@ -60,7 +131,7 @@ export default function OperationsDashboard() {
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
             <Activity className="h-8 w-8 animate-spin mx-auto mb-4" />
-            <p>Loading operations data...</p>
+            <p className="text-muted-foreground">Loading dashboard...</p>
           </div>
         </div>
       </OperationsLayout>
@@ -281,22 +352,34 @@ export default function OperationsDashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <button className="p-4 border rounded-lg hover:bg-accent transition-colors text-left">
+              <button 
+                onClick={() => navigate('/operations/trips')}
+                className="p-4 border rounded-lg hover:bg-accent transition-colors text-left"
+              >
                 <Activity className="h-6 w-6 mb-2 text-blue-600" />
                 <div className="font-medium">Trip Management</div>
                 <div className="text-sm text-muted-foreground">Monitor & manage trips</div>
               </button>
-              <button className="p-4 border rounded-lg hover:bg-accent transition-colors text-left">
+              <button 
+                onClick={() => navigate('/operations/fleet')}
+                className="p-4 border rounded-lg hover:bg-accent transition-colors text-left"
+              >
                 <Bus className="h-6 w-6 mb-2 text-green-600" />
                 <div className="font-medium">Fleet Operations</div>
                 <div className="text-sm text-muted-foreground">Manage bus fleet</div>
               </button>
-              <button className="p-4 border rounded-lg hover:bg-accent transition-colors text-left">
+              <button 
+                onClick={() => navigate('/operations/drivers')}
+                className="p-4 border rounded-lg hover:bg-accent transition-colors text-left"
+              >
                 <Users className="h-6 w-6 mb-2 text-purple-600" />
                 <div className="font-medium">Driver Operations</div>
                 <div className="text-sm text-muted-foreground">Driver assignments</div>
               </button>
-              <button className="p-4 border rounded-lg hover:bg-accent transition-colors text-left">
+              <button 
+                onClick={() => navigate('/operations/incidents')}
+                className="p-4 border rounded-lg hover:bg-accent transition-colors text-left"
+              >
                 <AlertCircle className="h-6 w-6 mb-2 text-red-600" />
                 <div className="font-medium">Incidents</div>
                 <div className="text-sm text-muted-foreground">Handle incidents</div>

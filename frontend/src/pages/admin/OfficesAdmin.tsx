@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import api from "@/lib/api";
+import { supabase } from '@/lib/supabase';
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,14 +20,21 @@ export default function AdminBookingOffices() {
   const { data: offices = [] } = useQuery({
     queryKey: ['booking-offices'],
     queryFn: async () => {
-      const response = await api.get('/booking_offices');
-      return response.data.data || [];
+      const { data, error } = await supabase
+        .from('booking_offices')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      return data || [];
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      await api.post('/booking_offices', data);
+      const { error } = await supabase
+        .from('booking_offices')
+        .insert([data]);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success('Office created successfully');
@@ -38,7 +45,11 @@ export default function AdminBookingOffices() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
-      await api.put(`/booking_offices/${editing.id}`, data);
+      const { error } = await supabase
+        .from('booking_offices')
+        .update(data)
+        .eq('id', editing.id);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success('Office updated successfully');
@@ -73,7 +84,11 @@ export default function AdminBookingOffices() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/booking_offices/${id}`);
+      const { error } = await supabase
+        .from('booking_offices')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success('Office deleted successfully');

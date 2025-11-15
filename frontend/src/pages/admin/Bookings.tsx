@@ -7,7 +7,6 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Calendar, Clock, User } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
 import { toast } from 'sonner';
 
 interface Booking {
@@ -37,17 +36,27 @@ export default function AdminBookings() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data: bookings, isLoading } = useQuery({
-    queryKey: ['bookings'],
+  const { data: bookingsData, isLoading } = useQuery({
+    queryKey: ['admin-bookings'],
     queryFn: async () => {
-      const response = await api.get('/bookings');
-      return response.data.data || [];
+      const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          trip:trips(*),
+          passenger:passengers(*)
+        `)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return { bookings: data || [] };
     },
   });
 
   const checkInMutation = useMutation({
     mutationFn: async (bookingId: string) => {
-      await api.post(`/bookings/${bookingId}/checkin`);
+      await supabase
+        .from('bookings')
+        .update({ id: bookingId, status: 'checked_in' });
     },
     onSuccess: () => {
       toast.success('Passenger checked in successfully');

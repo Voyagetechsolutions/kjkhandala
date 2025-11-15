@@ -1,25 +1,37 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/components/admin/AdminLayout';
+import OperationsLayout from '@/components/operations/OperationsLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText, Download, TrendingUp, DollarSign, Users, Bus, Calendar } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 
 export default function ReportsAnalytics() {
+  const location = useLocation();
+  const isOperationsRoute = location.pathname.startsWith('/operations');
+  const Layout = isOperationsRoute ? OperationsLayout : AdminLayout;
+
   const [reportType, setReportType] = useState('financial');
-  const [dateRange, setDateRange] = useState('month');
+  const [dateRangeType, setDateRangeType] = useState('month');
+  const [dateRange, setDateRange] = useState({ from: new Date().toISOString().split('T')[0], to: new Date().toISOString().split('T')[0] });
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   // Fetch daily sales
-  const { data: salesData } = useQuery({
+  const { data: dailySales } = useQuery({
     queryKey: ['daily-sales', selectedDate],
     queryFn: async () => {
-      const response = await api.get(`/analytics/daily-sales/${format(selectedDate, 'yyyy-MM-dd')}`);
-      return response.data.data;
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('total_amount, created_at')
+        .gte('created_at', format(selectedDate, 'yyyy-MM-dd'))
+        .lt('created_at', format(addDays(selectedDate, 1), 'yyyy-MM-dd'));
+      if (error) throw error;
+      return data || [];
     },
   });
 
@@ -27,8 +39,21 @@ export default function ReportsAnalytics() {
   const { data: financialData } = useQuery({
     queryKey: ['financial-report', dateRange],
     queryFn: async () => {
-      const response = await api.get(`/analytics/financial-report?from=${dateRange.from}&to=${dateRange.to}`);
-      return response.data.data;
+      const { data: income, error: incomeError } = await supabase
+        .from('income')
+        .select('*')
+        .gte('created_at', dateRange.from)
+        .lte('created_at', dateRange.to);
+      if (incomeError) throw incomeError;
+      
+      const { data: expenses, error: expensesError } = await supabase
+        .from('expenses')
+        .select('*')
+        .gte('created_at', dateRange.from)
+        .lte('created_at', dateRange.to);
+      if (expensesError) throw expensesError;
+      
+      return { income: income || [], expenses: expenses || [] };
     },
   });
 
@@ -36,17 +61,36 @@ export default function ReportsAnalytics() {
   const { data: tripPerformance } = useQuery({
     queryKey: ['trip-performance', dateRange],
     queryFn: async () => {
-      const response = await api.get(`/analytics/trip-performance?from=${dateRange.from}&to=${dateRange.to}`);
-      return response.data.data;
+      const { data, error } = await supabase
+        .from('trips')
+        .select('*')
+        .gte('scheduled_departure', dateRange.from)
+        .lte('scheduled_departure', dateRange.to);
+      if (error) throw error;
+      return data || [];
     },
   });
 
   // Fetch operational data
-  const { data: operationalData } = useQuery({
-    queryKey: ['operational-report'],
+  const { data: reportsData, isLoading } = useQuery({
+    queryKey: ['admin-reports'],
     queryFn: async () => {
-      const response = await api.get('/analytics/operational-report');
-      return response.data.data;
+      const { data: bookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('*');
+      if (bookingsError) throw bookingsError;
+
+      const { data: trips, error: tripsError } = await supabase
+        .from('trips')
+        .select('*');
+      if (tripsError) throw tripsError;
+
+      const { data: buses, error: busesError } = await supabase
+        .from('buses')
+        .select('*');
+      if (busesError) throw busesError;
+      
+      return { bookings: bookings || [], trips: trips || [], buses: buses || [] };
     },
   });
 
@@ -55,7 +99,7 @@ export default function ReportsAnalytics() {
     queryKey: ['hr-report'],
     queryFn: async () => {
       const { data: staff, error: staffError } = await supabase
-        .from('staff')
+        .from('profiles')
         .select('*');
       
       const { data: drivers, error: driverError } = await supabase
@@ -74,14 +118,15 @@ export default function ReportsAnalytics() {
   });
 
   // Calculate financial metrics
-  const totalRevenue = financialData?.revenue?.reduce((sum, r) => sum + parseFloat(r.total_amount), 0) || 0;
+  const totalRevenue = financialData?.income?.reduce((sum: number, r: any) => sum + parseFloat(r.amount), 0) || 0;
   const totalExpenses = financialData?.expenses?.reduce((sum, e) => sum + parseFloat(e.amount), 0) || 0;
   const netProfit = totalRevenue - totalExpenses;
   const profitMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : '0';
 
   // Calculate operational metrics
-  const totalTrips = operationalData?.schedules?.length || 0;
-  const completedTrips = operationalData?.schedules?.filter(s => s.status === 'completed').length || 0;
+  const operationalData = reportsData || { schedules: [] };
+  const totalTrips = tripPerformance?.length || 0;
+  const completedTrips = tripPerformance?.filter((t: any) => t.status === 'COMPLETED').length || 0;
   const onTimeRate = totalTrips > 0 ? ((completedTrips / totalTrips) * 100).toFixed(1) : '0';
 
   // Calculate HR metrics
@@ -98,7 +143,7 @@ export default function ReportsAnalytics() {
   };
 
   return (
-    <AdminLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
@@ -194,7 +239,7 @@ export default function ReportsAnalytics() {
                     <DollarSign className="h-5 w-5" />
                     Financial Performance Report
                   </CardTitle>
-                  <Select value={dateRange} onValueChange={setDateRange}>
+                  <Select value={dateRangeType} onValueChange={setDateRangeType}>
                     <SelectTrigger className="w-[180px]">
                       <SelectValue />
                     </SelectTrigger>
@@ -285,10 +330,10 @@ export default function ReportsAnalytics() {
                   <div>
                     <h3 className="font-semibold mb-3">Fleet Utilization</h3>
                     <p className="text-sm text-muted-foreground">
-                      Total Buses: {operationalData?.buses?.length || 0}
+                      Total Buses: {(operationalData && 'buses' in operationalData) ? operationalData.buses?.length || 0 : 0}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Active: {operationalData?.buses?.filter(b => b.status === 'active').length || 0}
+                      Active: {(operationalData && 'buses' in operationalData) ? operationalData.buses?.filter((b: any) => b.status === 'active').length || 0 : 0}
                     </p>
                   </div>
                 </div>
@@ -413,6 +458,6 @@ export default function ReportsAnalytics() {
           </TabsContent>
         </Tabs>
       </div>
-    </AdminLayout>
+    </Layout>
   );
 }

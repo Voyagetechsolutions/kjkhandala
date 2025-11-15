@@ -1,7 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
+const { supabase, pool } = require('../config/supabase');
 const axios = require('axios');
 const crypto = require('crypto');
-const prisma = new PrismaClient();
 
 class PaymentEngine {
   constructor() {

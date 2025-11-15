@@ -1,9 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
 const { auth, authorize } = require('../middleware/auth');
-
-const prisma = new PrismaClient();
+const { supabase } = require('../config/supabase');
 
 // Apply auth middleware to all routes
 router.use(auth);
@@ -24,101 +22,85 @@ router.get('/dashboard', authorize(['OPERATIONS_MANAGER', 'SUPER_ADMIN']), async
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Get today's trips summary
-    const trips = await prisma.trip.findMany({
-      where: {
-        departureTime: {
-          gte: today,
-          lt: tomorrow,
-        },
-      },
-      include: {
-        route: true,
-        bus: true,
-        driver: true,
-      },
-    });
+    // Get today's trips summary via Supabase
+    const { data: trips, error: tripsErr } = await supabase
+      .from('trips')
+      .select('id, status, bus_id, driver_id, departure_time')
+      .gte('departure_time', today.toISOString())
+      .lt('departure_time', tomorrow.toISOString());
+    if (tripsErr) throw tripsErr;
 
     const tripsSummary = {
-      total: trips.length,
-      departed: trips.filter(t => t.status === 'IN_PROGRESS' || t.status === 'COMPLETED').length,
-      delayed: trips.filter(t => t.status === 'DELAYED').length,
-      cancelled: trips.filter(t => t.status === 'CANCELLED').length,
-      arrived: trips.filter(t => t.status === 'COMPLETED').length,
+      total: trips?.length || 0,
+      departed: (trips || []).filter(t => t.status === 'IN_PROGRESS' || t.status === 'COMPLETED').length,
+      delayed: (trips || []).filter(t => t.status === 'DELAYED').length,
+      cancelled: (trips || []).filter(t => t.status === 'CANCELLED').length,
+      arrived: (trips || []).filter(t => t.status === 'COMPLETED').length,
     };
 
     // Get fleet status
-    const buses = await prisma.bus.findMany({
-      include: {
-        trips: {
-          where: {
-            departureTime: {
-              gte: today,
-              lt: tomorrow,
-            },
-            status: 'IN_PROGRESS',
-          },
-        },
-      },
+    const { data: buses, error: busesErr } = await supabase
+      .from('buses')
+      .select('id, status');
+    if (busesErr) throw busesErr;
+    const tripsByBus = new Map();
+    (trips || []).forEach(t => {
+      if (!tripsByBus.has(t.bus_id)) tripsByBus.set(t.bus_id, []);
+      tripsByBus.get(t.bus_id).push(t);
     });
 
     const fleetStatus = {
-      active: buses.filter(b => b.status === 'ACTIVE' && b.trips.length > 0).length,
-      inMaintenance: buses.filter(b => b.status === 'MAINTENANCE').length,
-      parked: buses.filter(b => b.status === 'ACTIVE' && b.trips.length === 0).length,
+      active: (buses || []).filter(b => b.status === 'ACTIVE' && (tripsByBus.get(b.id)?.length || 0) > 0).length,
+      inMaintenance: (buses || []).filter(b => b.status === 'MAINTENANCE').length,
+      parked: (buses || []).filter(b => b.status === 'ACTIVE' && !(tripsByBus.get(b.id)?.length)).length,
       offRoute: 0, // TODO: Implement GPS tracking
     };
 
     // Get driver status
-    const drivers = await prisma.driver.findMany({
-      include: {
-        trips: {
-          where: {
-            departureTime: {
-              gte: today,
-              lt: tomorrow,
-            },
-            status: 'IN_PROGRESS',
-          },
-        },
-      },
+    const { data: drivers, error: driversErr } = await supabase
+      .from('drivers')
+      .select('id, license_expiry');
+    if (driversErr) throw driversErr;
+    const tripsByDriver = new Map();
+    (trips || []).forEach(t => {
+      if (!tripsByDriver.has(t.driver_id)) tripsByDriver.set(t.driver_id, []);
+      tripsByDriver.get(t.driver_id).push(t);
     });
 
     const driverStatus = {
-      onDuty: drivers.filter(d => d.trips.length > 0).length,
-      offDuty: drivers.filter(d => d.trips.length === 0).length,
-      requireReplacement: drivers.filter(d => {
-        const licenseExpiry = new Date(d.licenseExpiry);
+      onDuty: (drivers || []).filter(d => (tripsByDriver.get(d.id)?.length || 0) > 0).length,
+      offDuty: (drivers || []).filter(d => !(tripsByDriver.get(d.id)?.length)).length,
+      requireReplacement: (drivers || []).filter(d => {
+        if (!d.license_expiry) return false;
+        const licenseExpiry = new Date(d.license_expiry);
         const daysUntilExpiry = Math.ceil((licenseExpiry - today) / (1000 * 60 * 60 * 24));
         return daysUntilExpiry < 30;
       }).length,
     };
 
     // Get revenue snapshot
-    const bookings = await prisma.booking.findMany({
-      where: {
-        bookingDate: {
-          gte: today,
-          lt: tomorrow,
-        },
-      },
-    });
+    const { data: bookings, error: bookingsErr } = await supabase
+      .from('bookings')
+      .select('id, total_amount, payment_status, booking_date')
+      .gte('booking_date', today.toISOString())
+      .lt('booking_date', tomorrow.toISOString());
+    if (bookingsErr) throw bookingsErr;
 
     const revenueSnapshot = {
-      ticketsSold: bookings.length,
-      revenueCollected: bookings
-        .filter(b => b.paymentStatus === 'PAID')
-        .reduce((sum, b) => sum + parseFloat(b.totalAmount), 0),
-      unpaidReserved: bookings
-        .filter(b => b.paymentStatus === 'PENDING')
-        .reduce((sum, b) => sum + parseFloat(b.totalAmount), 0),
+      ticketsSold: bookings?.length || 0,
+      revenueCollected: (bookings || [])
+        .filter(b => b.payment_status === 'COMPLETED')
+        .reduce((sum, b) => sum + parseFloat(b.total_amount || 0), 0),
+      unpaidReserved: (bookings || [])
+        .filter(b => b.payment_status === 'PENDING')
+        .reduce((sum, b) => sum + parseFloat(b.total_amount || 0), 0),
     };
 
     // Get alerts (simplified)
     const alerts = [];
     
     // Check for delayed trips
-    const delayedTrips = trips.filter(t => t.status === 'DELAYED');
+    const delayedTrips = (trips || []).filter(t => t.status === 'DELAYED');
     if (delayedTrips.length > 0) {
       alerts.push({
         type: 'warning',

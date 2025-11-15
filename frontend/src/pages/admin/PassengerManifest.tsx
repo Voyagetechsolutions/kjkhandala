@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,16 +30,22 @@ export default function PassengerManifest() {
   const { data: trips, isLoading } = useQuery({
     queryKey: ['manifest-trips', filterStatus],
     queryFn: async () => {
-      const params = filterStatus !== 'all' ? `?status=${filterStatus}` : '';
-      const response = await api.get(`/trips${params}`);
-      return response.data.data || [];
+      const { data, error } = await supabase
+        .from('trips')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
     },
   });
 
   // Generate manifest mutation
   const generateManifestMutation = useMutation({
     mutationFn: async (tripId: string) => {
-      await api.post(`/manifests/${tripId}/generate`);
+      const { error } = await supabase
+        .from('manifests')
+        .insert({ trip_id: tripId });
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success('Manifest generated successfully');
@@ -54,12 +60,16 @@ export default function PassengerManifest() {
   };
 
   // Fetch manifest for selected trip
-  const { data: manifest } = useQuery({
-    queryKey: ['manifest', selectedTrip],
+  const { data: manifestData, isLoading: isManifestLoading } = useQuery({
+    queryKey: ['admin-manifest', selectedTrip],
     queryFn: async () => {
       if (!selectedTrip) return null;
-      const response = await api.get(`/manifests/${selectedTrip}`);
-      return response.data.data;
+      const { data, error } = await supabase
+        .from('manifests')
+        .select('*')
+        .eq('trip_id', selectedTrip);
+      if (error) throw error;
+      return data || [];
     },
     enabled: !!selectedTrip,
   });

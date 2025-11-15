@@ -1,7 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
+const { supabase } = require('../config/supabase');
 const nodemailer = require('nodemailer');
 const twilio = require('twilio');
-const prisma = new PrismaClient();
 
 class QueueProcessor {
   constructor() {
@@ -28,13 +27,14 @@ class QueueProcessor {
    */
   async processEmailQueue() {
     try {
-      const pendingEmails = await prisma.emailQueue.findMany({
-        where: {
-          status: 'PENDING',
-          attempts: { lt: 3 }
-        },
-        take: 10
-      });
+      const { data: pendingEmails, error } = await supabase
+        .from('email_queue')
+        .select('*')
+        .eq('status', 'PENDING')
+        .lt('attempts', 3)
+        .limit(10);
+      
+      if (error) throw error;
 
       for (const email of pendingEmails) {
         try {
@@ -45,24 +45,24 @@ class QueueProcessor {
             html: email.body
           });
 
-          await prisma.emailQueue.update({
-            where: { id: email.id },
-            data: {
+          await supabase
+            .from('email_queue')
+            .update({
               status: 'SENT',
-              sentAt: new Date()
-            }
-          });
+              sent_at: new Date().toISOString()
+            })
+            .eq('id', email.id);
 
           console.log(`✅ Email sent to ${email.toEmail}`);
         } catch (error) {
-          await prisma.emailQueue.update({
-            where: { id: email.id },
-            data: {
+          await supabase
+            .from('email_queue')
+            .update({
               attempts: email.attempts + 1,
               error: error.message,
               status: email.attempts >= 2 ? 'FAILED' : 'PENDING'
-            }
-          });
+            })
+            .eq('id', email.id);
 
           console.error(`❌ Email failed for ${email.toEmail}:`, error.message);
         }
@@ -80,13 +80,14 @@ class QueueProcessor {
    */
   async processSmsQueue() {
     try {
-      const pendingSms = await prisma.smsQueue.findMany({
-        where: {
-          status: 'PENDING',
-          attempts: { lt: 3 }
-        },
-        take: 10
-      });
+      const { data: pendingSms, error } = await supabase
+        .from('sms_queue')
+        .select('*')
+        .eq('status', 'PENDING')
+        .lt('attempts', 3)
+        .limit(10);
+      
+      if (error) throw error;
 
       for (const sms of pendingSms) {
         try {
@@ -96,24 +97,24 @@ class QueueProcessor {
             to: sms.phone
           });
 
-          await prisma.smsQueue.update({
-            where: { id: sms.id },
-            data: {
+          await supabase
+            .from('sms_queue')
+            .update({
               status: 'SENT',
-              sentAt: new Date()
-            }
-          });
+              sent_at: new Date().toISOString()
+            })
+            .eq('id', sms.id);
 
           console.log(`✅ SMS sent to ${sms.phone}`);
         } catch (error) {
-          await prisma.smsQueue.update({
-            where: { id: sms.id },
-            data: {
+          await supabase
+            .from('sms_queue')
+            .update({
               attempts: sms.attempts + 1,
               error: error.message,
               status: sms.attempts >= 2 ? 'FAILED' : 'PENDING'
-            }
-          });
+            })
+            .eq('id', sms.id);
 
           console.error(`❌ SMS failed for ${sms.phone}:`, error.message);
         }
@@ -134,22 +135,22 @@ class QueueProcessor {
     cutoffDate.setDate(cutoffDate.getDate() - 7); // 7 days old
 
     try {
-      const deletedEmails = await prisma.emailQueue.deleteMany({
-        where: {
-          status: { in: ['SENT', 'FAILED'] },
-          createdAt: { lt: cutoffDate }
-        }
-      });
+      const { data: deletedEmails } = await supabase
+        .from('email_queue')
+        .delete()
+        .in('status', ['SENT', 'FAILED'])
+        .lt('created_at', cutoffDate.toISOString());
 
-      const deletedSms = await prisma.smsQueue.deleteMany({
-        where: {
-          status: { in: ['SENT', 'FAILED'] },
-          createdAt: { lt: cutoffDate }
-        }
-      });
+      const { data: deletedSms } = await supabase
+        .from('sms_queue')
+        .delete()
+        .in('status', ['SENT', 'FAILED'])
+        .lt('created_at', cutoffDate.toISOString());
 
-      console.log(`🧹 Cleaned ${deletedEmails.count} emails and ${deletedSms.count} SMS`);
-      return { emails: deletedEmails.count, sms: deletedSms.count };
+      const emailCount = deletedEmails?.length || 0;
+      const smsCount = deletedSms?.length || 0;
+      console.log(`🧹 Cleaned ${emailCount} emails and ${smsCount} SMS`);
+      return { emails: emailCount, sms: smsCount };
     } catch (error) {
       console.error('Cleanup error:', error);
       return { emails: 0, sms: 0 };

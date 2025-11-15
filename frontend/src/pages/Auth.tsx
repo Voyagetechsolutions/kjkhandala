@@ -22,13 +22,19 @@ const signInSchema = z.object({
 });
 
 // Helper function to get dashboard route based on user role
-const getDashboardRoute = (user: any) => {
-  if (!user) return "/";
+const getDashboardRoute = (userRoles: string[]) => {
+  if (!userRoles || userRoles.length === 0) {
+    console.log('No roles found, redirecting to home');
+    return "/"; // Passenger/customer goes to homepage
+  }
   
-  const role = user.role || user.userRoles?.[0]?.role;
+  // Get the highest priority role
+  const role = userRoles[0];
+  console.log('Redirecting based on role:', role);
   
   switch (role) {
     case "SUPER_ADMIN":
+    case "ADMIN":
       return "/admin";
     case "OPERATIONS_MANAGER":
       return "/operations";
@@ -39,10 +45,13 @@ const getDashboardRoute = (user: any) => {
     case "MAINTENANCE_MANAGER":
       return "/maintenance";
     case "TICKETING_AGENT":
+    case "TICKETING_SUPERVISOR":
       return "/ticketing";
     case "DRIVER":
       return "/driver";
+    case "PASSENGER":
     default:
+      console.log('Passenger role or unknown, redirecting to home');
       return "/"; // Passenger/customer goes to homepage
   }
 };
@@ -57,7 +66,7 @@ export default function Auth() {
     phone: ""
   });
   
-  const { signUp, signIn, user } = useAuth();
+  const { signUp, signIn, user, userRoles } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -92,16 +101,19 @@ export default function Auth() {
         if (error) throw error;
 
         console.log('Logged in user:', loggedInUser);
-        console.log('User role:', loggedInUser?.role);
-        console.log('User userRoles:', loggedInUser?.userRoles);
+        
+        // Wait a moment for userRoles to be populated in context
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        console.log('User roles from context:', userRoles);
 
         // Redirect to role-specific dashboard
-        const dashboardRoute = getDashboardRoute(loggedInUser);
+        const dashboardRoute = getDashboardRoute(userRoles);
         console.log('Dashboard route:', dashboardRoute);
         
         toast({
           title: "Welcome back!",
-          description: `Redirecting to ${dashboardRoute}...`,
+          description: `Redirecting...`,
         });
         
         navigate(dashboardRoute);

@@ -2,8 +2,7 @@ const cron = require('node-cron');
 const bookingEngine = require('./bookingEngine');
 const tripEngine = require('./tripEngine');
 const notificationEngine = require('./notificationEngine');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { supabase } = require('../config/supabase');
 
 class Scheduler {
   start() {
@@ -46,15 +45,14 @@ class Scheduler {
         const dayAfter = new Date(tomorrow);
         dayAfter.setDate(dayAfter.getDate() + 1);
 
-        const trips = await prisma.trip.findMany({
-          where: {
-            departureTime: {
-              gte: tomorrow,
-              lt: dayAfter
-            },
-            status: { in: ['SCHEDULED', 'BOARDING'] }
-          }
-        });
+        const { data: trips, error } = await supabase
+          .from('trips')
+          .select('*')
+          .gte('departure_time', tomorrow.toISOString())
+          .lt('departure_time', dayAfter.toISOString())
+          .in('status', ['SCHEDULED', 'BOARDING']);
+        
+        if (error) throw error;
 
         for (const trip of trips) {
           await notificationEngine.sendTripReminder(trip.id);

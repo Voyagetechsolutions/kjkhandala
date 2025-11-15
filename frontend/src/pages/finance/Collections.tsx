@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { DollarSign, Plus, X, CheckCircle, Clock, TrendingUp } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const collectionSchema = z.object({
   collectedBy: z.string().min(1, 'Collector is required'),
@@ -47,14 +48,13 @@ const Collections = () => {
 
   const fetchCollections = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/finance/collections', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setCollections(data.data || []);
-      }
+      const { data, error } = await supabase
+        .from('cash_collections')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setCollections(data || []);
     } catch (error) {
       console.error('Failed to fetch collections:', error);
     } finally {
@@ -64,21 +64,26 @@ const Collections = () => {
 
   const onSubmit = async (data: CollectionFormData) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/finance/collections', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(data)
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (response.ok) {
-        await fetchCollections();
-        setShowModal(false);
-        reset();
-      }
+      const { error } = await supabase
+        .from('cash_collections')
+        .insert([{
+          collected_by: data.collectedBy,
+          amount: data.amount,
+          currency: data.currency,
+          payment_method: data.paymentMethod,
+          reference: data.reference,
+          notes: data.notes,
+          status: 'pending',
+          recorded_by: user.id
+        }]);
+
+      if (error) throw error;
+      await fetchCollections();
+      setShowModal(false);
+      reset();
     } catch (error) {
       console.error('Failed to record collection:', error);
     }
@@ -86,18 +91,16 @@ const Collections = () => {
 
   const markAsDeposited = async (id: string) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/finance/collections/${id}/deposit`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const { error } = await supabase
+        .from('cash_collections')
+        .update({ 
+          status: 'deposited',
+          deposited_at: new Date().toISOString()
+        })
+        .eq('id', id);
 
-      if (response.ok) {
-        await fetchCollections();
-      }
+      if (error) throw error;
+      await fetchCollections();
     } catch (error) {
       console.error('Failed to mark as deposited:', error);
     }

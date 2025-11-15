@@ -1,11 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Bus, User, Menu, LogOut } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import CurrencySelector from "@/components/CurrencySelector";
 
 export default function Navbar() {
   const { user, isAdmin, userRoles, signOut } = useAuth();
+  const location = useLocation();
+  const isHomePage = location.pathname === '/';
 
   // Get all dashboard links based on user roles
   const getDashboardLinks = () => {
@@ -41,26 +43,27 @@ export default function Navbar() {
   return (
     <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 font-bold text-xl">
-            <Bus className="h-6 w-6 text-primary" />
-            <span>KJ Khandala</span>
+          <Link to="/" className="flex items-center">
+            <img src="/logo.png" alt="KJ Khandala" className="h-16 w-auto" />
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
-            <Link to="/" className="text-sm font-medium hover:text-primary transition-colors">
-              Home
-            </Link>
-            <Link to="/routes" className="text-sm font-medium hover:text-primary transition-colors">
-              Routes
+          <div className="hidden lg:flex items-center gap-6">
+            {!isHomePage && (
+              <Link to="/" className="text-sm font-medium hover:text-primary transition-colors">
+                Home
+              </Link>
+            )}
+            <Link to="/about" className="text-sm font-medium hover:text-primary transition-colors">
+              About
             </Link>
             <Link to="/our-coaches" className="text-sm font-medium hover:text-primary transition-colors">
-              Our Coaches
+              Our Fleet
             </Link>
-            <Link to="/booking-offices" className="text-sm font-medium hover:text-primary transition-colors">
-              Booking Offices
+            <Link to="/charters" className="text-sm font-medium hover:text-primary transition-colors">
+              Charters
             </Link>
             <Link to="/contact" className="text-sm font-medium hover:text-primary transition-colors">
               Contact
@@ -81,7 +84,7 @@ export default function Navbar() {
             ))}
           </div>
 
-          {/* Auth Buttons */}
+          {/* Right Side Icons */}
           <div className="hidden md:flex items-center gap-3">
             <CurrencySelector />
             {user ? (
@@ -90,18 +93,16 @@ export default function Navbar() {
                 Sign Out
               </Button>
             ) : (
-              <>
-                <Link to="/auth">
-                  <Button variant="ghost" size="sm">
-                    <User className="h-4 w-4 mr-2" />
-                    Login
-                  </Button>
-                </Link>
-                <Link to="/auth">
-                  <Button size="sm">Sign Up</Button>
-                </Link>
-              </>
+              <Link to="/auth">
+                <Button variant="ghost" size="sm">
+                  <User className="h-4 w-4 mr-2" />
+                  Sign In
+                </Button>
+              </Link>
             )}
+            <Link to="/routes">
+              <Button size="sm">Book Now</Button>
+            </Link>
           </div>
 
           {/* Mobile Menu Button */}

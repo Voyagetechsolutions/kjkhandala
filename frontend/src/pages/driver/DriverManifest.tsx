@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import DriverLayout from '@/components/driver/DriverLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,13 +32,17 @@ export default function DriverManifest() {
   const { data: tripData } = useQuery({
     queryKey: ['driver-trip'],
     queryFn: async () => {
-      const response = await api.get('/driver/my-trip');
-      return response.data;
+      const { data, error } = await supabase
+        .from('trips')
+        .select('*')
+        .eq('driver_id', supabase.auth.user().id);
+      if (error) throw error;
+      return data[0];
     },
   });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['driver-manifest', tripData?.trip?.id],
+  const { data: manifestData, isLoading } = useQuery({
+    queryKey: ['driver-manifest', tripData?.id],
     queryFn: async () => {
       const response = await api.get(`/driver/manifest/${tripData.trip.id}`);
       return response.data;

@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useLocation } from 'react-router-dom';
+import AdminLayout from '@/components/admin/AdminLayout';
 import HRLayout from '@/components/hr/HRLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
+import { Download, Plus, Users, UserCheck, UserX, Pencil, Ban, CheckCircle } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -14,14 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Download, Plus, Upload, Users, UserCheck, UserX } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -31,87 +23,55 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
+import { useEmployees, useDeactivateEmployee, useReactivateEmployee } from '@/hooks/useEmployees';
+import EmployeeForm from '@/components/hr/EmployeeForm';
 
 export default function Employees() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : HRLayout;
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [editEmployee, setEditEmployee] = useState<any>(null);
   const [filters, setFilters] = useState({
     department: 'all',
     status: 'all',
     search: '',
   });
 
-  const [newEmployee, setNewEmployee] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    department: '',
-    position: '',
-    employmentType: 'full-time',
-    startDate: '',
-    salary: '',
-  });
+  const { data: employees = [], isLoading } = useEmployees();
+  const deactivateEmployee = useDeactivateEmployee();
+  const reactivateEmployee = useReactivateEmployee();
 
-  const queryClient = useQueryClient();
+  const handleDeactivate = async (id: string) => {
+    if (confirm('Are you sure you want to deactivate this employee?')) {
+      await deactivateEmployee.mutateAsync(id);
+    }
+  };
 
-  const { data: employees = [] } = useQuery({
-    queryKey: ['hr-employees'],
-    queryFn: async () => {
-      const response = await api.get('/hr/employees');
-      return Array.isArray(response.data) ? response.data : (response.data?.employees || []);
-    },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: async (data: any) => {
-      await api.post('/hr/employees', data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hr-employees'] });
-      toast.success('Employee added successfully');
-      setShowAddDialog(false);
-      setNewEmployee({
-        firstName: '',
-        lastName: '',
-        email: '',
-        phone: '',
-        department: '',
-        position: '',
-        employmentType: 'full-time',
-        startDate: '',
-        salary: '',
-      });
-    },
-    onError: () => {
-      toast.error('Failed to add employee');
-    },
-  });
-
-  const handleAddEmployee = () => {
-    createMutation.mutate(newEmployee);
+  const handleReactivate = async (id: string) => {
+    await reactivateEmployee.mutateAsync(id);
   };
 
   const filteredEmployees = employees.filter((emp: any) => {
     const matchesDept = filters.department === 'all' || emp.department === filters.department;
     const matchesStatus = filters.status === 'all' || emp.status === filters.status;
     const matchesSearch = !filters.search || 
-      (emp.firstName + ' ' + emp.lastName).toLowerCase().includes(filters.search.toLowerCase()) ||
-      emp.email.toLowerCase().includes(filters.search.toLowerCase()) ||
-      emp.employeeId?.toLowerCase().includes(filters.search.toLowerCase());
+      emp.full_name?.toLowerCase().includes(filters.search.toLowerCase()) ||
+      emp.email?.toLowerCase().includes(filters.search.toLowerCase()) ||
+      emp.employee_id?.toLowerCase().includes(filters.search.toLowerCase());
     return matchesDept && matchesStatus && matchesSearch;
   });
 
   const summary = {
     total: employees.length,
-    active: employees.filter((e: any) => e.status === 'active').length,
-    onLeave: employees.filter((e: any) => e.status === 'on_leave').length,
-    terminated: employees.filter((e: any) => e.status === 'terminated').length,
+    active: employees.filter((e: any) => e.is_active).length,
+    inactive: employees.filter((e: any) => !e.is_active).length,
   };
 
   const departments = [...new Set(employees.map((e: any) => e.department))].filter(Boolean);
 
   return (
-    <HRLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -124,7 +84,7 @@ export default function Employees() {
               <Plus className="mr-2 h-4 w-4" />
               Add Employee
             </Button>
-            <Button>
+            <Button variant="outline">
               <Download className="mr-2 h-4 w-4" />
               Export
             </Button>
@@ -132,7 +92,7 @@ export default function Employees() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid md:grid-cols-4 gap-4">
+        <div className="grid md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
@@ -157,23 +117,12 @@ export default function Employees() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">On Leave</CardTitle>
-              <UserX className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{summary.onLeave}</div>
-              <p className="text-xs text-muted-foreground">On leave</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Terminated</CardTitle>
+              <CardTitle className="text-sm font-medium">Inactive</CardTitle>
               <UserX className="h-4 w-4 text-red-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">{summary.terminated}</div>
-              <p className="text-xs text-muted-foreground">Terminated</p>
+              <div className="text-2xl font-bold text-red-600">{summary.inactive}</div>
+              <p className="text-xs text-muted-foreground">Not active</p>
             </CardContent>
           </Card>
         </div>
@@ -185,15 +134,15 @@ export default function Employees() {
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-3 gap-4">
-              <div>
+              <div className="space-y-2">
                 <Label>Search</Label>
                 <Input
-                  placeholder="Search by name or ID..."
+                  placeholder="Search by name, email or ID..."
                   value={filters.search}
                   onChange={(e) => setFilters({...filters, search: e.target.value})}
                 />
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label>Department</Label>
                 <Select value={filters.department} onValueChange={(v) => setFilters({...filters, department: v})}>
                   <SelectTrigger>
@@ -207,7 +156,7 @@ export default function Employees() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label>Status</Label>
                 <Select value={filters.status} onValueChange={(v) => setFilters({...filters, status: v})}>
                   <SelectTrigger>
@@ -216,9 +165,7 @@ export default function Employees() {
                   <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="on-leave">On Leave</SelectItem>
-                    <SelectItem value="suspended">Suspended</SelectItem>
-                    <SelectItem value="terminated">Terminated</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -230,175 +177,106 @@ export default function Employees() {
         <Card>
           <CardHeader>
             <CardTitle>Employee List</CardTitle>
-            <CardDescription>All employee records</CardDescription>
+            <CardDescription>
+              {isLoading ? 'Loading employees...' : `${filteredEmployees.length} employees`}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Employee ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Position</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Start Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredEmployees.length === 0 ? (
+            {isLoading ? (
+              <div className="text-center py-8">Loading...</div>
+            ) : (
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground">
-                      No employees found
-                    </TableCell>
+                    <TableHead>Employee ID</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Position</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Hire Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ) : (
-                  filteredEmployees.map((employee: any) => (
-                    <TableRow key={employee.id}>
-                      <TableCell className="font-mono">{employee.employeeId || employee.id.slice(0, 8)}</TableCell>
-                      <TableCell className="font-medium">{employee.firstName} {employee.lastName}</TableCell>
-                      <TableCell>{employee.department}</TableCell>
-                      <TableCell>{employee.position}</TableCell>
-                      <TableCell>
-                      <div className="text-sm">
-                        <div>{employee.email}</div>
-                        <div className="text-muted-foreground">{employee.phone}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{employee.startDate}</TableCell>
-                    <TableCell>
-                      <Badge className={
-                        employee.status === 'active' ? 'bg-green-500' :
-                        employee.status === 'on-leave' ? 'bg-yellow-500' :
-                        employee.status === 'suspended' ? 'bg-red-500' :
-                        'bg-gray-500'
-                      }>
-                        {employee.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button>View</Button>
-                        <Button>Edit</Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredEmployees.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                        No employees found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredEmployees.map((employee: any) => (
+                      <TableRow key={employee.id}>
+                        <TableCell className="font-mono">
+                          {employee.employee_id || employee.id.slice(0, 8)}
+                        </TableCell>
+                        <TableCell className="font-medium">{employee.full_name}</TableCell>
+                        <TableCell>{employee.department || '-'}</TableCell>
+                        <TableCell>{employee.position || '-'}</TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div>{employee.email}</div>
+                            <div className="text-muted-foreground">{employee.phone || '-'}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {employee.hire_date ? new Date(employee.hire_date).toLocaleDateString() : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={employee.is_active ? 'default' : 'secondary'}>
+                            {employee.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setEditEmployee(employee);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            {employee.is_active ? (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDeactivate(employee.id)}
+                              >
+                                <Ban className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => handleReactivate(employee.id)}
+                              >
+                                <CheckCircle className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
 
-        {/* Add Employee Dialog */}
-        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Add New Employee</DialogTitle>
-              <DialogDescription>Enter employee details</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <Label>First Name</Label>
-                  <Input
-                    value={newEmployee.firstName}
-                    onChange={(e) => setNewEmployee({...newEmployee, firstName: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <Label>Last Name</Label>
-                  <Input
-                    value={newEmployee.lastName}
-                    onChange={(e) => setNewEmployee({...newEmployee, lastName: e.target.value})}
-                  />
-                </div>
-              </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Email</Label>
-                  <Input
-                    type="email"
-                    value={newEmployee.email}
-                    onChange={(e) => setNewEmployee({...newEmployee, email: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <Label>Phone</Label>
-                  <Input
-                    value={newEmployee.phone}
-                    onChange={(e) => setNewEmployee({...newEmployee, phone: e.target.value})}
-                  />
-                </div>
-              </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Department</Label>
-                  <Select value={newEmployee.department} onValueChange={(v) => setNewEmployee({...newEmployee, department: v})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="drivers">Drivers</SelectItem>
-                      <SelectItem value="maintenance">Maintenance</SelectItem>
-                      <SelectItem value="ticketing">Ticketing</SelectItem>
-                      <SelectItem value="operations">Operations</SelectItem>
-                      <SelectItem value="finance">Finance</SelectItem>
-                      <SelectItem value="hr">Human Resources</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Position</Label>
-                  <Input
-                    value={newEmployee.position}
-                    onChange={(e) => setNewEmployee({...newEmployee, position: e.target.value})}
-                  />
-                </div>
-              </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Employment Type</Label>
-                  <Select value={newEmployee.employmentType} onValueChange={(v) => setNewEmployee({...newEmployee, employmentType: v})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="full-time">Full-time</SelectItem>
-                      <SelectItem value="part-time">Part-time</SelectItem>
-                      <SelectItem value="contract">Contract</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Start Date</Label>
-                  <Input
-                    type="date"
-                    value={newEmployee.startDate}
-                    onChange={(e) => setNewEmployee({...newEmployee, startDate: e.target.value})}
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Monthly Salary (P)</Label>
-                <Input
-                  type="number"
-                  value={newEmployee.salary}
-                  onChange={(e) => setNewEmployee({...newEmployee, salary: e.target.value})}
-                />
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button onClick={() => setShowAddDialog(false)}>Cancel</Button>
-                <Button onClick={handleAddEmployee}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Employee
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {/* Add/Edit Employee Dialog */}
+        <EmployeeForm
+          employee={editEmployee}
+          open={showAddDialog || !!editEmployee}
+          onClose={() => {
+            setShowAddDialog(false);
+            setEditEmployee(null);
+          }}
+        />
       </div>
-    </HRLayout>
+    </Layout>
   );
 }

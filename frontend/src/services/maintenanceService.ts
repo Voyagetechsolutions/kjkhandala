@@ -1,117 +1,112 @@
-import api from './api';
+import { supabase } from '@/lib/supabase';
 
 export const maintenanceService = {
   // Work Orders Management
-  getWorkOrders: (filters: any) => api.get('/maintenance/work-orders', { params: filters }),
-  getWorkOrderById: (id: string) => api.get(`/maintenance/work-orders/${id}`),
-  createWorkOrder: (data: any) => api.post('/maintenance/work-orders', data),
-  updateWorkOrder: (id: string, data: any) => api.put(`/maintenance/work-orders/${id}`, data),
-  deleteWorkOrder: (id: string) => api.delete(`/maintenance/work-orders/${id}`),
+  getWorkOrders: (filters?: any) => supabase.from('work_orders').select('*'),
+  getWorkOrderById: (id: string) => supabase.from('work_orders').select('*').eq('id', id),
+  createWorkOrder: (data: any) => supabase.from('work_orders').insert([data]),
+  updateWorkOrder: (id: string, data: any) => supabase.from('work_orders').update(data).eq('id', id),
+  deleteWorkOrder: (id: string) => supabase.from('work_orders').delete().eq('id', id),
   assignMechanic: (id: string, mechanicId: string) => 
-    api.put(`/maintenance/work-orders/${id}/assign`, { mechanicId }),
+    supabase.from('work_orders').update({ mechanic_id: mechanicId }).eq('id', id),
   updateStatus: (id: string, status: string) => 
-    api.put(`/maintenance/work-orders/${id}/status`, { status }),
+    supabase.from('work_orders').update({ status }).eq('id', id),
   attachPhoto: (id: string, file: File) => {
     const formData = new FormData();
     formData.append('photo', file);
-    return api.post(`/maintenance/work-orders/${id}/photo`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+    return supabase.storage.from('work-orders').upload(`${id}/photo`, file, {
+      cacheControl: '3600',
+      upsert: false
     });
   },
 
   // Maintenance Schedule
-  getSchedule: (filters?: any) => api.get('/maintenance/schedule', { params: filters }),
-  getScheduleByBus: (busId: string) => api.get(`/maintenance/schedule/bus/${busId}`),
-  createSchedule: (data: any) => api.post('/maintenance/schedule', data),
-  updateSchedule: (id: string, data: any) => api.put(`/maintenance/schedule/${id}`, data),
-  markCompleted: (id: string, data: any) => api.put(`/maintenance/schedule/${id}/complete`, data),
-  getUpcomingServices: () => api.get('/maintenance/schedule/upcoming'),
-  getOverdueServices: () => api.get('/maintenance/schedule/overdue'),
+  getSchedule: (filters?: any) => supabase.from('schedule').select('*'),
+  getScheduleByBus: (busId: string) => supabase.from('schedule').select('*').eq('bus_id', busId),
+  createSchedule: (data: any) => supabase.from('schedule').insert([data]),
+  updateSchedule: (id: string, data: any) => supabase.from('schedule').update(data).eq('id', id),
+  markCompleted: (id: string, data: any) => supabase.from('schedule').update(data).eq('id', id),
+  getUpcomingServices: () => supabase.from('schedule').select('*').gt('due_date', new Date()),
+  getOverdueServices: () => supabase.from('schedule').select('*').lt('due_date', new Date()),
 
   // Vehicle Inspections
-  getInspections: (filters: any) => api.get('/maintenance/inspections', { params: filters }),
-  getInspectionById: (id: string) => api.get(`/maintenance/inspections/${id}`),
-  createInspection: (data: any) => api.post('/maintenance/inspections', data),
-  updateInspection: (id: string, data: any) => api.put(`/maintenance/inspections/${id}`, data),
+  getInspections: (filters?: any) => supabase.from('inspections').select('*'),
+  getInspectionById: (id: string) => supabase.from('inspections').select('*').eq('id', id),
+  createInspection: (data: any) => supabase.from('inspections').insert([data]),
+  updateInspection: (id: string, data: any) => supabase.from('inspections').update(data).eq('id', id),
   uploadInspectionPhoto: (id: string, file: File) => {
     const formData = new FormData();
     formData.append('photo', file);
-    return api.post(`/maintenance/inspections/${id}/photo`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+    return supabase.storage.from('inspections').upload(`${id}/photo`, file, {
+      cacheControl: '3600',
+      upsert: false
     });
   },
   generateInspectionReport: (id: string) => 
-    api.get(`/maintenance/inspections/${id}/report`, { responseType: 'blob' }),
-  getInspectionTemplates: () => api.get('/maintenance/inspections/templates'),
+    supabase.storage.from('inspections').download(`${id}/report`),
+  getInspectionTemplates: () => supabase.from('inspection_templates').select('*'),
 
   // Repairs & Parts Replacement
-  getRepairs: (filters: any) => api.get('/maintenance/repairs', { params: filters }),
-  getRepairById: (id: string) => api.get(`/maintenance/repairs/${id}`),
-  createRepair: (data: any) => api.post('/maintenance/repairs', data),
-  updateRepair: (id: string, data: any) => api.put(`/maintenance/repairs/${id}`, data),
-  markRepairComplete: (id: string, data: any) => 
-    api.put(`/maintenance/repairs/${id}/complete`, data),
-  getRepairHistory: (busId: string) => api.get(`/maintenance/repairs/history/${busId}`),
-  getCommonIssues: () => api.get('/maintenance/repairs/common-issues'),
+  getRepairs: (filters?: any) => supabase.from('repairs').select('*'),
+  getRepairById: (id: string) => supabase.from('repairs').select('*').eq('id', id),
+  createRepair: (data: any) => supabase.from('repairs').insert([data]),
+  updateRepair: (id: string, data: any) => supabase.from('repairs').update(data).eq('id', id),
+  markRepairComplete: (id: string, data: any) => supabase.from('repairs').update(data).eq('id', id),
+  getRepairHistory: (busId: string) => supabase.from('repairs').select('*').eq('bus_id', busId),
+  getCommonIssues: () => supabase.from('common_issues').select('*'),
 
   // Inventory & Spare Parts
-  getInventory: (filters?: any) => api.get('/maintenance/inventory', { params: filters }),
-  getInventoryItem: (id: string) => api.get(`/maintenance/inventory/${id}`),
-  createInventoryItem: (data: any) => api.post('/maintenance/inventory', data),
-  updateInventoryItem: (id: string, data: any) => api.put(`/maintenance/inventory/${id}`, data),
+  getInventory: (filters?: any) => supabase.from('inventory').select('*'),
+  getInventoryItem: (id: string) => supabase.from('inventory').select('*').eq('id', id),
+  createInventoryItem: (data: any) => supabase.from('inventory').insert([data]),
+  updateInventoryItem: (id: string, data: any) => supabase.from('inventory').update(data).eq('id', id),
   updateStock: (itemId: string, quantity: number, reason: string) => 
-    api.put(`/maintenance/inventory/${itemId}/stock`, { quantity, reason }),
-  getLowStockItems: () => api.get('/maintenance/inventory/low-stock'),
+    supabase.from('inventory').update({ quantity, reason }).eq('id', itemId),
+  getLowStockItems: () => supabase.from('inventory').select('*').lt('quantity', 5),
   createReorderAlert: (itemId: string, threshold: number) => 
-    api.post('/maintenance/inventory/reorder-alert', { itemId, threshold }),
-  getStockMovements: (itemId: string) => api.get(`/maintenance/inventory/${itemId}/movements`),
-  getSuppliers: () => api.get('/maintenance/inventory/suppliers'),
+    supabase.from('reorder_alerts').insert([{ item_id: itemId, threshold }]),
+  getStockMovements: (itemId: string) => supabase.from('stock_movements').select('*').eq('item_id', itemId),
+  getSuppliers: () => supabase.from('suppliers').select('*'),
 
   // Cost Management
-  getCosts: (filters: any) => api.get('/maintenance/costs', { params: filters }),
+  getCosts: (filters: any) => supabase.from('maintenance_costs').select('*'),
   getCostByBus: (busId: string, period: string) => 
-    api.get(`/maintenance/costs/bus/${busId}?period=${period}`),
+    supabase.from('maintenance_costs').select('*').eq('bus_id', busId),
   getCostByRoute: (routeId: string, period: string) => 
-    api.get(`/maintenance/costs/route/${routeId}?period=${period}`),
+    supabase.from('maintenance_costs').select('*').eq('route_id', routeId),
   getCostBreakdown: (period: string) => 
-    api.get(`/maintenance/costs/breakdown?period=${period}`),
+    supabase.from('maintenance_costs').select('*'),
   getBudgetComparison: (period: string) => 
-    api.get(`/maintenance/costs/budget-comparison?period=${period}`),
+    supabase.from('budget_comparison').select('*'),
   exportCostReport: (format: string, filters: any) => 
-    api.get(`/maintenance/costs/export?format=${format}`, { 
-      params: filters, 
-      responseType: 'blob' 
-    }),
+    supabase.from('maintenance_costs').select('*'),
 
   // Reports & Analytics
-  getCostReport: (period: string) => api.get(`/maintenance/reports/costs?period=${period}`),
-  getDowntimeReport: (period: string) => api.get(`/maintenance/reports/downtime?period=${period}`),
-  getFrequentIssuesReport: () => api.get('/maintenance/reports/frequent-issues'),
+  getCostReport: (period: string) => supabase.from('maintenance_reports').select('*').eq('type', 'costs'),
+  getDowntimeReport: (period: string) => supabase.from('maintenance_reports').select('*').eq('type', 'downtime'),
+  getFrequentIssuesReport: () => supabase.from('maintenance_reports').select('*').eq('type', 'frequent_issues'),
   getPartsConsumptionReport: (period: string) => 
-    api.get(`/maintenance/reports/parts-consumption?period=${period}`),
+    supabase.from('maintenance_reports').select('*').eq('type', 'parts_consumption'),
   getMechanicProductivityReport: (period: string) => 
-    api.get(`/maintenance/reports/mechanic-productivity?period=${period}`),
-  getComplianceReport: () => api.get('/maintenance/reports/compliance'),
+    supabase.from('maintenance_reports').select('*').eq('type', 'mechanic_productivity'),
+  getComplianceReport: () => supabase.from('maintenance_reports').select('*').eq('type', 'compliance'),
   exportReport: (reportType: string, format: string, params: any) => 
-    api.get(`/maintenance/reports/${reportType}/export?format=${format}`, { 
-      params, 
-      responseType: 'blob' 
-    }),
-  getDashboardMetrics: () => api.get('/maintenance/reports/dashboard-metrics'),
+    supabase.from('maintenance_reports').select('*').eq('type', reportType),
+  getDashboardMetrics: () => supabase.from('maintenance_metrics').select('*'),
 
   // Settings & Configuration
-  getSettings: () => api.get('/maintenance/settings'),
-  updateSettings: (data: any) => api.put('/maintenance/settings', data),
-  getServiceIntervals: () => api.get('/maintenance/settings/service-intervals'),
-  updateServiceIntervals: (data: any) => api.put('/maintenance/settings/service-intervals', data),
-  getIssueCategories: () => api.get('/maintenance/settings/issue-categories'),
+  getSettings: () => supabase.from('maintenance_settings').select('*'),
+  updateSettings: (data: any) => supabase.from('maintenance_settings').upsert(data),
+  getServiceIntervals: () => supabase.from('service_intervals').select('*'),
+  updateServiceIntervals: (data: any) => supabase.from('service_intervals').upsert(data),
+  getIssueCategories: () => supabase.from('issue_categories').select('*'),
   updateIssueCategories: (categories: any[]) => 
-    api.put('/maintenance/settings/issue-categories', { categories }),
-  getPriorityRules: () => api.get('/maintenance/settings/priority-rules'),
-  updatePriorityRules: (rules: any) => api.put('/maintenance/settings/priority-rules', rules),
-  getReorderThresholds: () => api.get('/maintenance/settings/reorder-thresholds'),
+    supabase.from('issue_categories').upsert(categories),
+  getPriorityRules: () => supabase.from('priority_rules').select('*'),
+  updatePriorityRules: (rules: any) => supabase.from('priority_rules').upsert(rules),
+  getReorderThresholds: () => supabase.from('reorder_thresholds').select('*'),
   updateReorderThresholds: (thresholds: any) => 
-    api.put('/maintenance/settings/reorder-thresholds', thresholds),
+    supabase.from('reorder_thresholds').upsert(thresholds),
 };
 
 export default maintenanceService;

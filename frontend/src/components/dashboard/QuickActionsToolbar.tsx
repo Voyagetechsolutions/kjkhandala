@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import supabaseApi from '@/lib/supabase-api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,25 +32,19 @@ export default function QuickActionsToolbar() {
   // Fetch routes for trip scheduling
   const { data: routes } = useQuery({
     queryKey: ['routes-quick'],
-    queryFn: async () => {
-      const response = await api.get('/routes');
-      return Array.isArray(response.data) ? response.data : (response.data?.routes || []);
-    },
+    queryFn: () => supabaseApi.routes.getAll(),
   });
 
   // Fetch buses for trip scheduling
   const { data: buses } = useQuery({
     queryKey: ['buses-quick'],
-    queryFn: async () => {
-      const response = await api.get('/buses');
-      return Array.isArray(response.data) ? response.data : (response.data?.buses || []);
-    },
+    queryFn: () => supabaseApi.buses.getAll(),
   });
 
   // Add Bus Mutation
   const addBusMutation = useMutation({
     mutationFn: async (formData: any) => {
-      await api.post('/buses', formData);
+      await supabaseApi.buses.create(formData);
     },
     onSuccess: () => {
       toast.success('Bus added successfully!');
@@ -65,7 +59,7 @@ export default function QuickActionsToolbar() {
   // Schedule Trip Mutation
   const scheduleTripMutation = useMutation({
     mutationFn: async (formData: any) => {
-      await api.post('/schedules', formData);
+      await supabaseApi.schedules.create(formData);
     },
     onSuccess: () => {
       toast.success('Trip scheduled successfully!');
@@ -80,7 +74,7 @@ export default function QuickActionsToolbar() {
   // Add Employee Mutation
   const addEmployeeMutation = useMutation({
     mutationFn: async (formData: any) => {
-      await api.post('/staff', formData);
+      await supabaseApi.staff.create(formData);
     },
     onSuccess: () => {
       toast.success('Employee added successfully!');
@@ -99,8 +93,7 @@ export default function QuickActionsToolbar() {
       name: formData.get('name'),
       number_plate: formData.get('number_plate'),
       seating_capacity: parseInt(formData.get('seating_capacity') as string),
-      layout_rows: parseInt(formData.get('layout_rows') as string) || 10,
-      layout_columns: parseInt(formData.get('layout_columns') as string) || 4,
+      status: 'ACTIVE',
     });
   };
 
@@ -197,16 +190,6 @@ export default function QuickActionsToolbar() {
             <div className="space-y-2">
               <Label htmlFor="seating_capacity">Seating Capacity</Label>
               <Input id="seating_capacity" name="seating_capacity" type="number" placeholder="e.g., 40" required />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="layout_rows">Layout Rows</Label>
-                <Input id="layout_rows" name="layout_rows" type="number" defaultValue="10" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="layout_columns">Layout Columns</Label>
-                <Input id="layout_columns" name="layout_columns" type="number" defaultValue="4" />
-              </div>
             </div>
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="outline" onClick={() => setAddBusOpen(false)}>

@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import HRLayout from '@/components/hr/HRLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,17 +18,24 @@ import {
 import { Badge } from '@/components/ui/badge';
 
 export default function Compliance() {
-  const { data: certifications = [] } = useQuery({
-    queryKey: ['hr-certifications'],
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : HRLayout;
+  const { data: certifications = [], isLoading } = useQuery({
+    queryKey: ['compliance'],
     queryFn: async () => {
-      const response = await api.get('/hr/certifications');
-      return Array.isArray(response.data) ? response.data : (response.data?.certifications || []);
+      const { data, error } = await supabase
+        .from('certifications')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
     },
   });
 
   const today = new Date();
   const certWithStatus = certifications.map((cert: any) => {
-    const expiry = new Date(cert.expiryDate);
+    const expiry = new Date(cert.expiry_date || cert.expiryDate);
     const daysUntilExpiry = Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     let status = 'valid';
     if (daysUntilExpiry < 0) status = 'expired';
@@ -42,7 +51,7 @@ export default function Compliance() {
   };
 
   return (
-    <HRLayout>
+    <Layout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold mb-2">Compliance & Certifications</h1>
@@ -147,6 +156,6 @@ export default function Compliance() {
           </CardContent>
         </Card>
       </div>
-    </HRLayout>
+    </Layout>
   );
 }

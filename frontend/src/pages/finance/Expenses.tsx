@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Receipt, Plus, X, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const expenseSchema = z.object({
   amount: z.number().min(0.01, 'Amount must be greater than 0'),
@@ -47,14 +48,13 @@ const Expenses = () => {
 
   const fetchExpenses = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/finance/expenses', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setExpenses(data.data || []);
-      }
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setExpenses(data || []);
     } catch (error) {
       console.error('Failed to fetch expenses:', error);
     } finally {
@@ -64,21 +64,22 @@ const Expenses = () => {
 
   const onSubmit = async (data: ExpenseFormData) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/finance/expenses', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(data)
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (response.ok) {
-        await fetchExpenses();
-        setShowModal(false);
-        reset();
-      }
+      const { error } = await supabase
+        .from('expenses')
+        .insert([{
+          ...data,
+          submitted_by_id: user.id,
+          status: 'PENDING',
+          date: new Date().toISOString().split('T')[0]
+        }]);
+
+      if (error) throw error;
+      await fetchExpenses();
+      setShowModal(false);
+      reset();
     } catch (error) {
       console.error('Failed to submit expense:', error);
     }
@@ -86,18 +87,20 @@ const Expenses = () => {
 
   const approveExpense = async (id: string) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/finance/expenses/${id}/approve`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (response.ok) {
-        await fetchExpenses();
-      }
+      const { error } = await supabase
+        .from('expenses')
+        .update({ 
+          status: 'APPROVED',
+          approved_by_id: user.id,
+          approved_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      await fetchExpenses();
     } catch (error) {
       console.error('Failed to approve expense:', error);
     }
@@ -105,19 +108,16 @@ const Expenses = () => {
 
   const rejectExpense = async (id: string) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/finance/expenses/${id}/reject`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ reason: 'Not approved' })
-      });
+      const { error } = await supabase
+        .from('expenses')
+        .update({ 
+          status: 'REJECTED',
+          notes: 'Not approved'
+        })
+        .eq('id', id);
 
-      if (response.ok) {
-        await fetchExpenses();
-      }
+      if (error) throw error;
+      await fetchExpenses();
     } catch (error) {
       console.error('Failed to reject expense:', error);
     }

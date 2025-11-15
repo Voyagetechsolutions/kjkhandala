@@ -1,9 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
-const { auth } = require('../middleware/auth');
-
-const prisma = new PrismaClient();
+const { auth, authorize } = require('../middleware/auth');
+const { supabase } = require('../config/supabase');
 
 // Get all bookings
 router.get('/', auth, async (req, res) => {
@@ -15,25 +13,13 @@ router.get('/', auth, async (req, res) => {
     if (tripId) where.tripId = tripId;
     if (passengerId) where.passengerId = passengerId;
 
-    const bookings = await prisma.booking.findMany({
-      where,
-      include: {
-        trip: {
-          include: {
-            route: true,
-          },
-        },
-        passenger: {
-          select: {
-            firstName: true,
-            lastName: true,
-            phone: true,
-            email: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    let q = supabase.from('bookings').select('*');
+    if (status) q = q.eq('status', status);
+    if (tripId) q = q.eq('trip_id', tripId);
+    if (passengerId) q = q.eq('passenger_id', passengerId);
+    q = q.order('created_at', { ascending: false });
+    const { data: bookings, error } = await q;
+    if (error) throw error;
 
     res.json({ data: bookings });
   } catch (error) {
@@ -44,25 +30,12 @@ router.get('/', auth, async (req, res) => {
 // Get booking by ID
 router.get('/:id', async (req, res) => {
   try {
-    const booking = await prisma.booking.findUnique({
-      where: { id: req.params.id },
-      include: {
-        trip: {
-          include: {
-            route: true,
-            bus: true,
-          },
-        },
-        passenger: {
-          select: {
-            firstName: true,
-            lastName: true,
-            phone: true,
-            email: true,
-          },
-        },
-      },
-    });
+    const { data: booking, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+    if (error) throw error;
 
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
@@ -80,37 +53,30 @@ router.post('/', async (req, res) => {
     const { tripId, passengerId, seatNumber, price, passengerDetails } = req.body;
 
     // Check if seat is available
-    const existingBooking = await prisma.booking.findFirst({
-      where: {
-        tripId,
-        seatNumber,
-        status: { in: ['CONFIRMED', 'CHECKED_IN'] },
-      },
-    });
+    const { data: existingBooking } = await supabase
+      .from('bookings')
+      .select('id')
+      .eq('trip_id', tripId)
+      .eq('seat_number', seatNumber)
+      .in('status', ['CONFIRMED', 'CHECKED_IN'])
+      .limit(1);
 
-    if (existingBooking) {
+    if (existingBooking && existingBooking.length > 0) {
       return res.status(400).json({ error: 'Seat already booked' });
     }
 
-    const booking = await prisma.booking.create({
-      data: {
-        tripId,
-        passengerId,
-        seatNumber,
-        price: parseFloat(price),
-        status: 'PENDING',
-        passengerName: passengerDetails?.name,
-        passengerPhone: passengerDetails?.phone,
-        passengerEmail: passengerDetails?.email,
-      },
-      include: {
-        trip: {
-          include: {
-            route: true,
-          },
-        },
-      },
-    });
+    const { data: booking, error } = await supabase
+      .from('bookings')
+      .insert({
+        trip_id: tripId,
+        passenger_id: passengerId,
+        seat_number: seatNumber,
+        total_amount: parseFloat(price),
+        status: 'PENDING'
+      })
+      .select('*')
+      .single();
+    if (error) throw error;
 
     // Emit WebSocket event
     req.app.get('io').emit('booking:update', { type: 'created', booking });
@@ -126,14 +92,13 @@ router.post('/:id/cancel', auth, async (req, res) => {
   try {
     const { reason } = req.body;
 
-    const booking = await prisma.booking.update({
-      where: { id: req.params.id },
-      data: {
-        status: 'CANCELLED',
-        cancellationReason: reason,
-        cancelledAt: new Date(),
-      },
-    });
+    const { data: booking, error } = await supabase
+      .from('bookings')
+      .update({ status: 'CANCELLED' })
+      .eq('id', req.params.id)
+      .select('*')
+      .single();
+    if (error) throw error;
 
     // Emit WebSocket event
     req.app.get('io').emit('booking:update', { type: 'cancelled', booking });
@@ -149,16 +114,17 @@ router.post('/:id/confirm-payment', async (req, res) => {
   try {
     const { paymentMethod, transactionId } = req.body;
 
-    const booking = await prisma.booking.update({
-      where: { id: req.params.id },
-      data: {
+    const { data: booking, error } = await supabase
+      .from('bookings')
+      .update({
         status: 'CONFIRMED',
-        paymentStatus: 'PAID',
-        paymentMethod,
-        transactionId,
-        paidAt: new Date(),
-      },
-    });
+        payment_status: 'COMPLETED',
+        payment_method: paymentMethod
+      })
+      .eq('id', req.params.id)
+      .select('*')
+      .single();
+    if (error) throw error;
 
     res.json({ data: booking });
   } catch (error) {

@@ -1,8 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import AdminLayout from '@/components/admin/AdminLayout';
+import MaintenanceLayout from '@/components/maintenance/MaintenanceLayout';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Calendar, Plus, X, CheckCircle, Clock } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const maintenanceSchema = z.object({
   busId: z.string().min(1, 'Bus is required'),
@@ -35,20 +40,34 @@ const Preventive = () => {
     resolver: zodResolver(maintenanceSchema)
   });
 
+  // Fetch buses for dropdown
+  const { data: buses = [] } = useQuery({
+    queryKey: ['buses'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('buses')
+        .select('id, name, number_plate, status')
+        .eq('status', 'active')
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   useEffect(() => {
     fetchMaintenances();
   }, []);
 
   const fetchMaintenances = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/maintenance/preventive', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setMaintenances(data.data || []);
-      }
+      const { data, error } = await supabase
+        .from('maintenance_records')
+        .select('*, buses(*)')
+        .eq('maintenance_type', 'preventive')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setMaintenances(data || []);
     } catch (error) {
       console.error('Failed to fetch maintenances:', error);
     } finally {
@@ -58,21 +77,34 @@ const Preventive = () => {
 
   const onSubmit = async (data: MaintenanceFormData) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/maintenance/preventive', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(data)
-      });
+      // Generate unique record number
+      const { data: lastRecord } = await supabase
+        .from('maintenance_records')
+        .select('record_number')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      const lastNumber = lastRecord?.record_number 
+        ? parseInt(lastRecord.record_number.split('-')[1]) 
+        : 0;
+      
+      const recordNumber = `MR-${String(lastNumber + 1).padStart(5, '0')}`;
 
-      if (response.ok) {
-        await fetchMaintenances();
-        setShowModal(false);
-        reset();
-      }
+      const { error } = await supabase
+        .from('maintenance_records')
+        .insert([{
+          record_number: recordNumber,
+          bus_id: data.busId,
+          type: data.maintenanceType,
+          date: data.scheduledDate,
+          description: data.description || `${data.maintenanceType} - Scheduled maintenance`,
+        }]);
+
+      if (error) throw error;
+      await fetchMaintenances();
+      setShowModal(false);
+      reset();
     } catch (error) {
       console.error('Failed to schedule maintenance:', error);
     }
@@ -80,24 +112,16 @@ const Preventive = () => {
 
   const completeMaintenance = async (id: string) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/maintenance/preventive/${id}/complete`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          completedBy: 'current-user-id',
-          actualDuration: 2,
-          cost: 0,
-          notes: 'Completed'
+      const { error } = await supabase
+        .from('maintenance_records')
+        .update({ 
+          status: 'completed',
+          service_date: new Date().toISOString().split('T')[0]
         })
-      });
+        .eq('id', id);
 
-      if (response.ok) {
-        await fetchMaintenances();
-      }
+      if (error) throw error;
+      await fetchMaintenances();
     } catch (error) {
       console.error('Failed to complete maintenance:', error);
     }
@@ -135,8 +159,12 @@ const Preventive = () => {
     return <div className="flex items-center justify-center h-64">Loading...</div>;
   }
 
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : MaintenanceLayout;
+
   return (
-    <div className="p-6">
+    <Layout className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Preventive Maintenance</h1>
@@ -274,12 +302,18 @@ const Preventive = () => {
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bus ID</label>
-                <input
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Bus/Vehicle</label>
+                <select
                   {...register('busId')}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter bus ID"
-                />
+                >
+                  <option value="">-- Select a vehicle --</option>
+                  {buses.map((bus: any) => (
+                    <option key={bus.id} value={bus.id}>
+                      {bus.name} ({bus.number_plate})
+                    </option>
+                  ))}
+                </select>
                 {errors.busId && <p className="text-red-500 text-sm mt-1">{errors.busId.message}</p>}
               </div>
 
@@ -349,7 +383,7 @@ const Preventive = () => {
           </div>
         </div>
       )}
-    </div>
+    </Layout>
   );
 };
 

@@ -1,9 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
 const { auth, authorize } = require('../middleware/auth');
-
-const prisma = new PrismaClient();
+const { supabase } = require('../config/supabase');
 
 // ==================== EMPLOYEES ====================
 
@@ -11,18 +9,14 @@ const prisma = new PrismaClient();
 router.get('/employees', auth, authorize('SUPER_ADMIN', 'HR_MANAGER'), async (req, res) => {
   try {
     const { department, position, status } = req.query;
-    
-    const where = {};
-    if (department) where.department = department;
-    if (position) where.position = position;
-    if (status) where.status = status;
-
-    const employees = await prisma.employee.findMany({
-      where,
-      orderBy: { firstName: 'asc' },
-    });
-
-    res.json({ data: employees });
+    let q = supabase.from('profiles').select('*');
+    if (department) q = q.eq('department', department);
+    if (position) q = q.eq('position', position);
+    if (status) q = q.eq('status', status);
+    q = q.order('first_name');
+    const { data: employees, error } = await q;
+    if (error) throw error;
+    res.json({ data: employees || [] });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -54,10 +48,8 @@ router.get('/employees/:id', auth, authorize('SUPER_ADMIN', 'HR_MANAGER'), async
 // Create employee
 router.post('/employees', auth, authorize('SUPER_ADMIN', 'HR_MANAGER'), async (req, res) => {
   try {
-    const employee = await prisma.employee.create({
-      data: req.body,
-    });
-
+    const { data: employee, error } = await supabase.from('profiles').insert(req.body).select('*').single();
+    if (error) throw error;
     res.status(201).json({ data: employee });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -84,28 +76,16 @@ router.put('/employees/:id', auth, authorize('SUPER_ADMIN', 'HR_MANAGER'), async
 router.get('/attendance', auth, async (req, res) => {
   try {
     const { date, employeeId, startDate, endDate } = req.query;
-    
-    const where = {};
-    if (employeeId) where.employeeId = employeeId;
-    if (date) where.date = new Date(date);
+    let q = supabase.from('attendance').select('*');
+    if (employeeId) q = q.eq('employee_id', employeeId);
+    if (date) q = q.eq('date', new Date(date).toISOString().split('T')[0]);
     if (startDate && endDate) {
-      where.date = {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
-      };
+      q = q.gte('date', new Date(startDate).toISOString().split('T')[0]).lte('date', new Date(endDate).toISOString().split('T')[0]);
     }
-
-    const attendance = await prisma.attendance.findMany({
-      where,
-      include: {
-        employee: {
-          select: { firstName: true, lastName: true, position: true },
-        },
-      },
-      orderBy: { date: 'desc' },
-    });
-
-    res.json({ data: attendance });
+    q = q.order('date', { ascending: false });
+    const { data: attendance, error } = await q;
+    if (error) throw error;
+    res.json({ data: attendance || [] });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -174,25 +154,13 @@ router.post('/attendance/checkout', auth, async (req, res) => {
 router.get('/leave/requests', auth, async (req, res) => {
   try {
     const { status, employeeId } = req.query;
-    
-    const where = {};
-    if (status) where.status = status;
-    if (employeeId) where.employeeId = employeeId;
-
-    const requests = await prisma.leaveRequest.findMany({
-      where,
-      include: {
-        employee: {
-          select: { firstName: true, lastName: true, position: true },
-        },
-        approvedBy: {
-          select: { firstName: true, lastName: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    res.json({ data: requests });
+    let q = supabase.from('leave_requests').select('*');
+    if (status) q = q.eq('status', status);
+    if (employeeId) q = q.eq('employee_id', employeeId);
+    q = q.order('created_at', { ascending: false });
+    const { data: requests, error } = await q;
+    if (error) throw error;
+    res.json({ data: requests || [] });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -201,14 +169,13 @@ router.get('/leave/requests', auth, async (req, res) => {
 // Create leave request
 router.post('/leave/requests', auth, async (req, res) => {
   try {
-    const request = await prisma.leaveRequest.create({
-      data: {
-        ...req.body,
-        employeeId: req.user.id,
-        status: 'PENDING',
-      },
-    });
-
+    const payload = {
+      ...req.body,
+      employee_id: req.user.id,
+      status: 'PENDING',
+    };
+    const { data: request, error } = await supabase.from('leave_requests').insert(payload).select('*').single();
+    if (error) throw error;
     res.status(201).json({ data: request });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -261,29 +228,17 @@ router.put('/leave/requests/:id/reject', auth, authorize('SUPER_ADMIN', 'HR_MANA
 router.get('/certifications', auth, async (req, res) => {
   try {
     const { employeeId, status } = req.query;
-    
-    const where = {};
-    if (employeeId) where.employeeId = employeeId;
+    let q = supabase.from('certifications').select('*');
+    if (employeeId) q = q.eq('employee_id', employeeId);
     if (status === 'expiring') {
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + 30);
-      where.expiryDate = {
-        lte: futureDate,
-        gte: new Date(),
-      };
+      q = q.lte('expiry_date', futureDate.toISOString()).gte('expiry_date', new Date().toISOString());
     }
-
-    const certifications = await prisma.certification.findMany({
-      where,
-      include: {
-        employee: {
-          select: { firstName: true, lastName: true, position: true },
-        },
-      },
-      orderBy: { expiryDate: 'asc' },
-    });
-
-    res.json({ data: certifications });
+    q = q.order('expiry_date');
+    const { data: certifications, error } = await q;
+    if (error) throw error;
+    res.json({ data: certifications || [] });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -320,10 +275,8 @@ router.get('/certifications/expiring', auth, async (req, res) => {
 // Add certification
 router.post('/certifications', auth, authorize('SUPER_ADMIN', 'HR_MANAGER'), async (req, res) => {
   try {
-    const certification = await prisma.certification.create({
-      data: req.body,
-    });
-
+    const { data: certification, error } = await supabase.from('certifications').insert(req.body).select('*').single();
+    if (error) throw error;
     res.status(201).json({ data: certification });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -771,6 +724,202 @@ router.get('/payroll/:month', auth, authorize('SUPER_ADMIN', 'HR_MANAGER', 'FINA
     res.json({ success: true, data: payroll, summary });
   } catch (error) {
     console.error('Error fetching payroll:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== JOB POSTINGS (RLS Bypass) ====================
+
+// Create job posting
+router.post('/job-postings', auth, authorize('SUPER_ADMIN', 'ADMIN', 'HR_MANAGER'), async (req, res) => {
+  try {
+    const { title, department, location, employment_type, salary_range, description, requirements, responsibilities } = req.body;
+    
+    const { data, error } = await supabase
+      .from('job_postings')
+      .insert([{
+        title,
+        department,
+        location,
+        employment_type,
+        salary_range,
+        description,
+        requirements,
+        responsibilities,
+        status: 'active',
+        posted_by: req.user.id,
+        posted_date: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Error creating job posting:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update job posting
+router.put('/job-postings/:id', auth, authorize('SUPER_ADMIN', 'ADMIN', 'HR_MANAGER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, department, location, employment_type, salary_range, description, requirements, responsibilities, status } = req.body;
+    
+    const { data, error } = await supabase
+      .from('job_postings')
+      .update({
+        title,
+        department,
+        location,
+        employment_type,
+        salary_range,
+        description,
+        requirements,
+        responsibilities,
+        status
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Error updating job posting:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete job posting
+router.delete('/job-postings/:id', auth, authorize('SUPER_ADMIN', 'ADMIN', 'HR_MANAGER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const { error } = await supabase
+      .from('job_postings')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    res.json({ success: true, message: 'Job posting deleted' });
+  } catch (error) {
+    console.error('Error deleting job posting:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== DRIVER SHIFTS (RLS Bypass) ====================
+
+// Create driver shift
+router.post('/shifts', auth, authorize('SUPER_ADMIN', 'ADMIN', 'HR_MANAGER', 'OPERATIONS_MANAGER'), async (req, res) => {
+  try {
+    const { driver_id, shift_date, shift_type, start_time, end_time, bus_id, route_id } = req.body;
+    
+    const { data, error } = await supabase
+      .from('driver_shifts')
+      .insert([{
+        driver_id,
+        shift_date,
+        shift_type,
+        start_time,
+        end_time,
+        bus_id: bus_id || null,
+        route_id: route_id || null,
+        status: 'SCHEDULED',
+        created_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Error creating shift:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update driver shift
+router.put('/shifts/:id', auth, authorize('SUPER_ADMIN', 'ADMIN', 'HR_MANAGER', 'OPERATIONS_MANAGER'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { driver_id, shift_date, shift_type, start_time, end_time, bus_id, route_id, status } = req.body;
+    
+    const { data, error } = await supabase
+      .from('driver_shifts')
+      .update({
+        driver_id,
+        shift_date,
+        shift_type,
+        start_time,
+        end_time,
+        bus_id: bus_id || null,
+        route_id: route_id || null,
+        status
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Error updating shift:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== PERFORMANCE EVALUATIONS (RLS Bypass) ====================
+
+// Create performance evaluation
+router.post('/evaluations', auth, authorize('SUPER_ADMIN', 'ADMIN', 'HR_MANAGER', 'OPERATIONS_MANAGER'), async (req, res) => {
+  try {
+    const {
+      employee_id,
+      period_start,
+      period_end,
+      attendance_score,
+      quality_of_work_score,
+      teamwork_score,
+      communication_score,
+      leadership_score,
+      problem_solving_score,
+      strengths,
+      areas_for_improvement,
+      goals,
+      comments
+    } = req.body;
+    
+    const { data, error } = await supabase
+      .from('performance_evaluations')
+      .insert([{
+        employee_id,
+        evaluator_id: req.user.id,
+        evaluation_date: new Date().toISOString().split('T')[0],
+        period_start,
+        period_end,
+        attendance_score,
+        quality_of_work_score,
+        teamwork_score,
+        communication_score,
+        leadership_score,
+        problem_solving_score,
+        strengths,
+        areas_for_improvement,
+        goals,
+        comments,
+        status: 'submitted',
+        submitted_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Error creating evaluation:', error);
     res.status(500).json({ error: error.message });
   }
 });

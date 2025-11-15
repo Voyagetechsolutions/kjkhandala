@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { supabase, pool } = require('../config/supabase');
 
 class FinanceEngine {
   constructor() {

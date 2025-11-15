@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { useLocation } from 'react-router-dom';
+import AdminLayout from '@/components/admin/AdminLayout';
+import MaintenanceLayout from '@/components/maintenance/MaintenanceLayout';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Package, Plus, X, AlertTriangle, TrendingDown, ShoppingCart } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const partSchema = z.object({
   partNumber: z.string().min(1, 'Part number is required'),
@@ -28,7 +32,11 @@ interface Part {
   status: string;
 }
 
-const Parts = () => {
+export default function Parts() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : MaintenanceLayout;
+  
   const [parts, setParts] = useState<Part[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -47,14 +55,13 @@ const Parts = () => {
 
   const fetchParts = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/maintenance/parts', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setParts(data.data || []);
-      }
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('*')
+        .order('part_name');
+
+      if (error) throw error;
+      setParts(data || []);
     } catch (error) {
       console.error('Failed to fetch parts:', error);
     } finally {
@@ -64,21 +71,23 @@ const Parts = () => {
 
   const onSubmit = async (data: PartFormData) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/maintenance/parts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(data)
-      });
+      const { error } = await supabase
+        .from('inventory')
+        .insert([{
+          part_number: data.partNumber,
+          name: data.partName,
+          category: data.category,
+          quantity: data.quantity,
+          unit_price: data.unitPrice,
+          supplier: data.supplier,
+          minimum_stock: data.minStockLevel,
+          status: 'available'
+        }]);
 
-      if (response.ok) {
-        await fetchParts();
-        setShowModal(false);
-        reset();
-      }
+      if (error) throw error;
+      await fetchParts();
+      setShowModal(false);
+      reset();
     } catch (error) {
       console.error('Failed to add part:', error);
     }
@@ -88,26 +97,34 @@ const Parts = () => {
     if (!selectedPart || !usedFor) return;
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/maintenance/parts/${selectedPart.id}/use`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          quantity: useQuantity,
-          usedFor
-        })
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (response.ok) {
-        await fetchParts();
-        setShowUseModal(false);
-        setSelectedPart(null);
-        setUseQuantity(1);
-        setUsedFor('');
-      }
+      const newQuantity = selectedPart.quantity - useQuantity;
+      
+      const { error: updateError } = await supabase
+        .from('inventory')
+        .update({ quantity: newQuantity })
+        .eq('id', selectedPart.id);
+
+      if (updateError) throw updateError;
+
+      const { error: usageError } = await supabase
+        .from('parts_usage')
+        .insert([{
+          part_id: selectedPart.id,
+          quantity_used: useQuantity,
+          used_by: user.id,
+          notes: usedFor
+        }]);
+
+      if (usageError) throw usageError;
+
+      await fetchParts();
+      setShowUseModal(false);
+      setSelectedPart(null);
+      setUseQuantity(1);
+      setUsedFor('');
     } catch (error) {
       console.error('Failed to use part:', error);
     }
@@ -115,19 +132,19 @@ const Parts = () => {
 
   const reorderPart = async (partId: string) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/maintenance/parts/${partId}/reorder`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ quantity: 10 })
-      });
+      const part = parts.find(p => p.id === partId);
+      if (!part) return;
 
-      if (response.ok) {
-        alert('Reorder request submitted');
-      }
+      const { error } = await supabase
+        .from('inventory')
+        .update({ 
+          status: 'on_order',
+          notes: `Reorder requested on ${new Date().toISOString()}`
+        })
+        .eq('id', partId);
+
+      if (error) throw error;
+      alert('Reorder request submitted');
     } catch (error) {
       console.error('Failed to reorder part:', error);
     }
@@ -148,7 +165,7 @@ const Parts = () => {
   const outOfStock = parts.filter(p => p.quantity === 0).length;
 
   return (
-    <div className="p-6">
+    <Layout className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Parts Inventory</h1>
@@ -430,8 +447,6 @@ const Parts = () => {
           </div>
         </div>
       )}
-    </div>
+    </Layout>
   );
-};
-
-export default Parts;
+}

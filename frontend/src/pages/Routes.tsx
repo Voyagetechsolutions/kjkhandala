@@ -6,7 +6,7 @@ import Footer from "@/components/Footer";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MapPin, Clock, DollarSign, Calendar, Bus } from "lucide-react";
+import { MapPin, Clock, DollarSign, Calendar, Bus, Phone, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface Schedule {
@@ -100,7 +100,9 @@ export default function Routes() {
           <p className="text-muted-foreground">
             {selectedDate
               ? "No trips available for the selected date. Try another date."
-              : `No ${activeTab === 'local' ? 'local' : 'cross-border'} trips available at the moment.`}
+              : activeTab === 'local' 
+                ? "No local trips are currently available." 
+                : "No cross-border routes available at the moment."}
           </p>
         </Card>
       );
@@ -172,14 +174,14 @@ export default function Routes() {
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Available Routes</h1>
-          <p className="text-muted-foreground">Select your journey and book your seat</p>
+          <p className="text-muted-foreground">Choose your journey and secure your seat.</p>
         </div>
 
         {/* Date Filter */}
         <Card className="p-4 mb-6">
           <div className="flex items-center gap-4">
             <Calendar className="h-5 w-5 text-primary" />
-            <Label className="text-sm font-medium">Filter by date:</Label>
+            <Label className="text-sm font-medium">Filter by Date</Label>
             <input
               type="date"
               value={selectedDate}
@@ -187,7 +189,7 @@ export default function Routes() {
               min={new Date().toISOString().split('T')[0]}
               className="px-4 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring"
               title="Select date to filter routes"
-              placeholder="Select date"
+              placeholder="yyyy/mm/dd"
             />
             {selectedDate && (
               <Button
@@ -216,6 +218,27 @@ export default function Routes() {
             {renderSchedulesList(filteredSchedules)}
           </TabsContent>
         </Tabs>
+
+        {/* Contact Section */}
+        <Card className="p-6 mt-8 text-center bg-muted/30">
+          <h3 className="text-lg font-semibold mb-2">Need Assistance?</h3>
+          <div className="flex flex-col md:flex-row items-center justify-center gap-4 mt-4">
+            <a href="tel:+26771799129" className="flex items-center gap-2 text-primary hover:underline">
+              <Phone className="h-5 w-5" />
+              <span>📞 +267 71 799 129</span>
+            </a>
+            <span className="hidden md:inline text-muted-foreground">|</span>
+            <a 
+              href="https://wa.me/26773442135" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-primary hover:underline"
+            >
+              <MessageCircle className="h-5 w-5" />
+              <span>📱 WhatsApp +267 73 442 135</span>
+            </a>
+          </div>
+        </Card>
       </main>
 
       <Footer />

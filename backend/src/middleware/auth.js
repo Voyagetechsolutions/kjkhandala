@@ -1,33 +1,35 @@
-const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { supabase } = require('../config/supabase');
 
 const auth = async (req, res, next) => {
   try {
-    // Try to get token from httpOnly cookie first, fallback to Authorization header
-    const token = req.cookies.authToken || req.header('Authorization')?.replace('Bearer ', '');
+    // Prefer Supabase cookie, then Authorization header
+    const token = req.cookies['sb-access-token'] || req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) return res.status(401).json({ error: 'Authentication required' });
 
-    if (!token) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data.user) return res.status(401).json({ error: 'Invalid token' });
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-      },
-    });
+    const userId = data.user.id;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, email, full_name, phone')
+      .eq('id', userId)
+      .single();
+    const { data: rolesData } = await supabase
+      .from('user_roles')
+      .select('role, role_level')
+      .eq('user_id', userId)
+      .eq('is_active', true);
 
-    if (!user) {
-      return res.status(401).json({ error: 'User not found' });
-    }
-
-    req.user = user;
+    req.user = {
+      id: userId,
+      email: profile?.email || data.user.email || null,
+      firstName: profile?.full_name?.split(' ')?.[0] || null,
+      lastName: profile?.full_name?.split(' ')?.slice(1).join(' ') || null,
+      role: rolesData?.[0]?.role || 'PASSENGER',
+      roles: (rolesData || []).map((r) => r.role),
+      roleLevel: rolesData && rolesData.length ? Math.max(...rolesData.map((r) => r.role_level || 0)) : 0,
+    };
     req.token = token;
     next();
   } catch (error) {
@@ -41,7 +43,11 @@ const authorize = (...roles) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    if (!roles.includes(req.user.role)) {
+    const allowed = Array.isArray(roles) && roles.length === 1 && Array.isArray(roles[0])
+      ? roles[0]
+      : roles;
+
+    if (!allowed.includes(req.user.role)) {
       return res.status(403).json({ error: 'Access denied' });
     }
 

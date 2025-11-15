@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import TicketingLayout from '@/components/ticketing/TicketingLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,21 +11,49 @@ import { Badge } from '@/components/ui/badge';
 import { DollarSign, CreditCard, Smartphone, Banknote, Download } from 'lucide-react';
 
 export default function Payments() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : TicketingLayout;
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const { data, isLoading } = useQuery({
+  const { data: paymentsData, isLoading } = useQuery({
     queryKey: ['payments', selectedDate],
     queryFn: async () => {
-      const response = await api.get('/ticketing/payments', { params: { date: selectedDate } });
-      return response.data;
+      let query = supabase
+        .from('payments')
+        .select(`
+          *,
+          booking:bookings(
+            *,
+            trip:trips(
+              *,
+              route:routes(*)
+            )
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (selectedDate) query = query.eq('created_at', selectedDate);
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return { payments: data || [] };
     },
   });
 
-  const summary = data?.summary || { cash: 0, card: 0, mobileMoney: 0, total: 0, count: 0 };
-  const payments = data?.payments || [];
+  const payments = paymentsData?.payments || [];
+  
+  // Calculate summary from payments
+  const summary = {
+    cash: payments.filter((p: any) => p.payment_method === 'CASH').reduce((sum: number, p: any) => sum + parseFloat(p.amount || 0), 0),
+    card: payments.filter((p: any) => p.payment_method === 'CARD').reduce((sum: number, p: any) => sum + parseFloat(p.amount || 0), 0),
+    mobileMoney: payments.filter((p: any) => p.payment_method === 'MOBILE_MONEY').reduce((sum: number, p: any) => sum + parseFloat(p.amount || 0), 0),
+    total: payments.reduce((sum: number, p: any) => sum + parseFloat(p.amount || 0), 0),
+    count: payments.length
+  };
 
   return (
-    <TicketingLayout>
+    <Layout>
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -179,6 +209,6 @@ export default function Payments() {
           </CardContent>
         </Card>
       </div>
-    </TicketingLayout>
+    </Layout>
   );
 }

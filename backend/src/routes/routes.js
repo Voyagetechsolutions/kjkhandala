@@ -1,20 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
 const { auth, authorize } = require('../middleware/auth');
-
-const prisma = new PrismaClient();
+const { supabase } = require('../config/supabase');
 
 // Get all routes
 router.get('/', async (req, res) => {
   try {
-    const routes = await prisma.route.findMany({
-      include: {
-        stops: true,
-      },
-      orderBy: { name: 'asc' },
-    });
-    res.json({ data: routes });
+    const { data: routes, error } = await supabase.from('routes').select('*').order('origin');
+    if (error) throw error;
+    res.json({ data: routes || [] });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -23,21 +17,9 @@ router.get('/', async (req, res) => {
 // Get route by ID
 router.get('/:id', async (req, res) => {
   try {
-    const route = await prisma.route.findUnique({
-      where: { id: req.params.id },
-      include: {
-        stops: true,
-        trips: {
-          take: 10,
-          orderBy: { departureDate: 'desc' },
-        },
-      },
-    });
-
-    if (!route) {
-      return res.status(404).json({ error: 'Route not found' });
-    }
-
+    const { data: route, error } = await supabase.from('routes').select('*').eq('id', req.params.id).single();
+    if (error) throw error;
+    if (!route) return res.status(404).json({ error: 'Route not found' });
     res.json({ data: route });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -45,24 +27,10 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create route
-router.post('/', auth, authorize('SUPER_ADMIN', 'OPERATIONS_MANAGER'), async (req, res) => {
+router.post('/', auth, authorize(['SUPER_ADMIN', 'OPERATIONS_MANAGER']), async (req, res) => {
   try {
-    const { name, origin, destination, distance, duration, stops } = req.body;
-
-    const route = await prisma.route.create({
-      data: {
-        name,
-        origin,
-        destination,
-        distance: parseFloat(distance),
-        duration: parseInt(duration),
-        stops: stops ? {
-          create: stops,
-        } : undefined,
-      },
-      include: { stops: true },
-    });
-
+    const { data: route, error } = await supabase.from('routes').insert(req.body).select('*').single();
+    if (error) throw error;
     res.status(201).json({ data: route });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -70,14 +38,10 @@ router.post('/', auth, authorize('SUPER_ADMIN', 'OPERATIONS_MANAGER'), async (re
 });
 
 // Update route
-router.put('/:id', auth, authorize('SUPER_ADMIN', 'OPERATIONS_MANAGER'), async (req, res) => {
+router.put('/:id', auth, authorize(['SUPER_ADMIN', 'OPERATIONS_MANAGER']), async (req, res) => {
   try {
-    const route = await prisma.route.update({
-      where: { id: req.params.id },
-      data: req.body,
-      include: { stops: true },
-    });
-
+    const { data: route, error } = await supabase.from('routes').update(req.body).eq('id', req.params.id).select('*').single();
+    if (error) throw error;
     res.json({ data: route });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -85,12 +49,10 @@ router.put('/:id', auth, authorize('SUPER_ADMIN', 'OPERATIONS_MANAGER'), async (
 });
 
 // Delete route
-router.delete('/:id', auth, authorize('SUPER_ADMIN'), async (req, res) => {
+router.delete('/:id', auth, authorize(['SUPER_ADMIN', 'OPERATIONS_MANAGER']), async (req, res) => {
   try {
-    await prisma.route.delete({
-      where: { id: req.params.id },
-    });
-
+    const { error } = await supabase.from('routes').delete().eq('id', req.params.id);
+    if (error) throw error;
     res.json({ message: 'Route deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });

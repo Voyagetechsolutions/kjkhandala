@@ -1,0 +1,6 @@
+full_name,email,phone,department,position,hire_date,salary
+John Doe,john.doe@example.com,+267 71234567,Operations,Manager,2025-01-15,15000
+Jane Smith,jane.smith@example.com,+267 72345678,Finance,Accountant,2025-01-20,12000
+Mike Johnson,mike.johnson@example.com,+267 73456789,HR,HR Officer,2025-02-01,10000
+Sarah Williams,sarah.williams@example.com,+267 74567890,Maintenance,Technician,2025-02-10,8000
+David Brown,david.brown@example.com,+267 75678901,Ticketing,Agent,2025-03-01,7000

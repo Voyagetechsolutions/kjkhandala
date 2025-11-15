@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import TicketingLayout from '@/components/ticketing/TicketingLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,15 +12,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FileText, Download, Calendar, TrendingUp, Users, DollarSign } from 'lucide-react';
 
 export default function Reports() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : TicketingLayout;
   const [reportType, setReportType] = useState('daily-sales');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const { data: payments } = useQuery({
-    queryKey: ['payments', startDate],
+  const dateRange = { startDate, endDate };
+
+  const { data: reportsData, isLoading } = useQuery({
+    queryKey: ['ticketing-reports', dateRange],
     queryFn: async () => {
-      const response = await api.get('/ticketing/payments', { params: { date: startDate } });
-      return response.data;
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('*')
+        .gte('created_at', dateRange.startDate)
+        .lte('created_at', dateRange.endDate);
+      if (error) throw error;
+      return { bookings: data || [], summary: {} };
     },
   });
 
@@ -27,10 +39,18 @@ export default function Reports() {
     // In production, this would generate and download a PDF/CSV
   };
 
-  const summary = payments?.summary || { cash: 0, card: 0, mobileMoney: 0, total: 0, count: 0 };
+  const bookings = reportsData?.bookings || [];
+  const summary = {
+    count: bookings.length,
+    total: bookings.reduce((sum: number, b: any) => sum + parseFloat(b.total_amount || 0), 0),
+    totalBookings: bookings.length,
+    totalRevenue: bookings.reduce((sum: number, b: any) => sum + parseFloat(b.total_amount || 0), 0),
+    confirmedBookings: bookings.filter((b: any) => b.status === 'CONFIRMED').length,
+    cancelledBookings: bookings.filter((b: any) => b.status === 'CANCELLED').length,
+  };
 
   return (
-    <TicketingLayout>
+    <Layout>
       <div className="max-w-6xl mx-auto space-y-6">
         <div>
           <h1 className="text-3xl font-bold mb-2">Reports & Audit</h1>
@@ -158,6 +178,6 @@ export default function Reports() {
           </CardContent>
         </Card>
       </div>
-    </TicketingLayout>
+    </Layout>
   );
 }

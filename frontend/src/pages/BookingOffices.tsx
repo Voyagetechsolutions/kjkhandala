@@ -52,9 +52,11 @@ export default function BookingOffices() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Booking Offices</h1>
           <p className="text-muted-foreground">
-            Visit our booking offices for in-person ticket purchases and support
+            Visit any of our offices for in-person ticket purchases, trip enquiries, and customer support.
           </p>
         </div>
+
+        <h2 className="text-2xl font-semibold mb-6">Available Offices</h2>
 
         {loading ? (
           <div className="text-center py-12">
@@ -63,9 +65,9 @@ export default function BookingOffices() {
         ) : offices.length === 0 ? (
           <Card className="p-12 text-center">
             <Building2 className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold mb-2">No offices available</h3>
+            <h3 className="text-lg font-semibold mb-2">No offices listed.</h3>
             <p className="text-muted-foreground">
-              Please contact us for booking office information.
+              Please contact us directly for more information.
             </p>
           </Card>
         ) : (

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Wrench, AlertTriangle, CheckCircle, Clock, Calendar, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import {
+  createMaintenanceRecord,
+  getServiceTypes,
+  getMaintenanceStats,
+} from '@/lib/maintenanceRecordHelpers';
 
 export default function MaintenanceManagement() {
   const [selectedStatus, setSelectedStatus] = useState('all');
@@ -24,39 +29,53 @@ export default function MaintenanceManagement() {
   const { data: records, isLoading } = useQuery({
     queryKey: ['maintenance-records', selectedStatus],
     queryFn: async () => {
-      const params = selectedStatus !== 'all' ? `?status=${selectedStatus}` : '';
-      const response = await api.get(`/maintenance_records${params}`);
-      return response.data.data || [];
+      const { data, error } = await supabase
+        .from('work_orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
     },
   });
 
   // Fetch buses for the form
-  const { data: buses } = useQuery({
+  const { data: busesData } = useQuery({
     queryKey: ['buses-maintenance'],
     queryFn: async () => {
-      const response = await api.get('/buses');
-      return response.data.data || [];
+      const { data, error } = await supabase
+        .from('buses')
+        .select('*')
+        .order('registration_number');
+      if (error) throw error;
+      return data || [];
     },
   });
+
+  const buses = busesData || [];
 
   // Fetch maintenance reminders
   const { data: reminders } = useQuery({
     queryKey: ['maintenance-reminders'],
     queryFn: async () => {
-      try {
-        const response = await api.get('/maintenance_reminders');
-        return response.data.data || [];
-      } catch (error) {
+      const { data, error } = await supabase
+        .from('maintenance_reminders')
+        .select('*')
+        .order('due_date', { ascending: true });
+      if (error) {
         console.error('Error fetching reminders:', error);
         return [];
       }
+      return data || [];
     },
   });
 
   // Add Service Record Mutation
   const addRecordMutation = useMutation({
     mutationFn: async (formData: any) => {
-      await api.post('/maintenance_records', formData);
+      const { error } = await supabase
+        .from('maintenance_records')
+        .insert([formData]);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success('Service record added successfully!');
@@ -68,18 +87,64 @@ export default function MaintenanceManagement() {
     },
   });
 
-  const handleAddRecord = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddRecord = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    addRecordMutation.mutate({
-      busId: formData.get('bus_id'),
-      type: formData.get('service_type'),
-      date: formData.get('maintenance_date'),
-      mileage: parseInt(formData.get('odometer_reading') as string),
-      cost: parseFloat(formData.get('cost') as string),
-      performedBy: formData.get('service_provider'),
-      description: formData.get('description'),
-    });
+    
+    // Extract and validate form values
+    const bus_id = (formData.get('bus_id') as string) || '';
+    const service_type = (formData.get('service_type') as string) || '';
+    const maintenance_date = (formData.get('maintenance_date') as string) || '';
+    const description = (formData.get('description') as string) || '';
+    const odometer_str = formData.get('odometer_reading') as string;
+    const cost_str = formData.get('cost') as string;
+    const service_provider = (formData.get('service_provider') as string) || '';
+    
+    // Validate required fields
+    if (!bus_id || !service_type || !maintenance_date || !description) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    
+    // Parse numeric values safely
+    const odometer_reading = odometer_str ? parseInt(odometer_str) : undefined;
+    const cost = cost_str ? parseFloat(cost_str) : undefined;
+    
+    if (cost_str && isNaN(cost!)) {
+      toast.error('Please enter a valid cost');
+      return;
+    }
+    
+    if (odometer_str && isNaN(odometer_reading!)) {
+      toast.error('Please enter a valid odometer reading');
+      return;
+    }
+    
+    try {
+      // Use the helper function to create maintenance record
+      const result = await createMaintenanceRecord({
+        bus_id,
+        service_type,
+        maintenance_date,
+        description,
+        odometer_reading,
+        cost,
+        performed_by: service_provider || undefined,
+        status: 'PENDING',
+      });
+      
+      if (result.success) {
+        toast.success(`Maintenance record ${result.data.record_number} created successfully!`);
+        queryClient.invalidateQueries({ queryKey: ['maintenance-records'] });
+        setNewRecordOpen(false);
+        e.currentTarget.reset();
+      } else {
+        toast.error(result.error || 'Failed to create maintenance record');
+      }
+    } catch (error: any) {
+      console.error('Error in handleAddRecord:', error);
+      toast.error(error.message || 'Failed to add service record');
+    }
   };
 
   // Calculate stats

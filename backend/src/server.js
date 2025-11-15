@@ -14,23 +14,7 @@ const requestLogger = require('./middleware/logger');
 const { apiLimiter } = require('./middleware/rateLimit');
 const sanitize = require('./middleware/sanitize');
 const logger = require('./config/logger');
-const { PrismaClient } = require('@prisma/client');
 require('dotenv').config();
-
-const prisma = new PrismaClient();
-
-// Test database connection
-async function testDatabaseConnection() {
-  try {
-    await prisma.$connect();
-    logger.info('✅ Database connected successfully');
-  } catch (err) {
-    logger.error('❌ Database connection failed:', err);
-    process.exit(1);
-  }
-}
-
-testDatabaseConnection();
 
 const app = express();
 const server = http.createServer(app);
@@ -82,6 +66,10 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/tracking', require('./routes/tracking'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/notifications', require('./routes/notifications'));
+// Centralized bridge API
+app.use('/api/bridge', require('./routes/bridge'));
+// Also expose at /bridge for frontend compatibility
+app.use('/bridge', require('./routes/bridge'));
 
 // Additional flat routes for frontend compatibility
 app.use('/api/schedules', require('./routes/schedules'));
@@ -208,12 +196,14 @@ server.listen(PORT, () => {
   logger.info(`🔒 Security: httpOnly cookies, input sanitization, rate limiting enabled`);
   
   // Start scheduled tasks
-  scheduler.start();
-  logger.info('⏰ Scheduler started');
+  // TEMPORARILY DISABLED - Waiting for Prisma to Supabase migration
+  // scheduler.start();
+  logger.info('⏰ Scheduler temporarily disabled (Prisma migration pending)');
   
   // Start queue processors
-  queueProcessor.start();
-  logger.info('📨 Queue processor started');
+  // TEMPORARILY DISABLED - Waiting for Prisma to Supabase migration
+  // queueProcessor.start();
+  logger.info('📨 Queue processor temporarily disabled (Prisma migration pending)');
 });
 
 module.exports = { app, io };

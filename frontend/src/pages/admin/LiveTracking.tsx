@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import AdminLayout from '@/components/admin/AdminLayout';
+import OperationsLayout from '@/components/operations/OperationsLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,16 +12,28 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Map, Navigation, AlertCircle, Clock, MapPin, Activity, Zap, Bus, Users } from 'lucide-react';
 import { format } from 'date-fns';
 
-export default function LiveTracking() {
+export default function LiveTracking({ Layout = AdminLayout }) {
+  const location = useLocation();
+  const isOperationsRoute = location.pathname.startsWith('/operations');
   const [selectedBus, setSelectedBus] = useState<string | null>(null);
   const [mapView, setMapView] = useState<'all' | 'active' | 'alerts'>('all');
 
   // Fetch GPS tracking data
   const { data: trackingData, isLoading } = useQuery({
-    queryKey: ['gps-tracking'],
+    queryKey: ['live-tracking'],
     queryFn: async () => {
-      const response = await api.get('/gps_tracking/dashboard');
-      return response.data.data || [];
+      const { data, error } = await supabase
+        .from('trips')
+        .select(`
+          *,
+          route:routes(*),
+          bus:buses(*),
+          driver:drivers(*)
+        `)
+        .eq('status', 'in_progress')
+        .order('scheduled_departure');
+      if (error) throw error;
+      return { trips: data || [] };
     },
     refetchInterval: 10000, // Refresh every 10 seconds
   });
@@ -46,17 +60,24 @@ export default function LiveTracking() {
     queryKey: ['active-trips-tracking'],
     queryFn: async () => {
       const today = new Date().toISOString().split('T')[0];
-      const response = await api.get(`/trips?date=${today}&status=DEPARTED`);
-      return response.data.data || [];
+      const { data, error } = await supabase
+        .from('trips')
+        .select('*')
+        .gte('departure_time', `${today}T00:00:00`)
+        .lte('departure_time', `${today}T23:59:59`)
+        .eq('status', 'DEPARTED');
+      if (error) throw error;
+      return data || [];
     },
     refetchInterval: 30000,
   });
 
   // Calculate stats
-  const totalBuses = trackingData?.length || 0;
-  const activeBuses = trackingData?.filter((t: any) => t.location && t.location.speed > 0).length || 0;
-  const idleBuses = trackingData?.filter((t: any) => !t.location || t.location.speed === 0).length || 0;
-  const alertBuses = trackingData?.filter((t: any) => 
+  const trips = trackingData?.trips || [];
+  const totalBuses = trips.length || 0;
+  const activeBuses = trips.filter((t: any) => t.location && t.location.speed > 0).length || 0;
+  const idleBuses = trips.filter((t: any) => !t.location || t.location.speed === 0).length || 0;
+  const alertBuses = trips.filter((t: any) => 
     (t.location?.speed && t.location.speed > 120) // Speeding
   ).length || 0;
 
@@ -75,7 +96,7 @@ export default function LiveTracking() {
   };
 
   return (
-    <AdminLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
@@ -204,7 +225,7 @@ export default function LiveTracking() {
                   {/* Bus Markers Preview */}
                   <div className="w-full max-w-2xl space-y-2">
                     <p className="text-sm font-medium text-gray-600 mb-3">Live Bus Positions:</p>
-                    {trackingData?.slice(0, 5).map((tracking: any) => (
+                    {trips.slice(0, 5).map((tracking: any) => (
                       <div key={tracking.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border">
                         <span className="text-2xl">{getBusStatusIcon(tracking)}</span>
                         <div className="flex-1">
@@ -241,13 +262,13 @@ export default function LiveTracking() {
                     <div className="text-center py-8 text-muted-foreground">
                       Loading tracking data...
                     </div>
-                  ) : trackingData?.length === 0 ? (
+                  ) : trips.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <MapPin className="h-12 w-12 mx-auto mb-4 opacity-50" />
                       <p>No GPS tracking data available</p>
                     </div>
                   ) : (
-                    trackingData?.map((tracking: any) => {
+                    trips.map((tracking: any) => {
                       const hasAlert = tracking.speed > 120 || (tracking.fuel_level && tracking.fuel_level < 20);
                       
                       return (
@@ -437,6 +458,6 @@ export default function LiveTracking() {
           </TabsContent>
         </Tabs>
       </div>
-    </AdminLayout>
+    </Layout>
   );
 }

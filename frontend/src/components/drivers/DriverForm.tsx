@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,16 +19,9 @@ export default function DriverForm({ driver, onClose, onSuccess }: DriverFormPro
   const [formData, setFormData] = useState({
     full_name: driver?.full_name || '',
     phone: driver?.phone || '',
-    email: driver?.email || '',
-    id_number: driver?.id_number || '',
     license_number: driver?.license_number || '',
     license_expiry: driver?.license_expiry || '',
-    date_of_birth: driver?.date_of_birth || '',
-    address: driver?.address || '',
-    emergency_contact_name: driver?.emergency_contact_name || '',
-    emergency_contact_phone: driver?.emergency_contact_phone || '',
-    status: driver?.status || 'active',
-    hire_date: driver?.hire_date || new Date().toISOString().split('T')[0],
+    status: driver?.status || 'ACTIVE',
     notes: driver?.notes || '',
   });
 
@@ -58,7 +51,12 @@ export default function DriverForm({ driver, onClose, onSuccess }: DriverFormPro
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    saveMutation.mutate(formData);
+    // Ensure status is UPPERCASE for enum compatibility
+    const payload = {
+      ...formData,
+      status: formData.status.toUpperCase(),
+    };
+    saveMutation.mutate(payload);
   };
 
   const handleChange = (field: string, value: any) => {
@@ -99,27 +97,6 @@ export default function DriverForm({ driver, onClose, onSuccess }: DriverFormPro
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleChange('email', e.target.value)}
-                placeholder="driver@example.com"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="id_number">ID Number *</Label>
-              <Input
-                id="id_number"
-                value={formData.id_number}
-                onChange={(e) => handleChange('id_number', e.target.value)}
-                placeholder="National ID"
-                required
-              />
-            </div>
 
             <div className="space-y-2">
               <Label htmlFor="license_number">License Number *</Label>
@@ -143,26 +120,6 @@ export default function DriverForm({ driver, onClose, onSuccess }: DriverFormPro
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="date_of_birth">Date of Birth</Label>
-              <Input
-                id="date_of_birth"
-                type="date"
-                value={formData.date_of_birth}
-                onChange={(e) => handleChange('date_of_birth', e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="hire_date">Hire Date *</Label>
-              <Input
-                id="hire_date"
-                type="date"
-                value={formData.hire_date}
-                onChange={(e) => handleChange('hire_date', e.target.value)}
-                required
-              />
-            </div>
 
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
@@ -171,43 +128,12 @@ export default function DriverForm({ driver, onClose, onSuccess }: DriverFormPro
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="on_leave">On Leave</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="emergency_contact_name">Emergency Contact Name</Label>
-              <Input
-                id="emergency_contact_name"
-                value={formData.emergency_contact_name}
-                onChange={(e) => handleChange('emergency_contact_name', e.target.value)}
-                placeholder="Contact person"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="emergency_contact_phone">Emergency Contact Phone</Label>
-              <Input
-                id="emergency_contact_phone"
-                value={formData.emergency_contact_phone}
-                onChange={(e) => handleChange('emergency_contact_phone', e.target.value)}
-                placeholder="Contact number"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="address">Address</Label>
-            <Input
-              id="address"
-              value={formData.address}
-              onChange={(e) => handleChange('address', e.target.value)}
-              placeholder="Residential address"
-            />
           </div>
 
           <div className="space-y-2">

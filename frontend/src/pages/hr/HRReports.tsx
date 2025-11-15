@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import HRLayout from '@/components/hr/HRLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +18,9 @@ import {
 import { Download, BarChart3, Users, TrendingUp, Calendar, FileText } from 'lucide-react';
 
 export default function HRReports() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : HRLayout;
   const [selectedReport, setSelectedReport] = useState('headcount');
   const [period, setPeriod] = useState('month');
   const [dateRange, setDateRange] = useState({
@@ -23,21 +28,25 @@ export default function HRReports() {
     to: new Date().toISOString().split('T')[0],
   });
 
-  const { data: employees = [] } = useQuery({
-    queryKey: ['hr-employees'],
+  const { data: reportsData, isLoading } = useQuery({
+    queryKey: ['hr-reports'],
     queryFn: async () => {
-      const response = await api.get('/hr/employees');
-      return Array.isArray(response.data) ? response.data : (response.data?.employees || []);
+      const { data: employees, error: empError } = await supabase
+        .from('employees')
+        .select('*');
+      if (empError) throw empError;
+      
+      const { data: attendance, error: attError } = await supabase
+        .from('attendance')
+        .select('*');
+      if (attError) throw attError;
+      
+      return { employees: employees || [], attendance: attendance || [] };
     },
   });
 
-  const { data: attendance = [] } = useQuery({
-    queryKey: ['hr-attendance-summary'],
-    queryFn: async () => {
-      const response = await api.get('/hr/attendance/summary');
-      return Array.isArray(response.data) ? response.data : (response.data?.summary || []);
-    },
-  });
+  const employees = reportsData?.employees || [];
+  const attendance = reportsData?.attendance || [];
 
   const reports = [
     { id: 'headcount', name: 'Headcount Report', icon: Users, color: 'text-blue-600', description: 'Employee count by department' },
@@ -59,7 +68,7 @@ export default function HRReports() {
   };
 
   return (
-    <HRLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -216,6 +225,6 @@ export default function HRReports() {
           </Card>
         </div>
       </div>
-    </HRLayout>
+    </Layout>
   );
 }

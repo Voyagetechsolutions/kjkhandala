@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import HRLayout from '@/components/hr/HRLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,7 +22,62 @@ import {
 export default function HRDashboard() {
   const { user, userRoles, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : HRLayout;
 
+  // All hooks must be called before any conditional returns
+  const { data: employees = [] } = useQuery({
+    queryKey: ['hr-employees'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .not('employee_id', 'is', null)
+        .order('full_name');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: attendance = [] } = useQuery({
+    queryKey: ['hr-attendance-today'],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('date', today);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: payroll = [] } = useQuery({
+    queryKey: ['hr-payroll'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('payroll')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: certifications = [] } = useQuery({
+    queryKey: ['hr-certifications'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('certifications')
+        .select('*')
+        .order('expiry_date');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Effects and conditional returns AFTER all hooks
   useEffect(() => {
     if (!loading && (!user || !userRoles?.includes('HR_MANAGER'))) {
       navigate('/');
@@ -34,38 +90,6 @@ export default function HRDashboard() {
   }
 
   if (!userRoles?.includes('HR_MANAGER')) return null;
-
-  const { data: employees = [] } = useQuery({
-    queryKey: ['hr-employees'],
-    queryFn: async () => {
-      const response = await api.get('/hr/employees');
-      return Array.isArray(response.data) ? response.data : (response.data?.employees || []);
-    },
-  });
-
-  const { data: attendance = [] } = useQuery({
-    queryKey: ['hr-attendance-today'],
-    queryFn: async () => {
-      const response = await api.get('/hr/attendance/today');
-      return Array.isArray(response.data) ? response.data : (response.data?.attendance || []);
-    },
-  });
-
-  const { data: payroll = [] } = useQuery({
-    queryKey: ['hr-payroll'],
-    queryFn: async () => {
-      const response = await api.get('/hr/payroll');
-      return Array.isArray(response.data) ? response.data : (response.data?.payroll || []);
-    },
-  });
-
-  const { data: certifications = [] } = useQuery({
-    queryKey: ['hr-certifications'],
-    queryFn: async () => {
-      const response = await api.get('/hr/certifications');
-      return Array.isArray(response.data) ? response.data : (response.data?.certifications || []);
-    },
-  });
 
   const employeeStats = {
     total: employees.length,
@@ -117,18 +141,49 @@ export default function HRDashboard() {
   ].filter(Boolean);
 
   const upcomingRenewals = expiringCerts.slice(0, 5).map((cert: any) => {
-    const expiry = new Date(cert.expiryDate);
+    const expiry = new Date(cert.expiry_date || cert.expiryDate);
     const days = Math.floor((expiry.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
     return {
-      name: cert.employeeName || 'Unknown',
-      type: cert.type,
-      date: cert.expiryDate,
+      name: cert.employee_name || cert.employeeName || 'Unknown',
+      type: cert.certificate_type || cert.type,
+      date: cert.expiry_date || cert.expiryDate,
       days
     };
   });
 
+  // Calculate real turnover and retention rates
+  const thisYear = new Date().getFullYear();
+  const startOfYear = new Date(thisYear, 0, 1);
+  
+  const employeesAtStartOfYear = employees.filter((e: any) => {
+    const hireDate = new Date(e.hire_date || e.created_at);
+    return hireDate < startOfYear;
+  }).length;
+  
+  const terminatedThisYear = employees.filter((e: any) => {
+    if (e.status !== 'terminated' || !e.termination_date) return false;
+    const termDate = new Date(e.termination_date);
+    return termDate >= startOfYear;
+  }).length;
+  
+  const turnoverRate = employeesAtStartOfYear > 0 
+    ? ((terminatedThisYear / employeesAtStartOfYear) * 100).toFixed(1)
+    : '0.0';
+  
+  const retentionRate = (100 - parseFloat(turnoverRate)).toFixed(1);
+  
+  const avgTenureYears = employees
+    .filter((e: any) => e.hire_date)
+    .reduce((sum: number, e: any) => {
+      const hireDate = new Date(e.hire_date);
+      const years = (today.getTime() - hireDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+      return sum + years;
+    }, 0) / (employees.filter((e: any) => e.hire_date).length || 1);
+  
+  const avgTenure = avgTenureYears.toFixed(1);
+
   return (
-    <HRLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -330,26 +385,26 @@ export default function HRDashboard() {
               <TrendingUp className="h-5 w-5" />
               Turnover & Retention Rate
             </CardTitle>
-            <CardDescription>Employee retention metrics</CardDescription>
+            <CardDescription>Employee retention metrics (Year {thisYear})</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-3 gap-4">
               <div className="text-center p-4 border rounded-lg">
-                <div className="text-3xl font-bold text-green-600">94.2%</div>
+                <div className="text-3xl font-bold text-green-600">{retentionRate}%</div>
                 <div className="text-sm text-muted-foreground">Retention Rate</div>
               </div>
               <div className="text-center p-4 border rounded-lg">
-                <div className="text-3xl font-bold text-red-600">5.8%</div>
+                <div className="text-3xl font-bold text-red-600">{turnoverRate}%</div>
                 <div className="text-sm text-muted-foreground">Turnover Rate</div>
               </div>
               <div className="text-center p-4 border rounded-lg">
-                <div className="text-3xl font-bold text-blue-600">2.3 yrs</div>
+                <div className="text-3xl font-bold text-blue-600">{avgTenure} yrs</div>
                 <div className="text-sm text-muted-foreground">Avg Tenure</div>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
-    </HRLayout>
+    </Layout>
   );
 }

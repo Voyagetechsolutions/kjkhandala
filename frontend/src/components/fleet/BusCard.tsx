@@ -12,14 +12,15 @@ interface BusCardProps {
 
 export default function BusCard({ bus, onEdit, onAddFuel }: BusCardProps) {
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
+    const value = (status || '').toUpperCase();
+    switch (value) {
+      case 'ACTIVE':
         return 'bg-green-500';
-      case 'maintenance':
+      case 'MAINTENANCE':
         return 'bg-orange-500';
-      case 'out_of_service':
+      case 'OUT_OF_SERVICE':
         return 'bg-red-500';
-      case 'retired':
+      case 'RETIRED':
         return 'bg-gray-500';
       default:
         return 'bg-gray-500';
@@ -28,9 +29,11 @@ export default function BusCard({ bus, onEdit, onAddFuel }: BusCardProps) {
 
   const getStatusLabel = (status: string) => {
     if (!status) return 'Unknown';
-    return status.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
+    return status
+      .toLowerCase()
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
 
   const isServiceDue = bus.next_service_date && 

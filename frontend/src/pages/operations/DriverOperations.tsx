@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import OperationsLayout from '@/components/operations/OperationsLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,16 +19,19 @@ export default function DriverOperations() {
   const [statusFilter, setStatusFilter] = useState('all');
 
   // Fetch drivers
-  const { data: driversData, isLoading } = useQuery({
+  const { data: drivers = [], isLoading } = useQuery({
     queryKey: ['operations-drivers'],
     queryFn: async () => {
-      const response = await api.get('/operations/drivers');
-      return response.data;
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('*')
+        .order('full_name');
+      
+      if (error) throw error;
+      return data || [];
     },
     refetchInterval: 30000,
   });
-
-  const drivers = driversData?.drivers || [];
 
   const filteredDrivers = drivers.filter((driver: any) => {
     if (statusFilter === 'all') return true;

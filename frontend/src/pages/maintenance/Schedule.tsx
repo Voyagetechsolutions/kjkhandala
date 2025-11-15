@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import MaintenanceLayout from '@/components/maintenance/MaintenanceLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,74 +28,104 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
 export default function Schedule() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : MaintenanceLayout;
+
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [formData, setFormData] = useState({
-    busId: '',
-    serviceType: '',
-    intervalKm: 0,
-    nextServiceDate: '',
+    bus_id: '',
+    maintenance_type: '',
+    frequency_km: 0,
+    next_service_date: '',
   });
 
   const queryClient = useQueryClient();
 
-  const { data: schedules = [] } = useQuery({
+  // Fetch schedules
+  const { data: schedulesData } = useQuery({
     queryKey: ['maintenance-schedules'],
     queryFn: async () => {
-      const response = await api.get('/maintenance/maintenance-schedules');
-      return Array.isArray(response.data) ? response.data : (response.data?.schedules || []);
+      const { data, error } = await supabase
+        .from('maintenance_schedules')
+        .select(`
+          *,
+          bus:buses(*)
+        `)
+        .order('next_service_date');
+      if (error) throw error;
+      return { schedules: data || [] };
     },
   });
 
+  // Fetch buses
   const { data: buses = [] } = useQuery({
     queryKey: ['buses'],
     queryFn: async () => {
-      const response = await api.get('/buses');
-      return Array.isArray(response.data) ? response.data : (response.data?.buses || []);
+      const { data, error } = await supabase
+        .from('buses')
+        .select('*');
+      if (error) throw error;
+      return data || [];
     },
   });
 
+  // Mutation to create schedule
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      await api.post('/maintenance/maintenance-schedules', data);
+      const { error } = await supabase
+        .from('maintenance_schedules')
+        .insert([data]);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maintenance-schedules'] });
       toast.success('Schedule created successfully');
       setShowCreateDialog(false);
       setFormData({
-        busId: '',
-        serviceType: '',
-        intervalKm: 0,
-        nextServiceDate: '',
+        bus_id: '',
+        maintenance_type: '',
+        frequency_km: 0,
+        next_service_date: '',
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('Supabase insert error:', error);
       toast.error('Failed to create schedule');
     },
   });
 
   const handleCreateSchedule = () => {
-    createMutation.mutate(formData);
+    const payload = {
+      bus_id: formData.bus_id || null,
+      maintenance_type: formData.maintenance_type || null, // must match enum: routine, repair, inspection, emergency
+      frequency_km: formData.frequency_km > 0 ? formData.frequency_km : null,
+      next_service_date: formData.next_service_date || null,
+    };
+    createMutation.mutate(payload);
   };
 
+  const schedules = schedulesData?.schedules || [];
   const today = new Date();
+
   const summary = {
     upcoming: schedules.filter((s: any) => {
-      const nextDate = new Date(s.nextServiceDate);
+      const nextDate = new Date(s.next_service_date);
       return nextDate > today && (nextDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24) > 7;
     }).length,
     dueSoon: schedules.filter((s: any) => {
-      const nextDate = new Date(s.nextServiceDate);
+      const nextDate = new Date(s.next_service_date);
       const days = (nextDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
       return days >= 0 && days <= 7;
     }).length,
-    overdue: schedules.filter((s: any) => new Date(s.nextServiceDate) < today).length,
+    overdue: schedules.filter((s: any) => new Date(s.next_service_date) < today).length,
     completed: schedules.filter((s: any) => s.status === 'completed').length,
   };
 
   return (
-    <MaintenanceLayout>
+    <Layout>
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold mb-2">Maintenance Schedule</h1>
@@ -105,6 +137,7 @@ export default function Schedule() {
           </Button>
         </div>
 
+        {/* Summary Cards */}
         <div className="grid md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -144,6 +177,7 @@ export default function Schedule() {
           </Card>
         </div>
 
+        {/* Maintenance Table */}
         <Card>
           <CardHeader>
             <CardTitle>Scheduled Services</CardTitle>
@@ -173,8 +207,8 @@ export default function Schedule() {
                   </TableRow>
                 ) : (
                   schedules.map((schedule: any) => {
-                    const bus = buses.find((b: any) => b.id === schedule.busId);
-                    const nextDate = new Date(schedule.nextServiceDate);
+                    const bus = buses.find((b: any) => b.id === schedule.bus_id);
+                    const nextDate = new Date(schedule.next_service_date);
                     const daysUntil = Math.floor((nextDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                     const status = daysUntil < 0 ? 'overdue' : daysUntil <= 7 ? 'due-soon' : 'upcoming';
                     
@@ -186,20 +220,16 @@ export default function Schedule() {
                             <div className="text-sm text-muted-foreground">{bus?.model || ''}</div>
                           </div>
                         </TableCell>
-                        <TableCell className="font-medium">{schedule.serviceType}</TableCell>
-                        <TableCell className="text-sm">{schedule.intervalKm ? `Every ${schedule.intervalKm} km` : schedule.intervalDays ? `Every ${schedule.intervalDays} days` : 'N/A'}</TableCell>
+                        <TableCell className="font-medium">{schedule.maintenance_type}</TableCell>
+                        <TableCell className="text-sm">{schedule.frequency_km ? `Every ${schedule.frequency_km} km` : 'N/A'}</TableCell>
                         <TableCell>
-                          <div>
-                            <div>{schedule.lastServiceDate ? new Date(schedule.lastServiceDate).toLocaleDateString() : 'N/A'}</div>
-                          </div>
+                          <div>{schedule.last_service_date ? new Date(schedule.last_service_date).toLocaleDateString() : 'N/A'}</div>
                         </TableCell>
                         <TableCell>
-                          <div>
-                            <div>{new Date(schedule.nextServiceDate).toLocaleDateString()}</div>
-                          </div>
+                          <div>{new Date(schedule.next_service_date).toLocaleDateString()}</div>
                         </TableCell>
                         <TableCell className="font-medium">{bus?.mileage?.toLocaleString() || 0} km</TableCell>
-                        <TableCell>{schedule.intervalKm ? (bus?.mileage + schedule.intervalKm)?.toLocaleString() : 'N/A'} km</TableCell>
+                        <TableCell>{schedule.frequency_km ? (bus?.mileage + schedule.frequency_km)?.toLocaleString() : 'N/A'} km</TableCell>
                         <TableCell>
                           <Badge className={
                             status === 'overdue' ? 'bg-red-500' :
@@ -221,6 +251,7 @@ export default function Schedule() {
           </CardContent>
         </Card>
 
+        {/* Create Dialog */}
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogContent>
             <DialogHeader>
@@ -232,8 +263,8 @@ export default function Schedule() {
                 <Label>Bus</Label>
                 <select 
                   className="w-full p-2 border rounded"
-                  value={formData.busId}
-                  onChange={(e) => setFormData({...formData, busId: e.target.value})}
+                  value={formData.bus_id}
+                  onChange={(e) => setFormData({...formData, bus_id: e.target.value})}
                 >
                   <option value="">Select bus</option>
                   {buses.map((bus: any) => (
@@ -243,39 +274,41 @@ export default function Schedule() {
                   ))}
                 </select>
               </div>
+
               <div>
                 <Label>Service Type</Label>
                 <select 
                   className="w-full p-2 border rounded"
-                  value={formData.serviceType}
-                  onChange={(e) => setFormData({...formData, serviceType: e.target.value})}
+                  value={formData.maintenance_type}
+                  onChange={(e) => setFormData({...formData, maintenance_type: e.target.value})}
                 >
                   <option value="">Select service type</option>
-                  <option value="Oil Change">Oil Change</option>
-                  <option value="Brake Inspection">Brake Inspection</option>
-                  <option value="Tire Rotation">Tire Rotation</option>
-                  <option value="Full Service">Full Service</option>
-                  <option value="Engine Service">Engine Service</option>
-                  <option value="Transmission Service">Transmission Service</option>
+                  <option value="routine">Routine</option>
+                  <option value="repair">Repair</option>
+                  <option value="inspection">Inspection</option>
+                  <option value="emergency">Emergency</option>
                 </select>
               </div>
+
               <div>
                 <Label>Frequency (km)</Label>
                 <Input 
                   type="number" 
                   placeholder="5000" 
-                  value={formData.intervalKm}
-                  onChange={(e) => setFormData({...formData, intervalKm: parseInt(e.target.value) || 0})}
+                  value={formData.frequency_km}
+                  onChange={(e) => setFormData({...formData, frequency_km: parseInt(e.target.value) || 0})}
                 />
               </div>
+
               <div>
                 <Label>Next Service Date</Label>
                 <Input 
                   type="date" 
-                  value={formData.nextServiceDate}
-                  onChange={(e) => setFormData({...formData, nextServiceDate: e.target.value})}
+                  value={formData.next_service_date}
+                  onChange={(e) => setFormData({...formData, next_service_date: e.target.value})}
                 />
               </div>
+
               <div className="flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
                 <Button onClick={handleCreateSchedule} disabled={createMutation.isPending}>
@@ -286,6 +319,6 @@ export default function Schedule() {
           </DialogContent>
         </Dialog>
       </div>
-    </MaintenanceLayout>
+    </Layout>
   );
 }

@@ -1,9 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
 const { auth, authorize } = require('../middleware/auth');
-
-const prisma = new PrismaClient();
+const { supabase } = require('../config/supabase');
 
 // Apply auth middleware
 router.use(auth);
@@ -19,38 +17,16 @@ router.get('/dashboard', authorize(['TICKETING_AGENT', 'SUPER_ADMIN']), async (r
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Today's trips
-    const trips = await prisma.trip.findMany({
-      where: {
-        departureTime: { gte: today, lt: tomorrow },
-      },
-      include: {
-        route: true,
-        bus: true,
-        bookings: { include: { passenger: true } },
-      },
-    });
-
-    // Agent's payments today
-    const payments = await prisma.booking.findMany({
-      where: {
-        createdAt: { gte: today, lt: tomorrow },
-        paymentStatus: 'PAID',
-      },
-    });
-
-    const totalCollected = payments.reduce((sum, p) => sum + p.totalPrice, 0);
+    const [tripsRes, paymentsRes] = await Promise.all([
+      supabase.from('trips').select('id, departure_time, status').gte('departure_time', today.toISOString()).lt('departure_time', tomorrow.toISOString()),
+      supabase.from('bookings').select('total_amount, payment_status').gte('booking_date', today.toISOString()).lt('booking_date', tomorrow.toISOString()).eq('payment_status', 'COMPLETED')
+    ]);
+    const trips = tripsRes.data || [];
+    const payments = paymentsRes.data || [];
+    const totalCollected = payments.reduce((sum, p) => sum + Number(p.total_amount || 0), 0);
 
     res.json({
-      trips: trips.map(t => ({
-        id: t.id,
-        route: `${t.route.origin} - ${t.route.destination}`,
-        departureTime: t.departureTime,
-        capacity: t.bus.capacity,
-        booked: t.bookings.length,
-        available: t.bus.capacity - t.bookings.length,
-        status: t.status,
-      })),
+      trips: trips.map(t => ({ id: t.id, departureTime: t.departure_time, status: t.status })),
       stats: {
         totalCollected,
         ticketsSold: payments.length,

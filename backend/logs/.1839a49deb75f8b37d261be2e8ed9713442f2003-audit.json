@@ -1,0 +1,45 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\.1839a49deb75f8b37d261be2e8ed9713442f2003-audit.json",
+    "files": [
+        {
+            "date": 1762725424806,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-09.log",
+            "hash": "887783be8973b0cd59240b9cf9c716359e7d3d6e8fe8bda4577074b7efb4f0a3"
+        },
+        {
+            "date": 1762726107511,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-10.log",
+            "hash": "34752b1f9742bdb8f0214d49e8d482636e2994d781c81976f05cd9718252204c"
+        },
+        {
+            "date": 1762814377957,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-11.log",
+            "hash": "52e95278848077e2a2e3ae3f9a2adbd9b421982daaf65376fb00e68d6405e063"
+        },
+        {
+            "date": 1762900576762,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-12.log",
+            "hash": "40d108f1edec00c3149a5efd48c81a39962a23ca35f29aa28369c7ecdc3f7fc5"
+        },
+        {
+            "date": 1762984805366,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-13.log",
+            "hash": "eeb82e8a2a68d22aefc6122c46e0f5c8136c17856491ce665ca5b7fc37b0f900"
+        },
+        {
+            "date": 1763072809105,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-14.log",
+            "hash": "044ebf3cee05d028ccb6e6b7e29d254de697f558009886cef5176927de034468"
+        },
+        {
+            "date": 1763223425163,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-15.log",
+            "hash": "8ac918c0d4d285434a224889b6dcd1b4f338e1a308392ea61972aadd08b431c6"
+        }
+    ],
+    "hashType": "sha256"
+}

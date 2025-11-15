@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import api from '@/lib/api';
 import DriverLayout from '@/components/driver/DriverLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,15 +20,21 @@ export default function ReportIssue() {
   const { data } = useQuery({
     queryKey: ['driver-trip'],
     queryFn: async () => {
-      const response = await api.get('/driver/my-trip');
-      return response.data;
+      const { data, error } = await supabase
+        .from('trips')
+        .select('id')
+        .eq('driver_id', supabase.auth.user().id);
+      if (error) throw error;
+      return data[0];
     },
   });
 
   const reportMutation = useMutation({
-    mutationFn: async (issueData: any) => {
-      const response = await api.post(`/driver/report-issue/${data.trip.id}`, issueData);
-      return response.data;
+    mutationFn: async (data: any) => {
+      const { error } = await supabase
+        .from('incidents')
+        .insert([data]);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success('Issue reported successfully');

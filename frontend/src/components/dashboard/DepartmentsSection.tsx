@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import supabaseApi from '@/lib/supabase-api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,46 +23,31 @@ export default function DepartmentsSection() {
   // Fetch fleet data
   const { data: buses } = useQuery({
     queryKey: ['buses-dept'],
-    queryFn: async () => {
-      const response = await api.get('/buses');
-      return Array.isArray(response.data) ? response.data : (response.data?.buses || []);
-    },
+    queryFn: () => supabaseApi.buses.getAll(),
   });
 
   // Fetch schedules
   const { data: schedules } = useQuery({
     queryKey: ['schedules-dept'],
-    queryFn: async () => {
-      const response = await api.get('/schedules');
-      return Array.isArray(response.data) ? response.data : (response.data?.schedules || []);
-    },
+    queryFn: () => supabaseApi.schedules.getAll(),
   });
 
   // Fetch bookings
   const { data: bookings } = useQuery({
     queryKey: ['bookings-dept'],
-    queryFn: async () => {
-      const response = await api.get('/bookings');
-      return Array.isArray(response.data) ? response.data : (response.data?.bookings || []);
-    },
+    queryFn: () => supabaseApi.bookings.getAll(),
   });
 
   // Fetch staff
   const { data: staff } = useQuery({
     queryKey: ['staff-dept'],
-    queryFn: async () => {
-      const response = await api.get('/staff');
-      return Array.isArray(response.data) ? response.data : (response.data?.staff || []);
-    },
+    queryFn: () => supabaseApi.staff.getAll(),
   });
 
   // Fetch maintenance
   const { data: maintenance } = useQuery({
     queryKey: ['maintenance-dept'],
-    queryFn: async () => {
-      const response = await api.get('/maintenance_records');
-      return Array.isArray(response.data) ? response.data : (response.data?.maintenance_records || []);
-    },
+    queryFn: () => supabaseApi.maintenance.getAll(),
   });
 
   // Calculate department stats

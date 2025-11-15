@@ -35,7 +35,7 @@ export default function Contact() {
           <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold mb-2">Contact Us</h1>
             <p className="text-muted-foreground">
-              Get in touch with us for any queries or support
+              We're here to help with bookings, enquiries, or support.
             </p>
           </div>
 
@@ -47,7 +47,7 @@ export default function Contact() {
               </div>
               <h3 className="font-semibold mb-2">Call Us</h3>
               <a href="tel:+26771799129" className="text-primary hover:underline">
-                +267 71 799 129
+                📞 +267 71 799 129
               </a>
             </Card>
 
@@ -63,7 +63,7 @@ export default function Contact() {
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
-                +267 73 442 135
+                📱 +267 73 442 135
               </a>
             </Card>
 
@@ -74,14 +74,14 @@ export default function Contact() {
               </div>
               <h3 className="font-semibold mb-2">Email</h3>
               <a href="mailto:info@kjkhandala.com" className="text-primary hover:underline">
-                info@kjkhandala.com
+                📧 info@kjkhandala.com
               </a>
             </Card>
           </div>
 
           {/* Contact Form */}
           <Card className="p-6">
-            <h2 className="text-2xl font-bold mb-6">Send us a Message</h2>
+            <h2 className="text-2xl font-bold mb-6">Send Us a Message</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
                 <div>

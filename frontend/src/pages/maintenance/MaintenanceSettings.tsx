@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useLocation } from 'react-router-dom';
+import api from '@/services/api';
+import AdminLayout from '@/components/admin/AdminLayout';
 import MaintenanceLayout from '@/components/maintenance/MaintenanceLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +12,9 @@ import { Save, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function MaintenanceSettings() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : MaintenanceLayout;
   const [settings, setSettings] = useState({
     oilChangeInterval: '5000',
     brakeInspectionInterval: '10000',
@@ -47,7 +52,7 @@ export default function MaintenanceSettings() {
   };
 
   return (
-    <MaintenanceLayout>
+    <Layout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -208,6 +213,6 @@ export default function MaintenanceSettings() {
           </Button>
         </div>
       </div>
-    </MaintenanceLayout>
+    </Layout>
   );
 }

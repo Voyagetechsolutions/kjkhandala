@@ -1,12 +1,17 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import api from '@/services/api';
+import AdminLayout from '@/components/admin/AdminLayout';
 import HRLayout from '@/components/hr/HRLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -15,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Users, UserPlus, Briefcase, Calendar } from 'lucide-react';
+import { Plus, Users, UserPlus, Briefcase, Calendar, Eye, Edit, Trash2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -27,23 +32,157 @@ import {
 import { Badge } from '@/components/ui/badge';
 
 export default function Recruitment() {
-  const [showJobDialog, setShowJobDialog] = useState(false);
-
+  const { user } = useAuth();
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : HRLayout;
   const queryClient = useQueryClient();
+  
+  const [showJobDialog, setShowJobDialog] = useState(false);
+  const [editingJob, setEditingJob] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    title: '',
+    department: '',
+    location: '',
+    employmentType: '',
+    salaryRange: '',
+    description: '',
+    requirements: '',
+    responsibilities: ''
+  });
 
   const { data: jobPostings = [] } = useQuery({
     queryKey: ['hr-job-postings'],
     queryFn: async () => {
-      const response = await api.get('/hr/recruitment/jobs');
-      return Array.isArray(response.data) ? response.data : (response.data?.jobs || []);
+      const { data, error } = await supabase
+        .from('job_postings')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
     },
   });
 
-  const { data: applications = [] } = useQuery({
-    queryKey: ['hr-applications'],
+  const createJob = useMutation({
+    mutationFn: async (jobData: any) => {
+      const response = await api.post('/hr/job-postings', {
+        title: jobData.title,
+        department: jobData.department,
+        location: jobData.location,
+        employment_type: jobData.employmentType,
+        salary_range: jobData.salaryRange,
+        description: jobData.description,
+        requirements: jobData.requirements,
+        responsibilities: jobData.responsibilities
+      });
+      return response.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-job-postings'] });
+      toast.success('Job posting created successfully');
+      setShowJobDialog(false);
+      setFormData({ title: '', department: '', location: '', employmentType: '', salaryRange: '', description: '', requirements: '', responsibilities: '' });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to create job posting');
+    }
+  });
+
+  const updateJob = useMutation({
+    mutationFn: async ({ id, ...jobData }: any) => {
+      const response = await api.put(`/hr/job-postings/${id}`, {
+        title: jobData.title,
+        department: jobData.department,
+        location: jobData.location,
+        employment_type: jobData.employmentType,
+        salary_range: jobData.salaryRange,
+        description: jobData.description,
+        requirements: jobData.requirements,
+        responsibilities: jobData.responsibilities
+      });
+      return response.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-job-postings'] });
+      toast.success('Job posting updated successfully');
+      setShowJobDialog(false);
+      setEditingJob(null);
+      setFormData({ title: '', department: '', location: '', employmentType: '', salaryRange: '', description: '', requirements: '', responsibilities: '' });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to update job posting');
+    }
+  });
+
+  const deleteJob = useMutation({
+    mutationFn: async (jobId: string) => {
+      await api.delete(`/hr/job-postings/${jobId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-job-postings'] });
+      toast.success('Job posting deleted');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to delete job posting');
+    }
+  });
+
+  const toggleJobStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { data, error } = await supabase
+        .from('job_postings')
+        .update({ status: status === 'active' ? 'closed' : 'active' })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-job-postings'] });
+      toast.success('Job status updated');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to update status');
+    }
+  });
+
+  const handleEdit = (job: any) => {
+    setEditingJob(job);
+    setFormData({
+      title: job.title,
+      department: job.department,
+      location: job.location,
+      employmentType: job.employment_type,
+      salaryRange: job.salary_range || '',
+      description: job.description,
+      requirements: job.requirements || '',
+      responsibilities: job.responsibilities || ''
+    });
+    setShowJobDialog(true);
+  };
+
+  const handleSubmit = () => {
+    if (!formData.title || !formData.department || !formData.location || !formData.employmentType || !formData.description) {
+      toast.error('Please fill all required fields');
+      return;
+    }
+    if (editingJob) {
+      updateJob.mutate({ id: editingJob.id, ...formData });
+    } else {
+      createJob.mutate(formData);
+    }
+  };
+
+  const { data: applications = [], isLoading } = useQuery({
+    queryKey: ['applications'],
     queryFn: async () => {
-      const response = await api.get('/hr/recruitment/applications');
-      return Array.isArray(response.data) ? response.data : (response.data?.applications || []);
+      const { data, error } = await supabase
+        .from('job_applications')
+        .select('*')
+        .order('applied_date', { ascending: false });
+      if (error) throw error;
+      return data || [];
     },
   });
 
@@ -55,7 +194,7 @@ export default function Recruitment() {
   };
 
   return (
-    <HRLayout>
+    <Layout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -126,29 +265,49 @@ export default function Recruitment() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {jobPostings.map((job) => (
-                  <TableRow key={job.id}>
-                    <TableCell className="font-medium">{job.title}</TableCell>
-                    <TableCell>{job.department}</TableCell>
-                    <TableCell>{job.location}</TableCell>
-                    <TableCell>{job.type}</TableCell>
-                    <TableCell>{job.posted}</TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <div>{job.applications} total</div>
-                        <div className="text-muted-foreground">{job.shortlisted} shortlisted</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={job.status === 'active' ? 'bg-green-500' : 'bg-gray-500'}>
-                        {job.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Button>View</Button>
+                {jobPostings.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-muted-foreground">
+                      No job postings yet. Click "Post New Job" to create one.
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  jobPostings.map((job: any) => {
+                    const jobApps = applications.filter((a: any) => a.job_posting_id === job.id);
+                    return (
+                      <TableRow key={job.id}>
+                        <TableCell className="font-medium">{job.title}</TableCell>
+                        <TableCell>{job.department}</TableCell>
+                        <TableCell>{job.location}</TableCell>
+                        <TableCell className="capitalize">{job.employment_type}</TableCell>
+                        <TableCell>{job.posted_date ? new Date(job.posted_date).toLocaleDateString() : '-'}</TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div>{jobApps.length} total</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={job.status === 'active' ? 'bg-green-500' : 'bg-gray-500'}>
+                            {job.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => handleEdit(job)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => toggleJobStatus.mutate({ id: job.id, status: job.status })}>
+                              {job.status === 'active' ? 'Close' : 'Activate'}
+                            </Button>
+                            <Button size="sm" variant="destructive" onClick={() => deleteJob.mutate(job.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -204,42 +363,74 @@ export default function Recruitment() {
         </Card>
 
         <Dialog open={showJobDialog} onOpenChange={setShowJobDialog}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Post New Job</DialogTitle>
-              <DialogDescription>Create a new job posting</DialogDescription>
+              <DialogTitle>{editingJob ? 'Edit Job Posting' : 'Post New Job'}</DialogTitle>
+              <DialogDescription>
+                {editingJob ? 'Update job posting details' : 'Create a new job posting that will appear on the careers page'}
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>Job Title</Label>
-                <Input placeholder="e.g., Bus Driver" />
+                <Label>Job Title *</Label>
+                <Input value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} placeholder="e.g., Bus Driver" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Department</Label>
-                  <Input placeholder="e.g., Operations" />
+                  <Label>Department *</Label>
+                  <Input value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} placeholder="e.g., Operations" />
                 </div>
                 <div>
-                  <Label>Location</Label>
-                  <Input placeholder="e.g., Gaborone" />
+                  <Label>Location *</Label>
+                  <Input value={formData.location} onChange={(e) => setFormData({...formData, location: e.target.value})} placeholder="e.g., Gaborone" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Employment Type *</Label>
+                  <Select value={formData.employmentType} onValueChange={(value) => setFormData({...formData, employmentType: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="full-time">Full-time</SelectItem>
+                      <SelectItem value="part-time">Part-time</SelectItem>
+                      <SelectItem value="contract">Contract</SelectItem>
+                      <SelectItem value="temporary">Temporary</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Salary Range (Optional)</Label>
+                  <Input value={formData.salaryRange} onChange={(e) => setFormData({...formData, salaryRange: e.target.value})} placeholder="e.g., P5,000 - P8,000" />
                 </div>
               </div>
               <div>
-                <Label>Job Description</Label>
-                <Textarea rows={4} placeholder="Enter job description..." />
+                <Label>Job Description *</Label>
+                <Textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} rows={4} placeholder="Enter job description..." />
               </div>
               <div>
                 <Label>Requirements</Label>
-                <Textarea rows={3} placeholder="Enter requirements..." />
+                <Textarea value={formData.requirements} onChange={(e) => setFormData({...formData, requirements: e.target.value})} rows={3} placeholder="Enter requirements (one per line)..." />
+              </div>
+              <div>
+                <Label>Responsibilities</Label>
+                <Textarea value={formData.responsibilities} onChange={(e) => setFormData({...formData, responsibilities: e.target.value})} rows={3} placeholder="Enter key responsibilities..." />
               </div>
               <div className="flex gap-2 justify-end">
-                <Button onClick={() => setShowJobDialog(false)}>Cancel</Button>
-                <Button>Post Job</Button>
+                <Button variant="outline" onClick={() => {
+                  setShowJobDialog(false);
+                  setEditingJob(null);
+                  setFormData({ title: '', department: '', location: '', employmentType: '', salaryRange: '', description: '', requirements: '', responsibilities: '' });
+                }}>Cancel</Button>
+                <Button onClick={handleSubmit} disabled={createJob.isPending || updateJob.isPending}>
+                  {createJob.isPending || updateJob.isPending ? 'Saving...' : editingJob ? 'Update Job' : 'Post Job'}
+                </Button>
               </div>
             </div>
           </DialogContent>
         </Dialog>
       </div>
-    </HRLayout>
+    </Layout>
   );
 }

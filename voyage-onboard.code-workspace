@@ -6,23 +6,23 @@
     },
     {
       "name": "🌐 Frontend",
-      "path": "./frontend"
+      "path": "frontend"
     },
     {
       "name": "⚙️ Backend",
-      "path": "./backend"
+      "path": "backend"
     },
     {
       "name": "📱 Mobile - Driver",
-      "path": "./mobile/driver"
+      "path": "mobile/driver"
     },
     {
       "name": "📱 Mobile - Passenger",
-      "path": "./mobile/passenger"
+      "path": "mobile/passenger"
     },
     {
       "name": "📚 Documentation",
-      "path": "./docs"
+      "path": "docs"
     }
   ],
   "settings": {

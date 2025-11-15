@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
+import { useLocation } from 'react-router-dom';
+import api from '@/services/api';
+import AdminLayout from '@/components/admin/AdminLayout';
 import FinanceLayout from '@/components/finance/FinanceLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,6 +37,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 
 export default function Invoices() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : FinanceLayout;
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [filters, setFilters] = useState({
     status: 'all',
@@ -54,16 +60,23 @@ export default function Invoices() {
 
   const queryClient = useQueryClient();
 
-  const { data: invoices = [] } = useQuery({
-    queryKey: ['finance-invoices'],
+  const { data: invoicesData, isLoading } = useQuery({
+    queryKey: ['invoices'],
     queryFn: async () => {
-      const response = await api.get('/finance/invoices');
-      return Array.isArray(response.data) ? response.data : (response.data?.invoices || []);
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return { invoices: data || [] };
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
+      await supabase
+        .from('invoices')
+        .insert(data);
       await api.post('/finance/invoices', data);
     },
     onSuccess: () => {
@@ -98,6 +111,8 @@ export default function Invoices() {
     },
   });
 
+  const invoices = invoicesData?.invoices || [];
+  
   const filteredInvoices = invoices.filter((inv: any) => {
     if (filters.status !== 'all' && inv.status !== filters.status) return false;
     if (filters.client !== 'all' && inv.client !== filters.client) return false;
@@ -177,7 +192,7 @@ export default function Invoices() {
   };
 
   return (
-    <FinanceLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -463,6 +478,6 @@ export default function Invoices() {
           </DialogContent>
         </Dialog>
       </div>
-    </FinanceLayout>
+    </Layout>
   );
 }

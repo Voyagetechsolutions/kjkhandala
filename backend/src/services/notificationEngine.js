@@ -1,7 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
+const { supabase, pool } = require('../config/supabase');
 const nodemailer = require('nodemailer');
 const twilio = require('twilio');
-const prisma = new PrismaClient();
 
 class NotificationEngine {
   constructor() {

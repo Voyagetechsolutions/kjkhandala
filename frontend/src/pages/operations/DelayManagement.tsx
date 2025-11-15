@@ -1,5 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import OperationsLayout from '@/components/operations/OperationsLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,12 +18,29 @@ import {
 import { Clock, AlertCircle, Users, TrendingUp, Activity } from 'lucide-react';
 
 export default function DelayManagement() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : OperationsLayout;
+
+  const [showForm, setShowForm] = useState(false);
+
   // Fetch delayed trips
   const { data: delaysData, isLoading } = useQuery({
     queryKey: ['operations-delays'],
     queryFn: async () => {
-      const response = await api.get('/operations/delays');
-      return response.data;
+      const { data, error } = await supabase
+        .from('trip_delays')
+        .select(`
+          *,
+          trip:trips(
+            *,
+            route:routes(*),
+            bus:buses(*)
+          )
+        `)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return { delays: data || [] };
     },
     refetchInterval: 30000,
   });
@@ -50,7 +70,7 @@ export default function DelayManagement() {
   };
 
   return (
-    <OperationsLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -283,6 +303,6 @@ export default function DelayManagement() {
           </Card>
         )}
       </div>
-    </OperationsLayout>
+    </Layout>
   );
 }

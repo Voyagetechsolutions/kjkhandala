@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
+import OperationsLayout from '@/components/operations/OperationsLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Bus, Fuel, Wrench, Calendar, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import AdminLayout from '@/components/admin/AdminLayout';
 import BusForm from '@/components/fleet/BusForm';
 import FuelRecordForm from '@/components/fleet/FuelRecordForm';
 import BusCard from '@/components/fleet/BusCard';
@@ -19,17 +21,25 @@ import MaintenanceAlerts from '@/components/fleet/MaintenanceAlerts';
  * Comprehensive fleet management including buses, fuel tracking, and maintenance
  */
 export default function FleetManagement() {
+  const location = useLocation();
+  const isOperationsRoute = location.pathname.startsWith('/operations');
+  const Layout = isOperationsRoute ? OperationsLayout : AdminLayout;
+
   const [showBusForm, setShowBusForm] = useState(false);
   const [showFuelForm, setShowFuelForm] = useState(false);
   const [selectedBus, setSelectedBus] = useState<any>(null);
   const queryClient = useQueryClient();
 
   // Fetch all buses with extended fleet data
-  const { data: buses, isLoading: busesLoading } = useQuery({
-    queryKey: ['fleet-buses'],
+  const { data: fleetData, isLoading } = useQuery({
+    queryKey: ['admin-fleet'],
     queryFn: async () => {
-      const response = await api.get('/buses');
-      return response.data.data || [];
+      const { data, error } = await supabase
+        .from('buses')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      return { buses: data || [] };
     },
   });
 
@@ -37,17 +47,25 @@ export default function FleetManagement() {
   const { data: fuelRecords } = useQuery({
     queryKey: ['fuel-records'],
     queryFn: async () => {
-      const response = await api.get('/fuel_records');
-      return response.data.data || [];
+      const { data, error } = await supabase
+        .from('fuel_logs')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
     },
   });
 
-  // Fetch maintenance reminders
-  const { data: maintenanceReminders } = useQuery({
-    queryKey: ['maintenance-reminders'],
+  // Fetch maintenance alerts
+  const { data: maintenanceAlerts } = useQuery({
+    queryKey: ['maintenance-alerts'],
     queryFn: async () => {
-      const response = await api.get('/maintenance_reminders?upcoming=true');
-      return response.data.data || [];
+      const { data, error } = await supabase
+        .from('maintenance_alerts')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
     },
   });
 
@@ -68,16 +86,20 @@ export default function FleetManagement() {
   };
 
   // Calculate fleet statistics
+  const buses = fleetData?.buses || [];
   const fleetStats = {
-    total: buses?.length || 0,
-    active: buses?.filter((b: any) => b.status === 'ACTIVE').length || 0,
-    maintenance: buses?.filter((b: any) => b.status === 'MAINTENANCE').length || 0,
-    outOfService: buses?.filter((b: any) => b.status === 'RETIRED').length || 0,
-    totalMileage: buses?.reduce((sum: number, b: any) => sum + (parseFloat(b.mileage) || 0), 0) || 0,
+    total: buses.length,
+    active: buses.filter((b: any) => (b.status || '').toUpperCase() === 'ACTIVE').length,
+    maintenance: buses.filter((b: any) => (b.status || '').toUpperCase() === 'MAINTENANCE').length,
+    outOfService: buses.filter((b: any) => {
+      const status = (b.status || '').toUpperCase();
+      return status === 'OUT_OF_SERVICE' || status === 'RETIRED';
+    }).length,
+    totalMileage: buses.reduce((sum: number, b: any) => sum + (Number(b.total_mileage) || 0), 0),
   };
 
   return (
-    <AdminLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -145,8 +167,8 @@ export default function FleetManagement() {
         </div>
 
         {/* Maintenance Alerts */}
-        {maintenanceReminders && maintenanceReminders.length > 0 && (
-          <MaintenanceAlerts reminders={maintenanceReminders} />
+        {maintenanceAlerts && maintenanceAlerts.length > 0 && (
+          <MaintenanceAlerts reminders={maintenanceAlerts} />
         )}
 
         {/* Main Content Tabs */}
@@ -163,7 +185,7 @@ export default function FleetManagement() {
           </TabsList>
 
           <TabsContent value="buses" className="space-y-4">
-            {busesLoading ? (
+            {isLoading ? (
               <div className="text-center py-8">Loading buses...</div>
             ) : buses && buses.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -200,7 +222,7 @@ export default function FleetManagement() {
             bus={selectedBus}
             onClose={handleCloseForm}
             onSuccess={() => {
-              queryClient.invalidateQueries({ queryKey: ['fleet-buses'] });
+              queryClient.invalidateQueries({ queryKey: ['admin-fleet'] });
               handleCloseForm();
             }}
           />
@@ -213,12 +235,12 @@ export default function FleetManagement() {
             onClose={handleCloseForm}
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ['fuel-records'] });
-              queryClient.invalidateQueries({ queryKey: ['fleet-buses'] });
+              queryClient.invalidateQueries({ queryKey: ['admin-fleet'] });
               handleCloseForm();
             }}
           />
         )}
       </div>
-    </AdminLayout>
+    </Layout>
   );
 }

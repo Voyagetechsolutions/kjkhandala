@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useLocation } from 'react-router-dom';
 import { 
   Bus, 
   CheckCircle, 
@@ -17,6 +17,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
+import OperationsLayout from '@/components/operations/OperationsLayout';
 import RealTimeStatusBar from '@/components/dashboard/RealTimeStatusBar';
 import LiveOperationsMap from '@/components/dashboard/LiveOperationsMap';
 import AnalyticsCharts from '@/components/dashboard/AnalyticsCharts';
@@ -40,6 +41,12 @@ import DepartmentsSection from '@/components/dashboard/DepartmentsSection';
  * All data is pulled from connected modules in real-time
  */
 export default function SuperAdminDashboard() {
+  const location = useLocation();
+  
+  // Determine which layout to use based on route
+  const isOperationsRoute = location.pathname.startsWith('/operations');
+  const Layout = isOperationsRoute ? OperationsLayout : AdminLayout;
+  
   // Fetch real-time company-wide metrics
   const { data: companyMetrics, isLoading: metricsLoading } = useQuery({
     queryKey: ['company-metrics'],
@@ -60,9 +67,10 @@ export default function SuperAdminDashboard() {
         
         // Today's trips
         supabase
-          .from('schedules')
-          .select('id, departure_date')
-          .eq('departure_date', new Date().toISOString().split('T')[0]),
+          .from('trips')
+          .select('id, departure_time')
+          .gte('departure_time', new Date().toISOString().split('T')[0] + 'T00:00:00')
+          .lte('departure_time', new Date().toISOString().split('T')[0] + 'T23:59:59'),
         
         // Bookings (today, week, month)
         supabase
@@ -194,7 +202,7 @@ export default function SuperAdminDashboard() {
   });
 
   return (
-    <AdminLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -278,6 +286,6 @@ export default function SuperAdminDashboard() {
         {/* Departments Section */}
         <DepartmentsSection />
       </div>
-    </AdminLayout>
+    </Layout>
   );
 }

@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
+import OperationsLayout from '@/components/operations/OperationsLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Users, TrendingUp, Calendar, AlertCircle } from 'lucide-react';
-import AdminLayout from '@/components/admin/AdminLayout';
 import DriverCard from '@/components/drivers/DriverCard';
 import DriverForm from '@/components/drivers/DriverForm';
 import DriverAssignments from '@/components/drivers/DriverAssignments';
@@ -16,16 +18,24 @@ import DriverPerformance from '@/components/drivers/DriverPerformance';
  * Manage drivers, assignments, and performance tracking
  */
 export default function DriverManagement() {
+  const location = useLocation();
+  const isOperationsRoute = location.pathname.startsWith('/operations');
+  const Layout = isOperationsRoute ? OperationsLayout : AdminLayout;
+
   const [showDriverForm, setShowDriverForm] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<any>(null);
   const queryClient = useQueryClient();
 
   // Fetch all drivers
-  const { data: drivers, isLoading } = useQuery({
+  const { data: driversData, isLoading } = useQuery({
     queryKey: ['drivers'],
     queryFn: async () => {
-      const response = await api.get('/drivers');
-      return response.data.data || [];
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('*')
+        .order('full_name');
+      if (error) throw error;
+      return { drivers: data || [] };
     },
   });
 
@@ -33,17 +43,21 @@ export default function DriverManagement() {
   const { data: assignments } = useQuery({
     queryKey: ['driver-assignments'],
     queryFn: async () => {
-      const response = await api.get('/driver_assignments');
-      return response.data.data || [];
+      const { data, error } = await supabase
+        .from('assignments')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
     },
   });
 
-  // Fetch performance summary
+  // Fetch performance summary (fallback to empty for now)
   const { data: performance } = useQuery({
     queryKey: ['driver-performance'],
     queryFn: async () => {
-      const response = await api.get('/driver_performance/summary');
-      return response.data.data || [];
+      // For now, return empty array until performance tracking is implemented
+      return [];
     },
   });
 
@@ -58,16 +72,17 @@ export default function DriverManagement() {
   };
 
   // Calculate driver statistics
+  const drivers = driversData?.drivers || [];
   const driverStats = {
-    total: drivers?.length || 0,
-    active: drivers?.filter((d: any) => d.status === 'ACTIVE').length || 0,
-    onLeave: drivers?.filter((d: any) => d.status === 'ON_LEAVE').length || 0,
-    suspended: drivers?.filter((d: any) => d.status === 'SUSPENDED').length || 0,
+    total: drivers.length,
+    active: drivers.filter((d: any) => d.status === 'ACTIVE').length,
+    onLeave: drivers.filter((d: any) => d.status === 'ON_LEAVE').length,
+    suspended: drivers.filter((d: any) => d.status === 'SUSPENDED').length,
     avgRating: '4.5', // TODO: Implement rating system
   };
 
   // Check for license expiries
-  const expiringLicenses = drivers?.filter((d: any) => {
+  const expiringLicenses = drivers.filter((d: any) => {
     if (!d.licenseExpiry) return false;
     const daysUntilExpiry = Math.ceil(
       (new Date(d.licenseExpiry).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
@@ -76,7 +91,7 @@ export default function DriverManagement() {
   }) || [];
 
   return (
-    <AdminLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -234,6 +249,6 @@ export default function DriverManagement() {
           />
         )}
       </div>
-    </AdminLayout>
+    </Layout>
   );
 }

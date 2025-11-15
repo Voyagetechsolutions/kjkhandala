@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import DriverLayout from '@/components/driver/DriverLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,13 +21,86 @@ import {
 export default function DriverHome() {
   const navigate = useNavigate();
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['driver-trip'],
+  const { data: driverData, isLoading } = useQuery({
+    queryKey: ['driver-home'],
     queryFn: async () => {
-      const response = await api.get('/driver/my-trip');
-      return response.data;
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Get driver profile
+      const { data: driver } = await supabase
+        .from('drivers')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!driver) {
+        return { hasTrip: false, trip: null };
+      }
+
+      // Get today's assigned trip for this driver
+      const today = new Date();
+      const todayStart = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+      const todayEnd = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+
+      const { data: trips, error: tripsError } = await supabase
+        .from('trips')
+        .select('id, trip_number, status, scheduled_departure, scheduled_arrival, bus_id, route_id')
+        .eq('driver_id', driver.id)
+        .gte('scheduled_departure', todayStart)
+        .lte('scheduled_departure', todayEnd)
+        .order('scheduled_departure')
+        .limit(1);
+
+      if (tripsError) throw tripsError;
+
+      if (!trips || trips.length === 0) {
+        return { hasTrip: false, trip: null };
+      }
+
+      const trip = trips[0];
+
+      // Fetch bus details
+      const { data: bus } = await supabase
+        .from('buses')
+        .select('bus_number, model, seating_capacity')
+        .eq('id', trip.bus_id)
+        .single();
+
+      // Fetch route details
+      const { data: route } = await supabase
+        .from('routes')
+        .select('origin, destination, distance, estimated_duration')
+        .eq('id', trip.route_id)
+        .single();
+
+      // Fetch bookings count
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('id, payment_status')
+        .eq('trip_id', trip.id);
+
+      const totalPassengers = bookings?.filter(b => b.payment_status === 'paid').length || 0;
+      const checkedInPassengers = 0; // Would need check-in tracking
+
+      return {
+        hasTrip: true,
+        trip: {
+          ...trip,
+          route: `${route?.origin} → ${route?.destination}`,
+          destination: route?.destination,
+          distance: route?.distance || 0,
+          estimatedDuration: route?.estimated_duration || 0,
+          busNumber: bus?.bus_number || 'N/A',
+          busModel: bus?.model || 'N/A',
+          totalPassengers,
+          checkedInPassengers,
+          departureTime: trip.scheduled_departure,
+        }
+      };
     },
-    refetchInterval: 30000 // Refresh every 30 seconds
+    refetchInterval: 30000
   });
 
   const getStatusColor = (status: string) => {
@@ -63,7 +136,7 @@ export default function DriverHome() {
     );
   }
 
-  if (!data?.hasTrip) {
+  if (!driverData?.hasTrip) {
     return (
       <DriverLayout>
         <div className="max-w-4xl mx-auto">
@@ -84,7 +157,25 @@ export default function DriverHome() {
     );
   }
 
-  const trip = data.trip;
+  const trip = driverData?.trip;
+
+  if (!trip) {
+    return (
+      <DriverLayout>
+        <div className="max-w-4xl mx-auto">
+          <Card className="border-2">
+            <CardContent className="py-16 text-center">
+              <Bus className="h-24 w-24 mx-auto mb-6 text-muted-foreground opacity-50" />
+              <h2 className="text-3xl font-bold mb-4">No Trip Data</h2>
+              <p className="text-xl text-muted-foreground mb-8">
+                Unable to load trip information
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </DriverLayout>
+    );
+  }
 
   return (
     <DriverLayout>

@@ -1,9 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
 const { auth, authorize } = require('../middleware/auth');
-
-const prisma = new PrismaClient();
+const { supabase } = require('../config/supabase');
 
 // ==================== INCOME ====================
 
@@ -11,25 +9,17 @@ const prisma = new PrismaClient();
 router.get('/income', auth, authorize('SUPER_ADMIN', 'FINANCE_MANAGER'), async (req, res) => {
   try {
     const { startDate, endDate, category, source } = req.query;
-    
-    const where = {};
+    let q = supabase.from('income').select('*');
     if (startDate && endDate) {
-      where.date = {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
-      };
+      q = q.gte('date', new Date(startDate).toISOString()).lte('date', new Date(endDate).toISOString());
     }
-    if (category) where.category = category;
-    if (source) where.source = source;
-
-    const income = await prisma.income.findMany({
-      where,
-      orderBy: { date: 'desc' },
-    });
-
-    const total = income.reduce((sum, item) => sum + item.amount, 0);
-
-    res.json({ data: income, total });
+    if (category) q = q.eq('category', category);
+    if (source) q = q.eq('source', source);
+    q = q.order('date', { ascending: false });
+    const { data, error } = await q;
+    if (error) throw error;
+    const total = (data || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    res.json({ data, total });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -38,15 +28,15 @@ router.get('/income', auth, authorize('SUPER_ADMIN', 'FINANCE_MANAGER'), async (
 // Add income
 router.post('/income', auth, authorize('SUPER_ADMIN', 'FINANCE_MANAGER'), async (req, res) => {
   try {
-    const income = await prisma.income.create({
-      data: {
-        ...req.body,
-        amount: parseFloat(req.body.amount),
-        recordedBy: req.user.id,
-      },
-    });
-
-    res.status(201).json({ data: income });
+    const payload = {
+      ...req.body,
+      amount: parseFloat(req.body.amount),
+      recorded_by: req.user.id,
+      date: req.body.date ? new Date(req.body.date).toISOString() : new Date().toISOString(),
+    };
+    const { data, error } = await supabase.from('income').insert(payload).select('*').single();
+    if (error) throw error;
+    res.status(201).json({ data });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -58,33 +48,17 @@ router.post('/income', auth, authorize('SUPER_ADMIN', 'FINANCE_MANAGER'), async 
 router.get('/expenses', auth, authorize('SUPER_ADMIN', 'FINANCE_MANAGER'), async (req, res) => {
   try {
     const { status, category, startDate, endDate } = req.query;
-    
-    const where = {};
-    if (status) where.status = status;
-    if (category) where.category = category;
+    let q = supabase.from('expenses').select('*');
+    if (status) q = q.eq('status', status);
+    if (category) q = q.eq('category', category);
     if (startDate && endDate) {
-      where.date = {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
-      };
+      q = q.gte('date', new Date(startDate).toISOString()).lte('date', new Date(endDate).toISOString());
     }
-
-    const expenses = await prisma.expense.findMany({
-      where,
-      include: {
-        submittedBy: {
-          select: { firstName: true, lastName: true },
-        },
-        approvedBy: {
-          select: { firstName: true, lastName: true },
-        },
-      },
-      orderBy: { date: 'desc' },
-    });
-
-    const total = expenses.reduce((sum, item) => sum + item.amount, 0);
-
-    res.json({ data: expenses, total });
+    q = q.order('date', { ascending: false });
+    const { data, error } = await q;
+    if (error) throw error;
+    const total = (data || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    res.json({ data, total });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -93,16 +67,16 @@ router.get('/expenses', auth, authorize('SUPER_ADMIN', 'FINANCE_MANAGER'), async
 // Submit expense
 router.post('/expenses', auth, async (req, res) => {
   try {
-    const expense = await prisma.expense.create({
-      data: {
-        ...req.body,
-        amount: parseFloat(req.body.amount),
-        submittedById: req.user.id,
-        status: 'PENDING',
-      },
-    });
-
-    res.status(201).json({ data: expense });
+    const payload = {
+      ...req.body,
+      amount: parseFloat(req.body.amount),
+      submitted_by_id: req.user.id,
+      status: 'PENDING',
+      date: req.body.date ? new Date(req.body.date).toISOString() : new Date().toISOString(),
+    };
+    const { data, error } = await supabase.from('expenses').insert(payload).select('*').single();
+    if (error) throw error;
+    res.status(201).json({ data });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -111,17 +85,15 @@ router.post('/expenses', auth, async (req, res) => {
 // Approve expense
 router.put('/expenses/:id/approve', auth, authorize('SUPER_ADMIN', 'FINANCE_MANAGER'), async (req, res) => {
   try {
-    const expense = await prisma.expense.update({
-      where: { id: req.params.id },
-      data: {
-        status: 'APPROVED',
-        approvedById: req.user.id,
-        approvedAt: new Date(),
-        notes: req.body.notes,
-      },
-    });
-
-    res.json({ data: expense });
+    const updates = {
+      status: 'APPROVED',
+      approved_by_id: req.user.id,
+      approved_at: new Date().toISOString(),
+      notes: req.body.notes || null,
+    };
+    const { data, error } = await supabase.from('expenses').update(updates).eq('id', req.params.id).select('*').single();
+    if (error) throw error;
+    res.json({ data });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -131,18 +103,15 @@ router.put('/expenses/:id/approve', auth, authorize('SUPER_ADMIN', 'FINANCE_MANA
 router.put('/expenses/:id/reject', auth, authorize('SUPER_ADMIN', 'FINANCE_MANAGER'), async (req, res) => {
   try {
     const { reason } = req.body;
-
-    const expense = await prisma.expense.update({
-      where: { id: req.params.id },
-      data: {
-        status: 'REJECTED',
-        approvedById: req.user.id,
-        approvedAt: new Date(),
-        notes: reason,
-      },
-    });
-
-    res.json({ data: expense });
+    const updates = {
+      status: 'REJECTED',
+      approved_by_id: req.user.id,
+      approved_at: new Date().toISOString(),
+      notes: reason || null,
+    };
+    const { data, error } = await supabase.from('expenses').update(updates).eq('id', req.params.id).select('*').single();
+    if (error) throw error;
+    res.json({ data });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -698,52 +667,29 @@ router.get('/expenses/pending', auth, authorize('SUPER_ADMIN', 'FINANCE_MANAGER'
 router.get('/summary', auth, authorize('SUPER_ADMIN', 'FINANCE_MANAGER'), async (req, res) => {
   try {
     const { from, to } = req.query;
-    
     const startDate = from ? new Date(from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const endDate = to ? new Date(to) : new Date();
+    const s = startDate.toISOString();
+    const e = endDate.toISOString();
 
-    const where = {
-      date: {
-        gte: startDate,
-        lte: endDate,
-      },
-    };
-
-    // Get all financial data
-    const income = await prisma.income.aggregate({
-      where,
-      _sum: { amount: true },
-    });
-
-    const expenses = await prisma.expense.aggregate({
-      where: { ...where, status: 'APPROVED' },
-      _sum: { amount: true },
-    });
-
-    const bookings = await prisma.booking.aggregate({
-      where: {
-        createdAt: {
-          gte: startDate,
-          lte: endDate,
-        },
-        status: 'CONFIRMED',
-      },
-      _sum: { totalAmount: true },
-    });
-
-    const pendingExpenses = await prisma.expense.count({
-      where: { status: 'PENDING' },
-    });
-
+    const [inc, exp, pend, book] = await Promise.all([
+      supabase.from('income').select('amount,date').gte('date', s).lte('date', e),
+      supabase.from('expenses').select('amount,date,status').gte('date', s).lte('date', e).eq('status', 'APPROVED'),
+      supabase.from('expenses').select('id', { count: 'exact', head: true }).eq('status', 'PENDING'),
+      supabase.from('bookings').select('total_amount,booking_date,status').gte('booking_date', s).lte('booking_date', e).eq('status', 'CONFIRMED'),
+    ]);
+    const totalIncome = (inc.data || []).reduce((sum, x) => sum + Number(x.amount || 0), 0);
+    const totalExpenses = (exp.data || []).reduce((sum, x) => sum + Number(x.amount || 0), 0);
+    const bookingsRevenue = (book.data || []).reduce((sum, x) => sum + Number(x.total_amount || 0), 0);
+    const pendingExpensesCount = pend.count || 0;
     const summary = {
       period: { from: startDate, to: endDate },
-      totalIncome: parseFloat(income._sum.amount || 0),
-      totalExpenses: parseFloat(expenses._sum.amount || 0),
-      bookingsRevenue: parseFloat(bookings._sum.totalAmount || 0),
-      netProfit: parseFloat(income._sum.amount || 0) - parseFloat(expenses._sum.amount || 0),
-      pendingExpensesCount: pendingExpenses,
+      totalIncome,
+      totalExpenses,
+      bookingsRevenue,
+      netProfit: totalIncome - totalExpenses,
+      pendingExpensesCount,
     };
-
     res.json({ success: true, data: summary });
   } catch (error) {
     console.error('Error fetching finance summary:', error);

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import OperationsLayout from '@/components/operations/OperationsLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,8 +23,12 @@ export default function FleetOperations() {
   const { data: fleetData, isLoading } = useQuery({
     queryKey: ['operations-fleet'],
     queryFn: async () => {
-      const response = await api.get('/operations/fleet');
-      return response.data;
+      const { data, error } = await supabase
+        .from('buses')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      return { fleet: data || [] };
     },
     refetchInterval: 30000,
   });
@@ -32,7 +36,11 @@ export default function FleetOperations() {
   // Update bus status mutation
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: any) => {
-      await api.put(`/operations/fleet/${id}/status`, { status });
+      const { error } = await supabase
+        .from('buses')
+        .update({ status })
+        .eq('id', id);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['operations-fleet'] });

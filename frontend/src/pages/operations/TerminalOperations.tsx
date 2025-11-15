@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import OperationsLayout from '@/components/operations/OperationsLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,32 +27,76 @@ import {
 } from 'lucide-react';
 
 export default function TerminalOperations() {
-  // Fetch today's trips for terminal monitoring
-  const { data: tripsData, isLoading } = useQuery({
-    queryKey: ['operations-trips-today'],
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : OperationsLayout;
+  const { data: terminalData, isLoading } = useQuery({
+    queryKey: ['terminal-operations'],
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const response = await api.get(`/operations/trips?date=${today}`);
-      return response.data;
+      const today = new Date();
+      const todayStart = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+      const todayEnd = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+      const now = new Date().toISOString();
+      const twoHoursLater = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+
+      const { data: trips, error: tripsError } = await supabase
+        .from('trips')
+        .select(`
+          *,
+          route:routes(id, origin, destination),
+          bus:buses(id, bus_number, seating_capacity),
+          driver:drivers(id, full_name)
+        `)
+        .gte('scheduled_departure', todayStart)
+        .lte('scheduled_departure', todayEnd)
+        .order('scheduled_departure');
+
+      if (tripsError) throw tripsError;
+
+      const { data: bookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('trip_id, seats_booked')
+        .in('trip_id', trips?.map(t => t.id) || []);
+
+      if (bookingsError) throw bookingsError;
+
+      const tripsWithBookings = trips?.map(trip => {
+        const tripBookings = bookings?.filter(b => b.trip_id === trip.id) || [];
+        const bookedSeats = tripBookings.reduce((sum, b) => sum + (b.seats_booked || 1), 0);
+        const bus = Array.isArray(trip.bus) ? trip.bus[0] : trip.bus;
+        const capacity = bus?.seating_capacity || trip.total_seats || 0;
+        const loadFactor = capacity > 0 ? ((bookedSeats / capacity) * 100).toFixed(1) : '0';
+
+        return {
+          ...trip,
+          bus,
+          route: Array.isArray(trip.route) ? trip.route[0] : trip.route,
+          driver: Array.isArray(trip.driver) ? trip.driver[0] : trip.driver,
+          bookedSeats,
+          capacity,
+          loadFactor: parseFloat(loadFactor),
+        };
+      }) || [];
+
+      return { trips: tripsWithBookings };
     },
     refetchInterval: 30000,
   });
 
-  const trips = tripsData?.trips || [];
+  const trips = terminalData?.trips || [];
 
-  // Calculate terminal metrics
+  const now = new Date();
+  const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+
   const upcomingTrips = trips.filter((t: any) => {
-    const departureTime = new Date(t.departureTime);
-    const now = new Date();
-    const hoursUntil = (departureTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-    return hoursUntil > 0 && hoursUntil <= 2 && t.status !== 'CANCELLED';
+    const departureTime = new Date(t.scheduled_departure);
+    return departureTime >= now && departureTime <= twoHoursFromNow && t.status !== 'CANCELLED';
   });
 
   const boardingTrips = trips.filter((t: any) => {
-    const departureTime = new Date(t.departureTime);
-    const now = new Date();
+    const departureTime = new Date(t.scheduled_departure);
     const minutesUntil = (departureTime.getTime() - now.getTime()) / (1000 * 60);
-    return minutesUntil > -15 && minutesUntil <= 30 && t.status !== 'CANCELLED';
+    return minutesUntil >= -15 && minutesUntil <= 30 && t.status !== 'CANCELLED';
   });
 
   const stats = {
@@ -58,25 +105,25 @@ export default function TerminalOperations() {
     boardingNow: boardingTrips.length,
     totalPassengers: trips.reduce((sum: number, t: any) => sum + (t.bookedSeats || 0), 0),
     averageLoadFactor: trips.length > 0
-      ? (trips.reduce((sum: number, t: any) => sum + parseFloat(t.loadFactor || 0), 0) / trips.length).toFixed(1)
-      : 0,
+      ? (trips.reduce((sum: number, t: any) => sum + (t.loadFactor || 0), 0) / trips.length).toFixed(1)
+      : '0',
   };
 
   const getBoardingStatus = (trip: any) => {
-    const departureTime = new Date(trip.departureTime);
+    const departureTime = new Date(trip.scheduled_departure);
     const now = new Date();
     const minutesUntil = (departureTime.getTime() - now.getTime()) / (1000 * 60);
 
-    if (minutesUntil <= 0 && minutesUntil > -15) {
-      return { status: 'BOARDING', color: 'bg-green-600', label: 'Boarding Now' };
+    if (trip.status === 'BOARDING' || (minutesUntil <= 0 && minutesUntil > -15)) {
+      return { status: 'BOARDING', color: 'bg-yellow-500', label: 'Boarding' };
     } else if (minutesUntil > 0 && minutesUntil <= 30) {
-      return { status: 'PREPARING', color: 'bg-blue-600', label: 'Preparing' };
-    } else if (minutesUntil > 30 && minutesUntil <= 60) {
-      return { status: 'UPCOMING', color: 'bg-gray-600', label: 'Upcoming' };
-    } else if (minutesUntil > 60) {
-      return { status: 'SCHEDULED', color: 'bg-gray-400', label: 'Scheduled' };
+      return { status: 'PREPARING', color: 'bg-blue-500', label: 'Preparing' };
+    } else if (minutesUntil > 30) {
+      return { status: 'SCHEDULED', color: 'bg-gray-500', label: 'Scheduled' };
+    } else if (trip.status === 'DEPARTED' || minutesUntil <= -15) {
+      return { status: 'DEPARTED', color: 'bg-green-600', label: 'Departed' };
     } else {
-      return { status: 'DEPARTED', color: 'bg-purple-600', label: 'Departed' };
+      return { status: 'DELAYED', color: 'bg-red-600', label: 'Delayed' };
     }
   };
 
@@ -93,7 +140,7 @@ export default function TerminalOperations() {
   };
 
   return (
-    <OperationsLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -185,21 +232,23 @@ export default function TerminalOperations() {
                           {boardingInfo.label}
                         </div>
                         <div>
-                          <div className="font-semibold">{trip.route?.name}</div>
+                          <div className="font-semibold">
+                            {trip.route?.origin} → {trip.route?.destination}
+                          </div>
                           <div className="text-sm text-muted-foreground">
-                            Bus: {trip.bus?.registrationNumber} • Driver: {trip.driver?.firstName} {trip.driver?.lastName}
+                            Bus: {trip.bus?.bus_number} • Driver: {trip.driver?.full_name || 'Not assigned'}
                           </div>
                         </div>
                       </div>
                       <div className="text-right">
                         <div className="font-medium">
-                          {new Date(trip.departureTime).toLocaleTimeString('en-US', {
+                          {new Date(trip.scheduled_departure).toLocaleTimeString('en-US', {
                             hour: '2-digit',
                             minute: '2-digit',
                           })}
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          {trip.bookedSeats}/{trip.bus?.capacity || 0} passengers
+                          {trip.bookedSeats}/{trip.capacity || 0} passengers
                         </div>
                       </div>
                     </div>
@@ -246,7 +295,7 @@ export default function TerminalOperations() {
                 <TableBody>
                   {upcomingTrips.map((trip: any) => {
                     const boardingInfo = getBoardingStatus(trip);
-                    const departureTime = new Date(trip.departureTime);
+                    const departureTime = new Date(trip.scheduled_departure);
                     const minutesUntil = Math.max(0, Math.round((departureTime.getTime() - new Date().getTime()) / (1000 * 60)));
 
                     return (
@@ -264,30 +313,29 @@ export default function TerminalOperations() {
                         </TableCell>
                         <TableCell>
                           <div>
-                            <div className="font-medium">{trip.route?.name}</div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="font-medium">
                               {trip.route?.origin} → {trip.route?.destination}
                             </div>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <code className="text-sm">{trip.bus?.registrationNumber}</code>
+                          <code className="text-sm">{trip.bus?.bus_number}</code>
                         </TableCell>
                         <TableCell>
                           <div className="text-sm">
-                            {trip.driver ? `${trip.driver.firstName} ${trip.driver.lastName}` : 'N/A'}
+                            {trip.driver?.full_name || 'Not assigned'}
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Users className="h-4 w-4" />
                             <Badge variant="outline">
-                              {trip.bookedSeats}/{trip.bus?.capacity || 0}
+                              {trip.bookedSeats}/{trip.capacity || 0}
                             </Badge>
                           </div>
                         </TableCell>
                         <TableCell>
-                          {getLoadFactorBadge(parseFloat(trip.loadFactor || 0))}
+                          {getLoadFactorBadge(trip.loadFactor || 0)}
                         </TableCell>
                         <TableCell>
                           <Badge className={boardingInfo.color}>
@@ -375,6 +423,6 @@ export default function TerminalOperations() {
           </Card>
         </div>
       </div>
-    </OperationsLayout>
+    </Layout>
   );
 }

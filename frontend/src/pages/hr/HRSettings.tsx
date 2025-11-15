@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import HRLayout from '@/components/hr/HRLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +13,9 @@ import { Save, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function HRSettings() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : HRLayout;
   const [settings, setSettings] = useState({
     // Leave Settings
     annualLeaveDays: '21',
@@ -36,8 +41,11 @@ export default function HRSettings() {
   const { data: employees = [] } = useQuery({
     queryKey: ['hr-employees'],
     queryFn: async () => {
-      const response = await api.get('/hr/employees');
-      return Array.isArray(response.data) ? response.data : (response.data?.employees || []);
+      const { data, error } = await supabase
+        .from('employees')
+        .select();
+      if (error) throw error;
+      return data;
     },
   });
 
@@ -57,9 +65,12 @@ export default function HRSettings() {
     .filter((j: any) => j.title)
     .map((j: any, index: number) => ({ id: index + 1, ...j }));
 
-  const saveMutation = useMutation({
+  const updateSettingsMutation = useMutation({
     mutationFn: async (data: any) => {
-      await api.post('/hr/settings', data);
+      const { error } = await supabase
+        .from('hr_settings')
+        .upsert(data);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success('Settings saved successfully');
@@ -70,11 +81,11 @@ export default function HRSettings() {
   });
 
   const handleSaveSettings = () => {
-    saveMutation.mutate(settings);
+    updateSettingsMutation.mutate(settings);
   };
 
   return (
-    <HRLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -325,6 +336,6 @@ export default function HRSettings() {
           </Button>
         </div>
       </div>
-    </HRLayout>
+    </Layout>
   );
 }

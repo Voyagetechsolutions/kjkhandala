@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Calendar, DollarSign, TrendingUp, CreditCard, Download } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface DailySalesData {
   date: string;
@@ -40,16 +41,27 @@ const DailySales = () => {
   const fetchDailySales = async (date: string) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/reports/daily-sales/${date}`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('total_amount, payment_status, created_at')
+        .gte('booking_date', `${date}T00:00:00Z`)
+        .lt('booking_date', `${date}T23:59:59Z`);
+
+      if (error) throw error;
+      
+      const totalRevenue = data?.reduce((sum, b) => sum + (b.total_amount || 0), 0) || 0;
+      const totalBookings = data?.length || 0;
+      
+      setSalesData({
+        date,
+        totalRevenue,
+        totalBookings,
+        totalPassengers: totalBookings,
+        averageTicketPrice: totalBookings > 0 ? totalRevenue / totalBookings : 0,
+        paymentMethods: []
       });
-      if (response.ok) {
-        const data = await response.json();
-        setSalesData(data.data);
-      }
     } catch (error) {
-      console.error('Failed to fetch daily sales:', error);
+      console.error('Failed to fetch sales data:', error);
     } finally {
       setLoading(false);
     }

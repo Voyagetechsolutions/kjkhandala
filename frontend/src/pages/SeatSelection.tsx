@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import TripSummary from "@/components/TripSummary";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Bus as BusIcon, MapPin } from "lucide-react";
@@ -49,7 +50,7 @@ export default function SeatSelection() {
   if (!schedule || !form || !passengers) return null;
 
   const totalSeats = passengers.length;
-  const busCapacity = schedule.buses?.capacity || 40;
+  const busCapacity = 60; // Fixed 60 seats, 2x2 configuration
   
   // Convert price to selected currency
   const priceInCurrency = convertCurrency(schedule.routes.price, 'BWP', currency);
@@ -73,65 +74,85 @@ export default function SeatSelection() {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="max-w-6xl mx-auto">
-          <Card className="p-6 mb-8">
-            <div className="flex items-center gap-4">
-              <BusIcon className="h-8 w-8 text-primary" />
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <MapPin className="h-4 w-4" />
-                  <span className="font-semibold">{schedule.routes.origin}</span>
-                  <span>&rarr;</span>
-                  <span className="font-semibold">{schedule.routes.destination}</span>
+      <main className="flex-1 bg-muted/30">
+        <div className="container mx-auto px-4 py-8">
+          <h1 className="text-3xl font-bold mb-6">Select Your Seats</h1>
+          
+          <div className="grid lg:grid-cols-3 gap-8">
+            {/* Main Content */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Seat Map */}
+              <Card className="p-6">
+                <h2 className="text-xl font-semibold mb-4">
+                  Select {totalSeats} Seat{totalSeats > 1 ? 's' : ''}
+                </h2>
+                <SeatMap
+                  totalSeats={busCapacity}
+                  bookedSeats={bookedSeats}
+                  selectedSeats={selectedSeats}
+                  onSeatSelect={handleSeatSelect}
+                  maxSeats={totalSeats}
+                />
+                
+                {/* Legend */}
+                <div className="flex flex-wrap gap-6 mt-6 pt-6 border-t">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 border-2 border-gray-300 rounded"></div>
+                    <span className="text-sm">Available</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-primary rounded"></div>
+                    <span className="text-sm">Selected</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-gray-400 rounded"></div>
+                    <span className="text-sm">Booked</span>
+                  </div>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {new Date(schedule.departure_date).toLocaleDateString()} at {schedule.departure_time}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold">{formatCurrency(priceInCurrency, currency)}</p>
-                <p className="text-sm text-muted-foreground">per seat</p>
+              </Card>
+
+              {/* Selected Seats Summary */}
+              <Card className="p-6">
+                <h2 className="text-xl font-semibold mb-4">Selected Seats</h2>
+                <div className="mb-6">
+                  {selectedSeats.length === 0 ? (
+                    <div className="text-muted-foreground text-center py-8">
+                      No seats selected yet. Please select {totalSeats} seat{totalSeats > 1 ? 's' : ''} to continue.
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedSeats.map((seat) => (
+                        <span key={seat} className="px-4 py-2 bg-primary/10 text-primary rounded-lg text-sm font-medium">
+                          Seat {seat}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <Button
+                  onClick={handleContinue}
+                  disabled={selectedSeats.length !== totalSeats}
+                  className="w-full"
+                  size="lg"
+                >
+                  {selectedSeats.length === totalSeats 
+                    ? "Continue to Payment" 
+                    : `Select ${totalSeats - selectedSeats.length} more seat${totalSeats - selectedSeats.length > 1 ? 's' : ''}`
+                  }
+                </Button>
+              </Card>
+            </div>
+
+            {/* Trip Summary Sidebar */}
+            <div className="lg:col-span-1">
+              <div className="sticky top-24">
+                <TripSummary 
+                  schedule={schedule} 
+                  passengers={totalSeats}
+                  totalPrice={priceInCurrency * selectedSeats.length}
+                />
               </div>
             </div>
-          </Card>
-          
-          <div className="mb-8">
-            <h2 className="text-2xl font-semibold mb-4">Select {totalSeats} Seat(s)</h2>
-            <SeatMap
-              totalSeats={busCapacity}
-              bookedSeats={bookedSeats}
-              selectedSeats={selectedSeats}
-              onSeatSelect={handleSeatSelect}
-              maxSeats={totalSeats}
-            />
-          </div>
-
-          <div className="grid lg:grid-cols-2 gap-8">
-            <Card className="p-6">
-              <h2 className="text-xl font-semibold mb-6">Selected Seats</h2>
-              <div className="mb-4">
-                {selectedSeats.length === 0 ? (
-                  <div className="text-muted-foreground">No seats selected yet.</div>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {selectedSeats.map((seat) => (
-                      <span key={seat} className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium">
-                        {seat}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <Button
-                onClick={handleContinue}
-                disabled={selectedSeats.length !== totalSeats}
-                className="w-full mt-4"
-                size="lg"
-              >
-                Continue to Payment
-              </Button>
-            </Card>
           </div>
         </div>
       </main>

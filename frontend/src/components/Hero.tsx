@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Phone, MapPin, Building2, Calendar } from "lucide-react";
 import HeroCarousel from "./HeroCarousel";
-import api from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 export default function Hero() {
   const navigate = useNavigate();
@@ -28,10 +28,14 @@ export default function Hero() {
     const fetchRoutes = async () => {
       setLoadingRoutes(true);
       try {
-        const response = await api.get('/routes');
-        // Handle both array and object responses
-        const routesData = Array.isArray(response.data) ? response.data : (response.data?.routes || []);
-        setRoutes(routesData);
+        const { data, error } = await supabase
+          .from('routes')
+          .select('*')
+          .eq('is_active', true)
+          .order('origin');
+        
+        if (error) throw error;
+        setRoutes(data || []);
       } catch (error) {
         console.error('Failed to fetch routes:', error);
         setRoutes([]);
@@ -43,20 +47,16 @@ export default function Hero() {
   }, []);
 
   useEffect(() => {
-    // Fetch unique origins and destinations for the booking form
+    // Fetch unique origins and destinations from cities table
     const fetchLocations = async () => {
       try {
-        const response = await api.get('/routes');
-        // Handle both array and object responses
-        const data = Array.isArray(response.data) ? response.data : (response.data?.routes || []);
-        // Use correct type for data
-        const locs = [
-          ...new Set([
-            ...data.map((r: { origin: string; destination: string }) => r.origin),
-            ...data.map((r: { origin: string; destination: string }) => r.destination),
-          ]),
-        ];
-        setLocations(locs.filter(Boolean));
+        const { data, error } = await supabase
+          .from('cities')
+          .select('name')
+          .order('name');
+        
+        if (error) throw error;
+        setLocations(data?.map(city => city.name) || []);
       } catch (error) {
         console.error('Failed to fetch locations:', error);
         setLocations([]);
@@ -82,7 +82,7 @@ export default function Hero() {
             Welcome to KJ Khandala
           </h1>
           <p className="text-xl text-white/90 max-w-2xl mx-auto animate-fade-in">
-            Botswana's favourite premium coach solution since 1984
+            Botswana's premier coach travel experience since 1984.
           </p>
         </div>
       </div>
@@ -100,6 +100,10 @@ export default function Hero() {
 
       {/* Three Cards Section */}
       <div className="container mx-auto px-4 py-16">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Book a Trip</h2>
+          <p className="text-muted-foreground text-lg">Your journey begins here. Choose the booking method that suits you best.</p>
+        </div>
         <div className="grid md:grid-cols-3 gap-6">
           {/* Online Bookings */}
           <Card className="p-6 text-center hover:shadow-elegant transition-shadow">
@@ -108,7 +112,7 @@ export default function Hero() {
             </div>
             <h3 className="text-xl font-semibold mb-3">Online Bookings</h3>
             <p className="text-muted-foreground mb-6">
-              Book your KJ Khandala bus tickets online from the comfort of your own home.
+              Book your KJ Khandala tickets from anywhere, at any time.
             </p>
             <Button onClick={() => navigate("/routes")} className="w-full">
               Book Online Now
@@ -122,10 +126,10 @@ export default function Hero() {
             </div>
             <h3 className="text-xl font-semibold mb-3">Phone Bookings</h3>
             <p className="text-muted-foreground mb-6">
-              Our call centre operates 24 hours a day, 365 days a year, for around-the-clock support.
+              Prefer speaking to a real person? Our 24/7 call centre is always available.
             </p>
             <Button asChild variant="secondary" className="w-full">
-              <a href="tel:+26771799129">Call +267 71 799 129</a>
+              <a href="tel:+26771799129">📞 +267 71 799 129</a>
             </Button>
           </Card>
 
@@ -136,10 +140,10 @@ export default function Hero() {
             </div>
             <h3 className="text-xl font-semibold mb-3">Booking Offices</h3>
             <p className="text-muted-foreground mb-6">
-              Book your KJ Khandala bus tickets in person at one of our many booking offices.
+              Visit any of our booking offices for in-person assistance.
             </p>
             <Button onClick={() => navigate("/booking-offices")} variant="outline" className="w-full">
-              Find a location
+              Find a Location
             </Button>
           </Card>
         </div>
@@ -148,7 +152,8 @@ export default function Hero() {
       {/* Our Popular Routes Section */}
       <div className="bg-muted/30 py-16">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">Our Popular Routes</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">Popular Routes</h2>
+          <p className="text-center text-muted-foreground text-lg mb-12">Our most-travelled routes across Southern Africa.</p>
           <div className="grid md:grid-cols-2 gap-8 items-center">
             {/* Slideshow */}
             <div>
@@ -157,20 +162,19 @@ export default function Hero() {
 
             {/* Popular Routes List */}
             <div className="space-y-4">
-              <h4 className="text-xl font-semibold mb-2">Popular Routes</h4>
               {loadingRoutes ? (
                 <div className="text-muted-foreground">Loading routes...</div>
               ) : !Array.isArray(routes) || routes.length === 0 ? (
                 <div className="text-muted-foreground">No routes available.</div>
               ) : (
-                <ul className="space-y-2">
+                <ul className="space-y-3">
                   {Array.isArray(routes) && routes.slice(0, 6).map((route) => (
-                    <li key={route.id} className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-primary" />
+                    <li key={route.id} className="flex items-center gap-2 p-3 rounded-lg hover:bg-background/50 transition-colors">
+                      <MapPin className="h-4 w-4 text-primary flex-shrink-0" />
                       <span className="font-medium">{route.origin}</span>
                       <span className="text-muted-foreground">→</span>
                       <span className="font-medium">{route.destination}</span>
-                      <span className="ml-2 px-2 py-0.5 rounded text-xs bg-primary/10 text-primary">
+                      <span className="ml-auto px-2 py-0.5 rounded text-xs bg-primary/10 text-primary">
                         {route.route_type === 'local' ? 'Local' : 'Cross-Border'}
                       </span>
                     </li>
@@ -184,7 +188,7 @@ export default function Hero() {
 
       {/* Our Story Section */}
       <div className="container mx-auto px-4 py-16">
-        <div className="grid md:grid-cols-2 gap-8 items-center">
+        <div className="grid md:grid-cols-2 gap-12 items-center">
           {/* Slideshow on the left */}
           <div>
             <HeroCarousel />
@@ -192,11 +196,32 @@ export default function Hero() {
           {/* Story Text on the right */}
           <div>
             <h2 className="text-3xl md:text-4xl font-bold mb-6">Our Story</h2>
-            <p className="text-lg leading-relaxed mb-4">
-              Since 1984, KJ Khandala has brought you South Africa's favourite premium coach solution, connecting cities as old as the country itself and towns as brilliantly curious as the cultures that connect us.
+            <p className="text-lg leading-relaxed mb-4 text-muted-foreground">
+              Since 1984, KJ Khandala has been Botswana's trusted premium coach brand—connecting cities, cultures, and people across borders.
             </p>
-            <p className="text-lg leading-relaxed">
-              KJ Khandala will continue to be the safe and reliable premium coach traveling partner with high standards and morals. When luxury yearns for affordability, our liners shine the brightest. Our coaches are built to 5-star specifications and an experience defined by professionalism, punctuality and good ol' fashioned politeness.
+            <p className="text-lg leading-relaxed mb-6 text-muted-foreground">
+              We continue to deliver safe, reliable, and luxurious travel defined by:
+            </p>
+            <ul className="space-y-3 mb-6">
+              <li className="flex items-start gap-3">
+                <span className="text-primary font-bold text-xl">✓</span>
+                <span className="text-lg">Professional drivers</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="text-primary font-bold text-xl">✓</span>
+                <span className="text-lg">5-star coach specifications</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="text-primary font-bold text-xl">✓</span>
+                <span className="text-lg">Punctual schedules</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="text-primary font-bold text-xl">✓</span>
+                <span className="text-lg">Unmatched hospitality</span>
+              </li>
+            </ul>
+            <p className="text-lg leading-relaxed font-medium">
+              When luxury meets affordability, KJ Khandala shines the brightest.
             </p>
           </div>
         </div>

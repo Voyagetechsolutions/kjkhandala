@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import DriverLayout from '@/components/driver/DriverLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,16 +23,30 @@ export default function TripDetails() {
     emergencyKit: false,
   });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['driver-trip'],
+  const { data: tripData, isLoading } = useQuery({
+    queryKey: ['trip-details'],
     queryFn: async () => {
-      const response = await api.get('/driver/my-trip');
-      return response.data;
+      const { data, error } = await supabase
+        .from('trips')
+        .select(`
+          *,
+          route:routes(*),
+          bus:buses(*)
+        `)
+        .eq('status', 'in_progress')
+        .single();
+      if (error) throw error;
+      return { trip: data };
     },
   });
 
   const submitChecklistMutation = useMutation({
     mutationFn: async (checklistData: any) => {
+      const { data, error } = await supabase
+        .from('checklists')
+        .insert([checklistData]);
+      if (error) throw error;
+      return data;
       const response = await api.post(`/driver/checklist/${data.trip.id}`, {
         checklist: checklistData,
       });

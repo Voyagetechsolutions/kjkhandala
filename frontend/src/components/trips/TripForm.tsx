@@ -1,10 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar, Bus, Clock } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 
 interface TripFormProps {
@@ -14,172 +15,261 @@ interface TripFormProps {
 }
 
 export default function TripForm({ trip, onClose, onSuccess }: TripFormProps) {
-  const queryClient = useQueryClient();
+  const [formData, setFormData] = useState({
+    route_id: trip?.route_id || '',
+    bus_id: trip?.bus_id || '',
+    driver_id: trip?.driver_id || '',
+    scheduled_departure: trip?.scheduled_departure || '',
+    scheduled_arrival: trip?.scheduled_arrival || '',
+    fare: trip?.fare || '',
+    status: trip?.status || 'SCHEDULED',
+  });
 
   // Fetch routes
   const { data: routes, isLoading: routesLoading } = useQuery({
-    queryKey: ['routes-form'],
+    queryKey: ['routes-active'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('routes').select('*').order('origin');
+      const { data, error } = await supabase
+        .from('routes')
+        .select('*')
+        .eq('is_active', true)
+        .order('origin');
       if (error) throw error;
-      return data;
+      return data || [];
     },
   });
 
   // Fetch buses
   const { data: buses, isLoading: busesLoading } = useQuery({
-    queryKey: ['buses-form'],
+    queryKey: ['buses-active'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('buses').select('*').order('name');
-      if (error) throw error;
-      return data;
+      const { data, error } = await supabase
+        .from('buses')
+        .select('*')
+        .eq('status', 'ACTIVE')
+        .order('name');
+      if (error) {
+        console.error('Error fetching buses:', error);
+        throw error;
+      }
+      console.log('Fetched buses for dropdown:', data?.length || 0, data);
+      return data || [];
     },
   });
 
   // Fetch drivers
-  const { data: drivers } = useQuery({
-    queryKey: ['drivers-form'],
+  const { data: drivers, isLoading: driversLoading } = useQuery({
+    queryKey: ['drivers-active'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('drivers').select('*').eq('status', 'active');
-      if (error) throw error;
-      return data;
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('*')
+        .eq('status', 'ACTIVE')
+        .order('full_name');
+      if (error) {
+        console.error('Error fetching drivers:', error);
+        throw error;
+      }
+      return data || [];
     },
   });
 
-  // Schedule trip mutation
-  const scheduleTripMutation = useMutation({
-    mutationFn: async (formData: any) => {
-      const { error } = await supabase.from('schedules').insert([formData]);
-      if (error) throw error;
+  const saveMutation = useMutation({
+    mutationFn: async (data: any) => {
+      // Get selected bus to populate seats
+      const selectedBus = buses?.find((b: any) => b.id === data.bus_id);
+      
+      const payload = {
+        route_id: data.route_id || null,  // Convert empty string to null
+        bus_id: data.bus_id || null,      // Convert empty string to null
+        driver_id: data.driver_id || null, // Convert empty string to null
+        scheduled_departure: data.scheduled_departure,
+        scheduled_arrival: data.scheduled_arrival,
+        fare: data.fare ? parseFloat(data.fare) : null,
+        status: data.status,
+        // Auto-populate seats from selected bus
+        total_seats: selectedBus?.seating_capacity || null,
+        available_seats: selectedBus?.seating_capacity || null,
+      };
+
+      if (trip) {
+        const { error } = await supabase
+          .from('trips')
+          .update(payload)
+          .eq('id', trip.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('trips')
+          .insert([payload]);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
-      toast.success('Trip scheduled successfully!');
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
-      queryClient.invalidateQueries({ queryKey: ['trips'] });
-      onSuccess?.();
+      toast.success(trip ? 'Trip updated successfully' : 'Trip scheduled successfully');
+      onSuccess();
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Failed to schedule trip');
+      toast.error(error.message || 'Failed to save trip');
     },
   });
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    
-    scheduleTripMutation.mutate({
-      route_id: formData.get('route_id'),
-      bus_id: formData.get('bus_id'),
-      departure_date: formData.get('departure_date'),
-      departure_time: formData.get('departure_time'),
-      available_seats: parseInt(formData.get('available_seats') as string),
-    });
+    saveMutation.mutate(formData);
   };
 
-  if (routesLoading || busesLoading) {
+  const handleChange = (field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const isLoading = routesLoading || busesLoading || driversLoading;
+
+  if (isLoading) {
     return (
-      <div className="p-8 text-center">
-        <p className="text-muted-foreground">Loading form data...</p>
-      </div>
+      <Dialog open onOpenChange={onClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Loading...</DialogTitle>
+          </DialogHeader>
+          <div className="p-8 text-center">
+            <p className="text-muted-foreground">Loading form data...</p>
+          </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{trip ? 'Edit Trip' : 'Schedule New Trip'}</DialogTitle>
+          <DialogDescription>
+            {trip ? 'Update trip information' : 'Schedule a new trip for your fleet'}
+          </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-6 p-6">
-          <div className="space-y-4">
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="route_id" className="flex items-center gap-2">
-                <Bus className="h-4 w-4" />
-                Route
-              </Label>
-              <select 
-                id="route_id" 
-                name="route_id" 
-                className="w-full px-3 py-2 border rounded-lg"
-                required
+              <Label htmlFor="route_id">Route *</Label>
+              <Select 
+                value={formData.route_id} 
+                onValueChange={(value) => handleChange('route_id', value)}
               >
-                <option value="">Select a route</option>
-                {routes?.map((route: any) => (
-                  <option key={route.id} value={route.id}>
-                    {route.origin} → {route.destination} ({route.distance}km, P{route.price})
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select route" />
+                </SelectTrigger>
+                <SelectContent>
+                  {routes?.map((route: any) => (
+                    <SelectItem key={route.id} value={route.id}>
+                      {route.origin} → {route.destination}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="bus_id">Bus</Label>
-              <select 
-                id="bus_id" 
-                name="bus_id" 
-                className="w-full px-3 py-2 border rounded-lg"
-                required
+              <Label htmlFor="bus_id">Bus *</Label>
+              <Select 
+                value={formData.bus_id} 
+                onValueChange={(value) => handleChange('bus_id', value)}
               >
-                <option value="">Select a bus</option>
-                {buses?.map((bus: any) => (
-                  <option key={bus.id} value={bus.id}>
-                    {bus.name} - {bus.number_plate} (Capacity: {bus.seating_capacity})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="departure_date" className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Departure Date
-                </Label>
-                <Input 
-                  id="departure_date" 
-                  name="departure_date" 
-                  type="date" 
-                  min={new Date().toISOString().split('T')[0]}
-                  required 
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="departure_time" className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Departure Time
-                </Label>
-                <Input 
-                  id="departure_time" 
-                  name="departure_time" 
-                  type="time" 
-                  required 
-                />
-              </div>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select bus" />
+                </SelectTrigger>
+                <SelectContent>
+                  {buses?.map((bus: any) => (
+                    <SelectItem key={bus.id} value={bus.id}>
+                      {bus.name || bus.number_plate}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="available_seats">Available Seats</Label>
-              <Input 
-                id="available_seats" 
-                name="available_seats" 
-                type="number" 
-                min="1"
-                placeholder="e.g., 40" 
-                required 
+              <Label htmlFor="driver_id">Driver</Label>
+              <Select 
+                value={formData.driver_id} 
+                onValueChange={(value) => handleChange('driver_id', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select driver" />
+                </SelectTrigger>
+                <SelectContent>
+                  {drivers?.map((driver: any) => (
+                    <SelectItem key={driver.id} value={driver.id}>
+                      {driver.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select 
+                value={formData.status} 
+                onValueChange={(value) => handleChange('status', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SCHEDULED">Scheduled</SelectItem>
+                  <SelectItem value="BOARDING">Boarding</SelectItem>
+                  <SelectItem value="DEPARTED">Departed</SelectItem>
+                  <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                  <SelectItem value="COMPLETED">Completed</SelectItem>
+                  <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                  <SelectItem value="DELAYED">Delayed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="scheduled_departure">Scheduled Departure *</Label>
+              <Input
+                id="scheduled_departure"
+                type="datetime-local"
+                value={formData.scheduled_departure}
+                onChange={(e) => handleChange('scheduled_departure', e.target.value)}
+                required
               />
-              <p className="text-xs text-muted-foreground">
-                Enter the number of seats available for booking
-              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="scheduled_arrival">Scheduled Arrival</Label>
+              <Input
+                id="scheduled_arrival"
+                type="datetime-local"
+                value={formData.scheduled_arrival}
+                onChange={(e) => handleChange('scheduled_arrival', e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fare">Fare</Label>
+              <Input
+                id="fare"
+                type="number"
+                step="0.01"
+                value={formData.fare}
+                onChange={(e) => handleChange('fare', e.target.value)}
+                placeholder="e.g., 150.00"
+              />
             </div>
           </div>
 
-          <div className="flex gap-2 justify-end pt-4 border-t">
+          <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={scheduleTripMutation.isPending}>
-              {scheduleTripMutation.isPending ? 'Scheduling...' : 'Schedule Trip'}
+            <Button type="submit" disabled={saveMutation.isPending}>
+              {saveMutation.isPending ? 'Saving...' : trip ? 'Update Trip' : 'Schedule Trip'}
             </Button>
           </div>
         </form>

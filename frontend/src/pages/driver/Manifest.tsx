@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import DriverLayout from '@/components/driver/DriverLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,16 +22,34 @@ export default function Manifest() {
   const [searchTerm, setSearchTerm] = useState('');
   const queryClient = useQueryClient();
 
-  const { data: tripData } = useQuery({
-    queryKey: ['driver-trip'],
+  const { data: manifestData, isLoading } = useQuery({
+    queryKey: ['driver-manifest'],
     queryFn: async () => {
-      const response = await api.get('/driver/my-trip');
-      return response.data;
+      const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          trip:trips(*),
+          passenger:passengers(*)
+        `)
+        .eq('booking_status', 'CONFIRMED')
+        .order('seat_number');
+      if (error) throw error;
+      return { passengers: data || [] };
     },
   });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['driver-manifest', tripData?.trip?.id],
+  const { data: tripData } = useQuery({
+    queryKey: ['driver-trip'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('trips')
+        .select('*')
+        .eq('id', manifestData?.passengers[0]?.trip_id);
+      if (error) throw error;
+      return data[0];
+    },
+    enabled: !!manifestData?.passengers[0]?.trip_id,
     queryFn: async () => {
       const response = await api.get(`/driver/manifest/${tripData.trip.id}`);
       return response.data;

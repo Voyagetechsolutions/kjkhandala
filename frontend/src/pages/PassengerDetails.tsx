@@ -2,12 +2,18 @@ import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import TripSummary from "@/components/TripSummary";
 
 interface Passenger {
   name: string;
   phone: string;
   email: string;
   idNumber: string;
+  gender?: string;
 }
 
 export default function PassengerDetails() {
@@ -42,18 +48,32 @@ export default function PassengerDetails() {
   };
 
   if (!schedule || !form) {
-    return <div className="text-red-500">Missing trip data. Please start your booking again.</div>;
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-red-500 mb-2">Missing Trip Data</h2>
+            <p className="text-muted-foreground mb-4">Please start your booking again from the homepage.</p>
+            <Button onClick={() => navigate("/")}>Go to Homepage</Button>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
   }
 
   return (
-    <div className="max-w-2xl mx-auto py-8">
-      <h1 className="text-2xl font-bold mb-4">Passenger Details</h1>
-      <Card className="p-4 mb-6">
-        <div className="mb-2 font-semibold">Trip: {schedule.routes.origin} → {schedule.routes.destination}</div>
-        <div className="text-sm text-muted-foreground">Date: {schedule.departure_date} | Time: {schedule.departure_time}</div>
-        <div className="text-sm">Seats: {form.seats}</div>
-      </Card>
-      <form onSubmit={handleNext} className="space-y-6">
+    <div className="min-h-screen flex flex-col">
+      <Navbar />
+      <main className="flex-1 bg-muted/30">
+        <div className="container mx-auto px-4 py-8">
+          <h1 className="text-3xl font-bold mb-6">Passenger Details</h1>
+          
+          <div className="grid lg:grid-cols-3 gap-8">
+            {/* Main Form */}
+            <div className="lg:col-span-2">
+              <form onSubmit={handleNext} className="space-y-6">
         {passengers.map((p, idx) => (
           <Card key={idx} className="p-4">
             <div className="font-semibold mb-2">Passenger {idx + 1}</div>
@@ -106,10 +126,24 @@ export default function PassengerDetails() {
               </div>
             </div>
           </Card>
-        ))}
-        {error && <div className="text-red-500 font-medium">{error}</div>}
-        <Button type="submit" className="w-full">Continue to Seat Selection</Button>
-      </form>
+                ))}
+                {error && <div className="text-red-500 font-medium">{error}</div>}
+                <Button type="submit" size="lg" className="w-full">
+                  Continue to Seat Selection
+                </Button>
+              </form>
+            </div>
+
+            {/* Trip Summary Sidebar */}
+            <div className="lg:col-span-1">
+              <div className="sticky top-24">
+                <TripSummary schedule={schedule} passengers={seats} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+      <Footer />
     </div>
   );
 }

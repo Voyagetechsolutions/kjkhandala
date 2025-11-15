@@ -1,30 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
 const { auth, authorize } = require('../middleware/auth');
-
-const prisma = new PrismaClient();
+const { supabase } = require('../config/supabase');
 
 // Get all buses
 router.get('/', async (req, res) => {
   try {
-    const { status } = req.query;
-    
-    const where = {};
-    if (status) where.status = status;
-
-    const buses = await prisma.bus.findMany({
-      where,
-      include: {
-        maintenanceRecords: {
-          take: 5,
-          orderBy: { date: 'desc' },
-        },
-      },
-      orderBy: { registrationNumber: 'asc' },
-    });
-
-    res.json({ data: buses });
+    const { data: buses, error } = await supabase.from('buses').select('*').order('registration_number');
+    if (error) throw error;
+    res.json({ data: buses || [] });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -33,23 +17,9 @@ router.get('/', async (req, res) => {
 // Get bus by ID
 router.get('/:id', async (req, res) => {
   try {
-    const bus = await prisma.bus.findUnique({
-      where: { id: req.params.id },
-      include: {
-        maintenanceRecords: {
-          orderBy: { date: 'desc' },
-        },
-        trips: {
-          take: 20,
-          orderBy: { departureDate: 'desc' },
-        },
-      },
-    });
-
-    if (!bus) {
-      return res.status(404).json({ error: 'Bus not found' });
-    }
-
+    const { data: bus, error } = await supabase.from('buses').select('*').eq('id', req.params.id).single();
+    if (error) throw error;
+    if (!bus) return res.status(404).json({ error: 'Bus not found' });
     res.json({ data: bus });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -57,63 +27,21 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create bus
-router.post('/', auth, authorize('SUPER_ADMIN', 'OPERATIONS_MANAGER'), async (req, res) => {
+router.post('/', auth, authorize(['SUPER_ADMIN', 'OPERATIONS_MANAGER']), async (req, res) => {
   try {
-    const { registrationNumber, model, capacity, yearOfManufacture, status, mileage } = req.body;
-
-    // Validate required fields
-    if (!registrationNumber || !model || !capacity) {
-      return res.status(400).json({ error: 'Missing required fields: registrationNumber, model, capacity' });
-    }
-
-    const busData = {
-      registrationNumber,
-      model,
-      capacity: parseInt(capacity),
-      status: status || 'ACTIVE',
-      mileage: mileage || 0,
-    };
-
-    // Add optional fields
-    if (yearOfManufacture) {
-      busData.yearOfManufacture = parseInt(yearOfManufacture);
-    }
-
-    const bus = await prisma.bus.create({
-      data: busData,
-    });
-
+    const { data: bus, error } = await supabase.from('buses').insert(req.body).select('*').single();
+    if (error) throw error;
     res.status(201).json({ data: bus });
   } catch (error) {
-    console.error('Error creating bus:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // Update bus
-router.put('/:id', auth, authorize('SUPER_ADMIN', 'OPERATIONS_MANAGER'), async (req, res) => {
+router.put('/:id', auth, authorize(['SUPER_ADMIN', 'OPERATIONS_MANAGER']), async (req, res) => {
   try {
-    const bus = await prisma.bus.update({
-      where: { id: req.params.id },
-      data: req.body,
-    });
-
-    res.json({ data: bus });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Update bus status
-router.patch('/:id/status', auth, authorize('SUPER_ADMIN', 'OPERATIONS_MANAGER', 'MAINTENANCE_MANAGER'), async (req, res) => {
-  try {
-    const { status } = req.body;
-
-    const bus = await prisma.bus.update({
-      where: { id: req.params.id },
-      data: { status },
-    });
-
+    const { data: bus, error } = await supabase.from('buses').update(req.body).eq('id', req.params.id).select('*').single();
+    if (error) throw error;
     res.json({ data: bus });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -121,12 +49,10 @@ router.patch('/:id/status', auth, authorize('SUPER_ADMIN', 'OPERATIONS_MANAGER',
 });
 
 // Delete bus
-router.delete('/:id', auth, authorize('SUPER_ADMIN'), async (req, res) => {
+router.delete('/:id', auth, authorize(['SUPER_ADMIN', 'OPERATIONS_MANAGER']), async (req, res) => {
   try {
-    await prisma.bus.delete({
-      where: { id: req.params.id },
-    });
-
+    const { error } = await supabase.from('buses').delete().eq('id', req.params.id);
+    if (error) throw error;
     res.json({ message: 'Bus deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import AdminLayout from '@/components/admin/AdminLayout';
 import TicketingLayout from '@/components/ticketing/TicketingLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +12,10 @@ import { toast } from 'sonner';
 import { Save, Settings as SettingsIcon, Printer, Bell, DollarSign } from 'lucide-react';
 
 export default function Settings() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : TicketingLayout;
+  
   const [settings, setSettings] = useState({
     // Printer Settings
     autoPrint: true,
@@ -44,7 +50,7 @@ export default function Settings() {
   };
 
   return (
-    <TicketingLayout>
+    <Layout>
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -290,6 +296,6 @@ export default function Settings() {
           </Button>
         </div>
       </div>
-    </TicketingLayout>
+    </Layout>
   );
 }

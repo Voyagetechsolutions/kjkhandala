@@ -7,7 +7,7 @@ import axios from 'axios';
 
 // Create axios instance
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
+  baseURL: `${import.meta.env.VITE_API_URL}/bridge`,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -18,9 +18,27 @@ const api = axios.create({
 // Request interceptor - Add auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // Use Supabase session access token for Edge Functions auth
+    const session = (window as any).__supabase_session;
+    const setBearer = (jwt?: string) => {
+      if (jwt) {
+        config.headers.Authorization = `Bearer ${jwt}`;
+      }
+    };
+    if (session?.access_token) {
+      setBearer(session.access_token);
+    } else {
+      // Fallback: read current session synchronously where possible
+      // Note: supabase-js getSession is async; we can't await here.
+      // Consumers should ensure session is initialized at app start and cached on window.
+      // As a safety, try to read from localStorage where Supabase persists the session.
+      try {
+        const raw = localStorage.getItem('supabase.auth.token');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          setBearer(parsed?.currentSession?.access_token || parsed?.access_token);
+        }
+      } catch {}
     }
     return config;
   },
@@ -35,7 +53,7 @@ api.interceptors.response.use(
   (error) => {
     // Handle 401 Unauthorized
     if (error.response?.status === 401) {
-      localStorage.removeItem('auth_token');
+      localStorage.removeItem('supabase.auth.token');
       // Only redirect if not already on auth page
       if (!window.location.pathname.includes('/auth')) {
         window.location.href = '/auth';

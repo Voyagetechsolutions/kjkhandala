@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { Bell, X, Check, CheckCheck } from 'lucide-react';
 import { useNotificationStore } from '../store';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 const NotificationCenter = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -43,17 +45,18 @@ const NotificationCenter = () => {
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/notifications', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (response.ok) {
-        const data = await response.json();
-        setNotifications(data.data || []);
-      }
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setNotifications(data || []);
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
     }
@@ -61,17 +64,17 @@ const NotificationCenter = () => {
 
   const fetchUnreadCount = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/notifications/unread-count', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (response.ok) {
-        const data = await response.json();
-        setUnreadCount(data.data.count || 0);
-      }
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('read', false);
+
+      if (error) throw error;
+      setUnreadCount(count || 0);
     } catch (error) {
       console.error('Failed to fetch unread count:', error);
     }
@@ -79,17 +82,13 @@ const NotificationCenter = () => {
 
   const handleMarkAsRead = async (id: string) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/notifications/${id}/read`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', id);
 
-      if (response.ok) {
-        markAsRead(id);
-      }
+      if (error) throw error;
+      markAsRead(id);
     } catch (error) {
       console.error('Failed to mark as read:', error);
     }
@@ -98,17 +97,17 @@ const NotificationCenter = () => {
   const handleMarkAllAsRead = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/notifications/read-all', {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (response.ok) {
-        markAllAsRead();
-      }
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('user_id', user.id)
+        .eq('read', false);
+
+      if (error) throw error;
+      markAllAsRead();
     } catch (error) {
       console.error('Failed to mark all as read:', error);
     } finally {
@@ -118,17 +117,13 @@ const NotificationCenter = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/notifications/${id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', id);
 
-      if (response.ok) {
-        removeNotification(id);
-      }
+      if (error) throw error;
+      removeNotification(id);
     } catch (error) {
       console.error('Failed to delete notification:', error);
     }

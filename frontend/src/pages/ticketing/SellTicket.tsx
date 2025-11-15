@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import TicketingLayout from '@/components/ticketing/TicketingLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,9 @@ import { toast } from 'sonner';
 import { ArrowLeft, ArrowRight, Clock, Users, DollarSign, CheckCircle, Printer } from 'lucide-react';
 
 export default function SellTicket() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : TicketingLayout;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
@@ -41,7 +45,38 @@ export default function SellTicket() {
   });
 
   // Step 4: Payment
-  const [paymentMethod, setPaymentMethod] = useState('CASH');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+
+  // Fetch cities for dropdowns
+  const { data: cities = [] } = useQuery({
+    queryKey: ['cities'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('cities')
+        .select('*')
+        .eq('status', 'active')
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Fetch routes based on selected cities
+  const { data: routes = [] } = useQuery({
+    queryKey: ['routes', searchParams.origin, searchParams.destination],
+    queryFn: async () => {
+      if (!searchParams.origin || !searchParams.destination) return [];
+      const { data, error } = await supabase
+        .from('routes')
+        .select('*')
+        .eq('origin_city', searchParams.origin)
+        .eq('destination_city', searchParams.destination)
+        .eq('status', 'active');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!searchParams.origin && !!searchParams.destination,
+  });
 
   // Step 5: Confirmation
   const [bookingResult, setBookingResult] = useState<any>(null);
@@ -50,26 +85,123 @@ export default function SellTicket() {
   const { data: tripsData, isLoading: tripsLoading } = useQuery({
     queryKey: ['available-trips', searchParams],
     queryFn: async () => {
-      if (!searchParams.origin || !searchParams.destination) return null;
-      const response = await api.get('/ticketing/available-trips', { params: searchParams });
-      return response.data;
+      if (!searchParams.origin || !searchParams.destination) return [];
+      
+      const { data, error } = await supabase
+        .from('trips')
+        .select(`
+          *,
+          route:routes!inner(*),
+          bus:buses(*),
+          driver:drivers(*)
+        `)
+        .eq('route.origin_city', searchParams.origin)
+        .eq('route.destination_city', searchParams.destination)
+        .gte('departure_time', `${searchParams.date}T00:00:00`)
+        .lte('departure_time', `${searchParams.date}T23:59:59`)
+        .in('status', ['SCHEDULED', 'BOARDING'])
+        .order('departure_time');
+      
+      if (error) throw error;
+      return data || [];
     },
     enabled: step === 2 && !!searchParams.origin && !!searchParams.destination,
   });
 
+  // Fetch booked seats for selected trip
+  const { data: bookedSeats = [] } = useQuery({
+    queryKey: ['booked-seats', selectedTrip?.id],
+    queryFn: async () => {
+      if (!selectedTrip?.id) return [];
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('seat_number')
+        .eq('trip_id', selectedTrip.id)
+        .in('status', ['confirmed', 'checked_in']);
+      if (error) throw error;
+      return data?.map(b => b.seat_number) || [];
+    },
+    enabled: !!selectedTrip?.id && step === 3,
+  });
+
   // Book ticket mutation
   const bookMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await api.post('/ticketing/book-ticket', data);
-      return response.data;
+    mutationFn: async () => {
+      // Create or get passenger profile
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('phone', passengerData.phone)
+        .single();
+
+      let passengerId = existingProfile?.id;
+
+      if (!passengerId) {
+        const { data: newProfile, error: profileError } = await supabase
+          .from('profiles')
+          .insert([{
+            full_name: `${passengerData.firstName} ${passengerData.lastName}`,
+            phone: passengerData.phone,
+            email: passengerData.email,
+            id_number: passengerData.idNumber,
+            role: 'PASSENGER',
+          }])
+          .select()
+          .single();
+
+        if (profileError) throw profileError;
+        passengerId = newProfile.id;
+      }
+
+      // Create booking
+      const { data: booking, error: bookingError } = await supabase
+        .from('bookings')
+        .insert([{
+          trip_id: selectedTrip.id,
+          passenger_id: passengerId,
+          passenger_name: `${passengerData.firstName} ${passengerData.lastName}`,
+          passenger_phone: passengerData.phone,
+          passenger_email: passengerData.email,
+          seat_number: selectedSeat,
+          total_amount: selectedTrip.route.base_fare,
+          status: 'confirmed',
+          booking_date: new Date().toISOString(),
+        }])
+        .select(`
+          *,
+          trip:trips(*,
+            route:routes(*),
+            bus:buses(*)
+          )
+        `)
+        .single();
+      
+      if (bookingError) throw bookingError;
+
+      // Create payment record
+      const { error: paymentError } = await supabase
+        .from('payments')
+        .insert([{
+          booking_id: booking.id,
+          amount: selectedTrip.route.base_fare,
+          payment_method: paymentMethod,
+          payment_status: 'completed',
+          payment_date: new Date().toISOString(),
+        }]);
+
+      if (paymentError) throw paymentError;
+
+      return booking;
     },
     onSuccess: (data) => {
       setBookingResult(data);
       setStep(5);
       queryClient.invalidateQueries({ queryKey: ['ticketing-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['available-trips'] });
       toast.success('Ticket booked successfully!');
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Booking error:', error);
       toast.error('Failed to book ticket');
     },
   });
@@ -92,13 +224,11 @@ export default function SellTicket() {
       toast.error('Please select a seat');
       return;
     }
-
-    bookMutation.mutate({
-      tripId: selectedTrip.id,
-      passengerData,
-      seatNumber: selectedSeat,
-      paymentMethod,
-    });
+    if (!passengerData.firstName || !passengerData.lastName || !passengerData.phone) {
+      toast.error('Please fill in all required passenger details');
+      return;
+    }
+    bookMutation.mutate();
   };
 
   const handlePrintTicket = () => {
@@ -120,7 +250,7 @@ export default function SellTicket() {
   };
 
   return (
-    <TicketingLayout>
+    <Layout>
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Progress Indicator */}
         <div className="flex items-center justify-center gap-2">
@@ -152,10 +282,11 @@ export default function SellTicket() {
                       <SelectValue placeholder="Select origin" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Gaborone">Gaborone</SelectItem>
-                      <SelectItem value="Francistown">Francistown</SelectItem>
-                      <SelectItem value="Maun">Maun</SelectItem>
-                      <SelectItem value="Kasane">Kasane</SelectItem>
+                      {cities.map((city: any) => (
+                        <SelectItem key={city.id} value={city.name}>
+                          {city.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -166,10 +297,11 @@ export default function SellTicket() {
                       <SelectValue placeholder="Select destination" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Gaborone">Gaborone</SelectItem>
-                      <SelectItem value="Francistown">Francistown</SelectItem>
-                      <SelectItem value="Maun">Maun</SelectItem>
-                      <SelectItem value="Kasane">Kasane</SelectItem>
+                      {cities.map((city: any) => (
+                        <SelectItem key={city.id} value={city.name}>
+                          {city.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -200,7 +332,7 @@ export default function SellTicket() {
             <CardContent>
               {tripsLoading ? (
                 <div className="text-center py-8">Loading trips...</div>
-              ) : !tripsData?.trips || tripsData.trips.length === 0 ? (
+              ) : !tripsData || tripsData.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <p>No trips available for this route</p>
                   <Button variant="outline" onClick={() => setStep(1)} className="mt-4">
@@ -209,7 +341,7 @@ export default function SellTicket() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {tripsData.trips.map((trip: any) => (
+                  {tripsData.map((trip: any) => (
                     <div key={trip.id} className="border rounded-lg p-4 hover:border-primary cursor-pointer" onClick={() => handleSelectTrip(trip)}>
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -436,6 +568,6 @@ export default function SellTicket() {
           </Card>
         )}
       </div>
-    </TicketingLayout>
+    </Layout>
   );
 }

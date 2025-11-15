@@ -20,7 +20,7 @@ export default function CurrencySelector() {
         <Button variant="outline" size="sm" className="gap-2">
           <span>{currentCurrency?.flag}</span>
           <span>{currentCurrency?.symbol}</span>
-          <span className="hidden sm:inline">{currentCurrency?.code}</span>
+          <span>{currentCurrency?.code}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

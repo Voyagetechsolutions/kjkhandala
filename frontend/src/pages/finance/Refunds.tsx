@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
+import { useLocation } from 'react-router-dom';
+import api from '@/services/api';
+import AdminLayout from '@/components/admin/AdminLayout';
 import FinanceLayout from '@/components/finance/FinanceLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,6 +37,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 
 export default function Refunds() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : FinanceLayout;
   const [showProcessDialog, setShowProcessDialog] = useState(false);
   const [selectedRefund, setSelectedRefund] = useState<any>(null);
   const [filters, setFilters] = useState({
@@ -51,16 +57,23 @@ export default function Refunds() {
 
   const queryClient = useQueryClient();
 
-  const { data: refundRequests = [] } = useQuery({
-    queryKey: ['finance-refunds'],
+  const { data: refundsData, isLoading } = useQuery({
+    queryKey: ['refunds'],
     queryFn: async () => {
-      const response = await api.get('/finance/refunds');
-      return Array.isArray(response.data) ? response.data : (response.data?.refunds || []);
+      const { data, error } = await supabase
+        .from('refunds')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return { refunds: data || [] };
     },
   });
 
   const processRefundMutation = useMutation({
     mutationFn: async ({ id, decision }: any) => {
+      await supabase
+        .from('refunds')
+        .update({ id: id, ...decision });
       await api.post(`/finance/refunds/${id}/process`, decision);
     },
     onSuccess: () => {
@@ -73,6 +86,8 @@ export default function Refunds() {
     },
   });
 
+  const refundRequests = refundsData?.refunds || [];
+  
   const filteredRefunds = refundRequests.filter((req: any) => {
     if (filters.status !== 'all' && req.status !== filters.status) return false;
     if (filters.dateFrom && req.requestDate < filters.dateFrom) return false;
@@ -183,7 +198,7 @@ export default function Refunds() {
   };
 
   return (
-    <FinanceLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -485,6 +500,6 @@ export default function Refunds() {
           </DialogContent>
         </Dialog>
       </div>
-    </FinanceLayout>
+    </Layout>
   );
 }

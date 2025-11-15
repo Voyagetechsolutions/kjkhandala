@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { User, Mail, Phone, Lock, Camera, Save } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const profileSchema = z.object({
   firstName: z.string().min(2, 'First name must be at least 2 characters'),
@@ -55,15 +56,18 @@ const Profile = () => {
 
   const fetchProfile = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/users/profile', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setProfile(data.data);
-        reset(data.data);
-      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      setProfile(data);
+      reset(data);
     } catch (error) {
       console.error('Failed to fetch profile:', error);
     } finally {
@@ -75,22 +79,21 @@ const Profile = () => {
     setUpdating(true);
     setMessage(null);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/users/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(data)
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (response.ok) {
-        setMessage({ type: 'success', text: 'Profile updated successfully!' });
-        await fetchProfile();
-      } else {
-        setMessage({ type: 'error', text: 'Failed to update profile' });
-      }
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: `${data.firstName} ${data.lastName}`,
+          email: data.email,
+          phone: data.phone
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      setMessage({ type: 'success', text: 'Profile updated successfully!' });
+      await fetchProfile();
     } catch (error) {
       setMessage({ type: 'error', text: 'An error occurred' });
     } finally {
@@ -102,28 +105,15 @@ const Profile = () => {
     setUpdating(true);
     setMessage(null);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/users/password', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          currentPassword: data.currentPassword,
-          newPassword: data.newPassword
-        })
+      const { error } = await supabase.auth.updateUser({
+        password: data.newPassword
       });
 
-      if (response.ok) {
-        setMessage({ type: 'success', text: 'Password changed successfully!' });
-        resetPassword();
-      } else {
-        const errorData = await response.json();
-        setMessage({ type: 'error', text: errorData.message || 'Failed to change password' });
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: 'An error occurred' });
+      if (error) throw error;
+      setMessage({ type: 'success', text: 'Password changed successfully!' });
+      resetPassword();
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.message || 'Failed to change password' });
     } finally {
       setUpdating(false);
     }
@@ -133,23 +123,32 @@ const Profile = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const formData = new FormData();
-    formData.append('photo', file);
-
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/users/profile/photo', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        body: formData
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (response.ok) {
-        setMessage({ type: 'success', text: 'Profile photo updated!' });
-        await fetchProfile();
-      }
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('profiles')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('profiles')
+        .getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+      setMessage({ type: 'success', text: 'Profile photo updated!' });
+      await fetchProfile();
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to upload photo' });
     }

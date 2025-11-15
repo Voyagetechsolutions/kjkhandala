@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { User, TrendingUp, AlertTriangle, Star, Clock, MapPin } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface Driver {
   id: string;
@@ -44,17 +45,16 @@ const DriverPerformance = () => {
 
   const fetchDrivers = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/users?role=DRIVER', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const driverList = data.data || [];
-        setDrivers(driverList);
-        if (driverList.length > 0) {
-          setSelectedDriver(driverList[0].id);
-        }
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('*')
+        .eq('status', 'ACTIVE')
+        .order('last_name');
+
+      if (error) throw error;
+      setDrivers(data || []);
+      if (data?.length > 0) {
+        setSelectedDriver(data[0].id);
       }
     } catch (error) {
       console.error('Failed to fetch drivers:', error);

@@ -1,29 +1,50 @@
-import api from './api';
+import { supabase } from '@/lib/supabase';
 
 export const financeService = {
   // Income Management
-  getIncome: (filters: any) => api.get('/finance/income', { params: filters }),
-  addIncome: (data: any) => api.post('/finance/income', data),
-  updateIncome: (id: string, data: any) => api.put(`/finance/income/${id}`, data),
-  deleteIncome: (id: string) => api.delete(`/finance/income/${id}`),
+  async getIncomeData() {
+    const { data, error } = await supabase
+      .from('income')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return { income: data || [] };
+  },
+  addIncome: (data: any) => supabase.from('income').insert(data),
+  updateIncome: (id: string, data: any) => supabase.from('income').update(data).eq('id', id),
+  deleteIncome: (id: string) => supabase.from('income').delete().eq('id', id),
   exportIncome: (format: string, filters: any) => 
-    api.get(`/finance/income/export?format=${format}`, { params: filters, responseType: 'blob' }),
+    supabase.from('income').select('*').order('created_at', { ascending: false }),
 
   // Expense Management
-  getExpenses: (filters: any) => api.get('/finance/expenses', { params: filters }),
-  addExpense: (data: FormData) => api.post('/finance/expenses', data, {
+  async getExpenseData() {
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return { expenses: data || [] };
+  },
+  addExpense: (data: FormData) => supabase.from('expenses').insert(data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
-  approveExpense: (id: string) => api.put(`/finance/expenses/${id}/approve`),
-  rejectExpense: (id: string, reason: string) => 
-    api.put(`/finance/expenses/${id}/reject`, { reason }),
+  approveExpense: (id: string) => supabase.from('expenses').update({ approved: true }).eq('id', id),
+  async updateExpense(id: string, expenseData: any) {
+    const { data, error } = await supabase
+      .from('expenses')
+      .update(expenseData)
+      .eq('id', id)
+      .select();
+    if (error) throw error;
+    return data[0];
+  },
   exportExpenses: (format: string, filters: any) => 
-    api.get(`/finance/expenses/export?format=${format}`, { params: filters, responseType: 'blob' }),
+    supabase.from('expenses').select('*').order('created_at', { ascending: false }),
 
   // Payroll Management
-  getPayroll: (month: string) => api.get(`/finance/payroll/${month}`),
+  getPayroll: (month: string) => supabase.from('payroll').select('*').eq('month', month),
   getEmployeePayroll: (employeeId: string, month: string) => 
-    api.get(`/finance/payroll/employee/${employeeId}/${month}`),
+    supabase.from('payroll').select('*').eq('employee_id', employeeId).eq('month', month),
   processPayroll: (month: string, data: any) => 
     api.post(`/finance/payroll/process/${month}`, data),
   approvePayroll: (month: string) => api.put(`/finance/payroll/approve/${month}`),

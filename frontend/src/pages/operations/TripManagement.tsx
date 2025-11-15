@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import OperationsLayout from '@/components/operations/OperationsLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -55,12 +55,27 @@ export default function TripManagement() {
   const { data: tripsData, isLoading } = useQuery({
     queryKey: ['operations-trips', selectedDate, statusFilter],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (selectedDate) params.append('date', selectedDate);
-      if (statusFilter !== 'all') params.append('status', statusFilter);
+      let query = supabase
+        .from('trips')
+        .select(`
+          *,
+          route:routes(*),
+          bus:buses(*),
+          driver:drivers(*)
+        `)
+        .order('scheduled_departure', { ascending: false });
       
-      const response = await api.get(`/operations/trips?${params}`);
-      return response.data;
+      if (selectedDate) {
+        query = query.gte('scheduled_departure', `${selectedDate}T00:00:00`)
+                     .lte('scheduled_departure', `${selectedDate}T23:59:59`);
+      }
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      return { trips: data || [] };
     },
     refetchInterval: 30000,
   });
@@ -69,8 +84,13 @@ export default function TripManagement() {
   const { data: routesData } = useQuery({
     queryKey: ['routes'],
     queryFn: async () => {
-      const response = await api.get('/routes');
-      return response.data;
+      const { data, error } = await supabase
+        .from('routes')
+        .select('*')
+        .eq('is_active', true)
+        .order('origin');
+      if (error) throw error;
+      return { routes: data || [] };
     },
   });
 
@@ -78,8 +98,13 @@ export default function TripManagement() {
   const { data: busesData } = useQuery({
     queryKey: ['buses'],
     queryFn: async () => {
-      const response = await api.get('/buses');
-      return response.data;
+      const { data, error } = await supabase
+        .from('buses')
+        .select('*')
+        .eq('status', 'active')
+        .order('name');
+      if (error) throw error;
+      return { buses: data || [] };
     },
   });
 
@@ -87,15 +112,23 @@ export default function TripManagement() {
   const { data: driversData } = useQuery({
     queryKey: ['drivers'],
     queryFn: async () => {
-      const response = await api.get('/drivers');
-      return response.data;
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('*')
+        .eq('status', 'active')
+        .order('full_name');
+      if (error) throw error;
+      return { drivers: data || [] };
     },
   });
 
   // Create trip mutation
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      await api.post('/operations/trips', data);
+      const { error } = await supabase
+        .from('trips')
+        .insert([data]);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['operations-trips'] });
@@ -118,7 +151,11 @@ export default function TripManagement() {
   // Update trip status mutation
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: any) => {
-      await api.put(`/operations/trips/${id}/status`, { status });
+      const { error } = await supabase
+        .from('trips')
+        .update({ status })
+        .eq('id', id);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['operations-trips'] });
@@ -132,7 +169,11 @@ export default function TripManagement() {
   // Replace driver mutation
   const replaceDriverMutation = useMutation({
     mutationFn: async ({ id, driverId }: any) => {
-      await api.put(`/operations/trips/${id}/driver`, { driverId });
+      const { error } = await supabase
+        .from('trips')
+        .update({ driver_id: driverId })
+        .eq('id', id);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['operations-trips'] });
@@ -147,7 +188,11 @@ export default function TripManagement() {
   // Replace bus mutation
   const replaceBusMutation = useMutation({
     mutationFn: async ({ id, busId }: any) => {
-      await api.put(`/operations/trips/${id}/bus`, { busId });
+      const { error } = await supabase
+        .from('trips')
+        .update({ bus_id: busId })
+        .eq('id', id);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['operations-trips'] });

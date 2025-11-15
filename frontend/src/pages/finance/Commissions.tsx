@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { DollarSign, TrendingUp, Users, Calendar } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface Commission {
   id: string;
@@ -23,14 +24,13 @@ const Commissions = () => {
 
   const fetchCommissions = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/finance/commissions', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setCommissions(data.data || []);
-      }
+      const { data, error } = await supabase
+        .from('staff_commissions')
+        .select('*, staff(*)')
+        .order('period', { ascending: false });
+
+      if (error) throw error;
+      setCommissions(data || []);
     } catch (error) {
       console.error('Failed to fetch commissions:', error);
     } finally {
@@ -40,20 +40,16 @@ const Commissions = () => {
 
   const payCommission = async (id: string) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/finance/commissions/pay`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ commissionId: id })
-      });
+      const { error } = await supabase
+        .from('staff_commissions')
+        .update({ 
+          status: 'paid',
+          paid_at: new Date().toISOString()
+        })
+        .eq('id', id);
 
-      if (response.ok) {
-        await fetchCommissions();
-        alert('Commission paid successfully!');
-      }
+      if (error) throw error;
+      await fetchCommissions();
     } catch (error) {
       console.error('Failed to pay commission:', error);
     }

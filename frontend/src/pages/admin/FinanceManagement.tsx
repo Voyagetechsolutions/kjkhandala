@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,38 +19,32 @@ export default function FinanceManagement() {
   const [expenseFilter, setExpenseFilter] = useState('all');
   const queryClient = useQueryClient();
 
-  // Fetch revenue data
-  const { data: revenue } = useQuery({
-    queryKey: ['revenue-data', dateRange],
+  // Fetch finance data
+  const { data: financeData, isLoading } = useQuery({
+    queryKey: ['admin-finance'],
     queryFn: async () => {
-      const response = await api.get('/finance/revenue');
-      return response.data.data || [];
-    },
-  });
-
-  // Fetch income records
-  const { data: incomeRecords, isLoading: incomeLoading } = useQuery({
-    queryKey: ['income-records'],
-    queryFn: async () => {
-      const response = await api.get('/finance/income');
-      return response.data.data || [];
-    },
-  });
-
-  // Fetch expenses
-  const { data: expenses } = useQuery({
-    queryKey: ['expenses-data', expenseFilter],
-    queryFn: async () => {
-      const params = expenseFilter !== 'all' ? `?category=${expenseFilter}` : '';
-      const response = await api.get(`/finance/expenses${params}`);
-      return response.data.data || [];
+      const { data: income, error: incomeError } = await supabase
+        .from('income')
+        .select('*');
+      if (incomeError) throw incomeError;
+      
+      const { data: expenses, error: expensesError } = await supabase
+        .from('expenses')
+        .select('*');
+      if (expensesError) throw expensesError;
+      
+      return { income: income || [], expenses: expenses || [] };
     },
   });
 
   // Approve expense mutation
   const approveMutation = useMutation({
     mutationFn: async (id: string) => {
-      await api.put(`/finance/expenses/${id}/approve`);
+      const { error } = await supabase
+        .from('expenses')
+        .update({ status: 'approved' })
+        .eq('id', id);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success('Expense approved');
@@ -59,23 +53,23 @@ export default function FinanceManagement() {
   });
 
   // Calculate summary stats
-  const totalIncome = revenue?.reduce((sum, r) => sum + parseFloat(r.total_amount || 0), 0) || 0;
-  const totalExpenses = (expenses && Array.isArray(expenses)) 
-    ? expenses.filter((e: any) => e.status === 'approved')
-      .reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0) 
-    : 0;
+  const income = financeData?.income || [];
+  const expenses = financeData?.expenses || [];
+  
+  const totalIncome = income.reduce((sum: number, r: any) => sum + parseFloat(r.amount || 0), 0);
+  const totalExpenses = expenses
+    .filter((e: any) => e.status === 'approved')
+    .reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0);
   const netProfit = totalIncome - totalExpenses;
   const profitMargin = totalIncome > 0 ? ((netProfit / totalIncome) * 100).toFixed(1) : '0';
 
-  const pendingExpenses = (expenses && Array.isArray(expenses))
-    ? expenses.filter((e: any) => e.status === 'pending').length 
-    : 0;
+  const pendingExpenses = expenses.filter((e: any) => e.status === 'pending').length;
 
   // Prepare chart data
-  const chartData = revenue?.slice(0, 30).reverse().map((r: any) => ({
+  const chartData = income.slice(0, 30).reverse().map((r: any) => ({
     date: format(new Date(r.created_at), 'MMM dd'),
-    revenue: parseFloat(r.total_amount),
-  })) || [];
+    revenue: parseFloat(r.amount),
+  }));
 
   // Expense breakdown
   const expenseBreakdown = expenses?.reduce((acc: any, exp: any) => {
@@ -234,14 +228,14 @@ export default function FinanceManagement() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {revenue?.slice(0, 20).map((transaction: any) => (
+                    {income.slice(0, 20).map((transaction: any) => (
                       <TableRow key={transaction.id}>
                         <TableCell>{format(new Date(transaction.created_at), 'MMM dd, yyyy HH:mm')}</TableCell>
                         <TableCell>
                           <Badge className="bg-green-500">Income</Badge>
                         </TableCell>
                         <TableCell>Ticket Sale</TableCell>
-                        <TableCell className="font-bold text-green-600">+P{parseFloat(transaction.total_amount).toFixed(2)}</TableCell>
+                        <TableCell className="font-bold text-green-600">+P{parseFloat(transaction.amount).toFixed(2)}</TableCell>
                         <TableCell>
                           <Badge className="bg-green-500">
                             <CheckCircle className="h-3 w-3 mr-1" />

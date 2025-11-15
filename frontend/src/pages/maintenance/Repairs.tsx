@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import MaintenanceLayout from '@/components/maintenance/MaintenanceLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,22 +18,37 @@ import {
 import { Badge } from '@/components/ui/badge';
 
 export default function Repairs() {
-  const { data: repairs = [] } = useQuery({
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : MaintenanceLayout;
+  const { data: repairsData, isLoading } = useQuery({
     queryKey: ['repairs'],
     queryFn: async () => {
-      const response = await api.get('/maintenance/repairs');
-      return Array.isArray(response.data) ? response.data : (response.data?.repairs || []);
+      const { data, error } = await supabase
+        .from('repairs')
+        .select(`
+          *,
+          bus:buses(*),
+          mechanic:profiles(*)
+        `)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return { repairs: data || [] };
     },
   });
 
   const { data: buses = [] } = useQuery({
     queryKey: ['buses'],
     queryFn: async () => {
-      const response = await api.get('/buses');
-      return Array.isArray(response.data) ? response.data : (response.data?.buses || []);
+      const { data, error } = await supabase
+        .from('buses')
+        .select('*');
+      if (error) throw error;
+      return data || [];
     },
   });
 
+  const repairs = repairsData?.repairs || [];
   const summary = {
     totalRepairs: repairs.length,
     partsCost: repairs.reduce((sum: number, r: any) => sum + (parseFloat(r.partsCost) || 0), 0),
@@ -40,7 +57,7 @@ export default function Repairs() {
   };
 
   return (
-    <MaintenanceLayout>
+    <Layout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold mb-2">Repairs & Parts Replacement</h1>
@@ -157,6 +174,6 @@ export default function Repairs() {
           </CardContent>
         </Card>
       </div>
-    </MaintenanceLayout>
+    </Layout>
   );
 }

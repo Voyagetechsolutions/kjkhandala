@@ -1,0 +1,45 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\.38363580bfadb87ccbb097cf4800206cf7160568-audit.json",
+    "files": [
+        {
+            "date": 1762725424800,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\error-2025-11-09.log",
+            "hash": "42861a76a89a27a9882fe6b0e7f36666f4b351b78496f279d0904f88b9a42163"
+        },
+        {
+            "date": 1762726107505,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\error-2025-11-10.log",
+            "hash": "db8ac9284bcd51709bcd597a9a9218625c69c591ed050a6464dde6eebe2462ca"
+        },
+        {
+            "date": 1762814377951,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\error-2025-11-11.log",
+            "hash": "68a9558bd239772ca2c24a0b854b42e9bd0988ea31479051da5d2328537d3ee0"
+        },
+        {
+            "date": 1762900576755,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\error-2025-11-12.log",
+            "hash": "533ddb1b974597307000773aa61ea0c100993773961494347b13865e863d4a04"
+        },
+        {
+            "date": 1762990344932,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\error-2025-11-13.log",
+            "hash": "263f4ffa9b45976017c212e11a7b2a8933c37d41376ce5ebf8ac54d8c07f4961"
+        },
+        {
+            "date": 1763072809098,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\error-2025-11-14.log",
+            "hash": "edb1de56b6e176950ee1806e1537db7b9cf2278b6d854fc32671868244a93f28"
+        },
+        {
+            "date": 1763223425157,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\error-2025-11-15.log",
+            "hash": "a7a33cb672ab94caef9d024930de3d9acc1e8293e63d664aebe21e48b86b4491"
+        }
+    ],
+    "hashType": "sha256"
+}

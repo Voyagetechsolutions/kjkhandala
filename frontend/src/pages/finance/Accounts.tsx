@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
+import { useLocation } from 'react-router-dom';
+import api from '@/services/api';
+import AdminLayout from '@/components/admin/AdminLayout';
 import FinanceLayout from '@/components/finance/FinanceLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,17 +29,24 @@ import {
 import { Badge } from '@/components/ui/badge';
 
 export default function Accounts() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : FinanceLayout;
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
 
   const queryClient = useQueryClient();
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ['finance-accounts'],
+  const { data: accountsData, isLoading } = useQuery({
+    queryKey: ['accounts'],
     queryFn: async () => {
-      const response = await api.get('/finance/accounts');
-      return Array.isArray(response.data) ? response.data : (response.data?.accounts || []);
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      return { accounts: data || [] };
     },
   });
 
@@ -77,7 +87,7 @@ export default function Accounts() {
   };
 
   return (
-    <FinanceLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -112,7 +122,7 @@ export default function Accounts() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {accounts.map((account) => (
+                {accountsData?.accounts?.map((account) => (
                   <TableRow key={account.id}>
                     <TableCell className="font-medium">{account.name}</TableCell>
                     <TableCell>{account.bank}</TableCell>
@@ -251,12 +261,12 @@ export default function Accounts() {
                   className="w-full p-2 border rounded"
                   value={selectedAccount?.id || ''}
                   onChange={(e) => {
-                    const account = accounts.find(a => a.id === parseInt(e.target.value));
+                    const account = accountsData?.accounts?.find(a => a.id === parseInt(e.target.value));
                     setSelectedAccount(account);
                   }}
                 >
                   <option value="">Choose account...</option>
-                  {accounts.map((account) => (
+                  {accountsData?.accounts?.map((account) => (
                     <option key={account.id} value={account.id}>
                       {account.name} - {account.bank}
                     </option>
@@ -282,6 +292,6 @@ export default function Accounts() {
           </DialogContent>
         </Dialog>
       </div>
-    </FinanceLayout>
+    </Layout>
   );
 }

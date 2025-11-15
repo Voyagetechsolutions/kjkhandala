@@ -1,9 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
 const { auth, authorize } = require('../middleware/auth');
-
-const prisma = new PrismaClient();
+const { supabase } = require('../config/supabase');
 
 // ==================== WORK ORDERS ====================
 
@@ -11,26 +9,14 @@ const prisma = new PrismaClient();
 router.get('/work-orders', auth, async (req, res) => {
   try {
     const { status, priority, busId } = req.query;
-    
-    const where = {};
-    if (status) where.status = status;
-    if (priority) where.priority = priority;
-    if (busId) where.busId = busId;
-
-    const workOrders = await prisma.workOrder.findMany({
-      where,
-      include: {
-        bus: {
-          select: { registrationNumber: true, model: true },
-        },
-        assignedTo: {
-          select: { firstName: true, lastName: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    res.json(workOrders);
+    let q = supabase.from('work_orders').select('*');
+    if (status) q = q.eq('status', status);
+    if (priority) q = q.eq('priority', priority);
+    if (busId) q = q.eq('bus_id', busId);
+    q = q.order('created_at', { ascending: false });
+    const { data: workOrders, error } = await q;
+    if (error) throw error;
+    res.json(workOrders || []);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -62,20 +48,13 @@ router.get('/work-orders/:id', auth, async (req, res) => {
 // Create work order
 router.post('/work-orders', auth, authorize('SUPER_ADMIN', 'MAINTENANCE_MANAGER'), async (req, res) => {
   try {
-    const workOrder = await prisma.workOrder.create({
-      data: {
-        ...req.body,
-        estimatedCost: req.body.estimatedCost ? parseFloat(req.body.estimatedCost) : null,
-        createdById: req.user.id,
-      },
-      include: {
-        bus: true,
-      },
-    });
-
-    // Emit WebSocket event
-    req.app.get('io').emit('workorder:update', { type: 'created', workOrder });
-
+    const payload = {
+      ...req.body,
+      estimated_cost: req.body.estimatedCost ? parseFloat(req.body.estimatedCost) : null,
+      created_by_id: req.user.id,
+    };
+    const { data: workOrder, error } = await supabase.from('work_orders').insert(payload).select('*').single();
+    if (error) throw error;
     res.status(201).json({ data: workOrder });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -251,28 +230,16 @@ router.delete('/maintenance-schedules/:id', auth, authorize('SUPER_ADMIN', 'MAIN
 router.get('/inspections', auth, async (req, res) => {
   try {
     const { busId, status, startDate, endDate } = req.query;
-    
-    const where = {};
-    if (busId) where.busId = busId;
-    if (status) where.status = status;
+    let q = supabase.from('inspections').select('*');
+    if (busId) q = q.eq('bus_id', busId);
+    if (status) q = q.eq('status', status);
     if (startDate && endDate) {
-      where.date = {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
-      };
+      q = q.gte('date', new Date(startDate).toISOString()).lte('date', new Date(endDate).toISOString());
     }
-
-    const inspections = await prisma.inspection.findMany({
-      where,
-      include: {
-        bus: {
-          select: { registrationNumber: true, model: true },
-        },
-      },
-      orderBy: { date: 'desc' },
-    });
-
-    res.json(inspections);
+    q = q.order('date', { ascending: false });
+    const { data: inspections, error } = await q;
+    if (error) throw error;
+    res.json(inspections || []);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -301,16 +268,12 @@ router.get('/inspections/:id', auth, async (req, res) => {
 // Create inspection
 router.post('/inspections', auth, async (req, res) => {
   try {
-    const inspection = await prisma.inspection.create({
-      data: {
-        ...req.body,
-        inspectorId: req.body.inspectorId || req.user.id,
-      },
-      include: {
-        bus: true,
-      },
-    });
-
+    const payload = {
+      ...req.body,
+      inspector_id: req.body.inspectorId || req.user.id,
+    };
+    const { data: inspection, error } = await supabase.from('inspections').insert(payload).select('*').single();
+    if (error) throw error;
     res.status(201).json({ data: inspection });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -360,28 +323,16 @@ router.post('/inspections/:id/photo', auth, async (req, res) => {
 router.get('/repairs', auth, async (req, res) => {
   try {
     const { busId, status, startDate, endDate } = req.query;
-    
-    const where = {};
-    if (busId) where.busId = busId;
-    if (status) where.status = status;
+    let q = supabase.from('repairs').select('*');
+    if (busId) q = q.eq('bus_id', busId);
+    if (status) q = q.eq('status', status);
     if (startDate && endDate) {
-      where.date = {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
-      };
+      q = q.gte('date', new Date(startDate).toISOString()).lte('date', new Date(endDate).toISOString());
     }
-
-    const repairs = await prisma.repair.findMany({
-      where,
-      include: {
-        bus: {
-          select: { registrationNumber: true, model: true },
-        },
-      },
-      orderBy: { date: 'desc' },
-    });
-
-    res.json(repairs);
+    q = q.order('date', { ascending: false });
+    const { data: repairs, error } = await q;
+    if (error) throw error;
+    res.json(repairs || []);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -404,17 +355,13 @@ router.get('/repairs/history/:busId', auth, async (req, res) => {
 // Create repair
 router.post('/repairs', auth, async (req, res) => {
   try {
-    const repair = await prisma.repair.create({
-      data: {
-        ...req.body,
-        partsCost: parseFloat(req.body.partsCost || 0),
-        laborCost: parseFloat(req.body.laborCost || 0),
-      },
-      include: {
-        bus: true,
-      },
-    });
-
+    const payload = {
+      ...req.body,
+      parts_cost: parseFloat(req.body.partsCost || 0),
+      labor_cost: parseFloat(req.body.laborCost || 0),
+    };
+    const { data: repair, error } = await supabase.from('repairs').insert(payload).select('*').single();
+    if (error) throw error;
     res.status(201).json({ data: repair });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -458,19 +405,16 @@ router.delete('/repairs/:id', auth, authorize('SUPER_ADMIN', 'MAINTENANCE_MANAGE
 router.get('/inventory', auth, async (req, res) => {
   try {
     const { category, lowStock } = req.query;
-    
-    const where = {};
-    if (category) where.category = category;
+    let q = supabase.from('inventory_items').select('*');
+    if (category) q = q.eq('category', category);
     if (lowStock === 'true') {
-      where.quantity = { lte: prisma.inventoryItem.fields.reorderLevel };
+      // Simple low stock check - quantity <= 10
+      q = q.lte('quantity', 10);
     }
-
-    const inventory = await prisma.inventoryItem.findMany({
-      where,
-      orderBy: { name: 'asc' },
-    });
-
-    res.json(inventory);
+    q = q.order('name');
+    const { data: inventory, error } = await q;
+    if (error) throw error;
+    res.json(inventory || []);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -496,15 +440,14 @@ router.get('/inventory/:id', auth, async (req, res) => {
 // Create inventory item
 router.post('/inventory', auth, authorize('SUPER_ADMIN', 'MAINTENANCE_MANAGER'), async (req, res) => {
   try {
-    const item = await prisma.inventoryItem.create({
-      data: {
-        ...req.body,
-        quantity: parseInt(req.body.quantity),
-        unitPrice: parseFloat(req.body.unitPrice),
-        reorderLevel: parseInt(req.body.reorderLevel),
-      },
-    });
-
+    const payload = {
+      ...req.body,
+      quantity: parseInt(req.body.quantity),
+      unit_price: parseFloat(req.body.unitPrice),
+      reorder_level: parseInt(req.body.reorderLevel),
+    };
+    const { data: item, error } = await supabase.from('inventory_items').insert(payload).select('*').single();
+    if (error) throw error;
     res.status(201).json({ data: item });
   } catch (error) {
     res.status(500).json({ error: error.message });

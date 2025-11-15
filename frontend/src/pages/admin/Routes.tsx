@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import api from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import AdminLayout from "@/components/admin/AdminLayout";
@@ -44,8 +44,12 @@ export default function AdminRoutes() {
 
   const fetchRoutes = useCallback(async () => {
     try {
-      const response = await api.get('/routes');
-      setRoutes(response.data.data || []);
+      const { data, error } = await supabase
+        .from('routes')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      setRoutes(data || []);
     } catch (error: any) {
       toast({ 
         variant: "destructive", 
@@ -78,14 +82,22 @@ export default function AdminRoutes() {
 
     try {
       if (editingRoute) {
-        await api.put(`/routes/${editingRoute.id}`, routeData);
+        const { error } = await supabase
+          .from('routes')
+          .update(routeData)
+          .eq('id', editingRoute.id);
+        if (error) throw error;
         toast({ title: "Route updated successfully" });
       } else {
-        await api.post('/routes', routeData);
+        const { error } = await supabase
+          .from('routes')
+          .insert([routeData]);
+        if (error) throw error;
         toast({ title: "Route created successfully" });
       }
 
-      fetchRoutes();
+      // Refresh the routes data
+      window.location.reload(); // Simple refresh for now
       setDialogOpen(false);
       setEditingRoute(null);
       setFormData({ name: "", origin: "", destination: "", distance: "", duration: "" });
@@ -102,7 +114,11 @@ export default function AdminRoutes() {
     if (!confirm("Are you sure you want to delete this route?")) return;
 
     try {
-      await api.delete(`/routes/${id}`);
+      const { error } = await supabase
+        .from('routes')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
       toast({ title: "Route deleted successfully" });
       fetchRoutes();
     } catch (error: any) {

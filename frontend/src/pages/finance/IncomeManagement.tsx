@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import FinanceLayout from '@/components/finance/FinanceLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,6 +35,10 @@ import {
 } from "@/components/ui/table";
 
 export default function IncomeManagement() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : FinanceLayout;
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [filters, setFilters] = useState({
     source: 'all',
@@ -52,16 +58,25 @@ export default function IncomeManagement() {
 
   const queryClient = useQueryClient();
 
-  const { data: incomeRecords = [] } = useQuery({
-    queryKey: ['finance-income'],
+  const { data: incomeData, isLoading } = useQuery({
+    queryKey: ['income', filters],
     queryFn: async () => {
-      const response = await api.get('/finance/income');
-      return Array.isArray(response.data) ? response.data : (response.data?.income || []);
+      const { data, error } = await supabase
+        .from('income')
+        .select('*')
+        .gte('date', filters.dateFrom)
+        .lte('date', filters.dateTo)
+        .order('date', { ascending: false });
+      if (error) throw error;
+      return { records: data || [], summary: {} };
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
+      await supabase
+        .from('income')
+        .insert(data);
       await api.post('/finance/income', data);
     },
     onSuccess: () => {
@@ -82,6 +97,8 @@ export default function IncomeManagement() {
     },
   });
 
+  const incomeRecords = incomeData?.records || [];
+  
   const filteredRecords = incomeRecords.filter((record: any) => {
     if (filters.source !== 'all' && record.source !== filters.source) return false;
     if (filters.route !== 'all' && record.route !== filters.route) return false;
@@ -107,7 +124,7 @@ export default function IncomeManagement() {
   };
 
   return (
-    <FinanceLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -347,6 +364,6 @@ export default function IncomeManagement() {
           </DialogContent>
         </Dialog>
       </div>
-    </FinanceLayout>
+    </Layout>
   );
 }

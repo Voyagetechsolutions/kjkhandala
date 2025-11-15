@@ -1,0 +1,45 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\.7b65acb5e1a0da7588008aecd82389d54e4ef28c-audit.json",
+    "files": [
+        {
+            "date": 1762725424810,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\warn-2025-11-09.log",
+            "hash": "1c3f3ab04dd5dfecf5e5bc2ffaf32a56ffaec075bc5ed1643005202e031a2f27"
+        },
+        {
+            "date": 1762726107517,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\warn-2025-11-10.log",
+            "hash": "8b30346f7e113b049e2b3b858d9c763d9fdbf56308af27f1569594fb75f731de"
+        },
+        {
+            "date": 1762814377961,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\warn-2025-11-11.log",
+            "hash": "ad2d862494a9dcda99eacbb0831f78070e452308f2d6a6661f179339a41c6f9b"
+        },
+        {
+            "date": 1762900576767,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\warn-2025-11-12.log",
+            "hash": "466e7b89bf0bd8d43e37ad4322df03c3b55d8db879efef50857ca569be32fbf8"
+        },
+        {
+            "date": 1762990344942,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\warn-2025-11-13.log",
+            "hash": "93840bc0f17c856598c338f5c63976418394cf7d484cf7ea3fc88e457175e083"
+        },
+        {
+            "date": 1763072809109,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\warn-2025-11-14.log",
+            "hash": "581d01eda0e046fd87387c2193804b1424e3b42a9902136db877cdc64f6a08f1"
+        },
+        {
+            "date": 1763223425168,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\warn-2025-11-15.log",
+            "hash": "b46dd2eb895a1714c556ca868f09d291676a4555c37139d94b60512cb883e694"
+        }
+    ],
+    "hashType": "sha256"
+}

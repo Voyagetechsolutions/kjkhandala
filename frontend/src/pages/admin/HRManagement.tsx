@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,32 +10,53 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Users, UserPlus, DollarSign, Calendar, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
+import { Users, UserPlus, DollarSign, Calendar, TrendingUp, AlertCircle, CheckCircle, Upload } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import {
+  checkDuplicateEmail,
+  validateDepartment,
+  generateEmployeeId,
+  createPayrollRecord,
+  sendWelcomeEmail,
+  generateTemporaryPassword,
+  parseEmployeeCSV,
+  bulkImportEmployees,
+} from '@/lib/employeeHelpers';
 
 export default function HRManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
   // Fetch staff
-  const { data: staff, isLoading: staffLoading } = useQuery({
-    queryKey: ['staff-directory', selectedDepartment],
+  const { data: hrData, isLoading } = useQuery({
+    queryKey: ['admin-hr'],
     queryFn: async () => {
-      const params = selectedDepartment !== 'all' ? `?department=${selectedDepartment}` : '';
-      const response = await api.get(`/staff${params}`);
-      return response.data.data || [];
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('full_name');
+      if (error) throw error;
+      return { employees: data || [] };
     },
   });
+
+  const staff = hrData?.employees || [];
 
   // Fetch drivers
   const { data: drivers, isLoading: driversLoading } = useQuery({
     queryKey: ['drivers-hr'],
     queryFn: async () => {
-      const response = await api.get('/drivers');
-      return response.data.data || [];
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('*');
+      if (error) throw error;
+      return data || [];
     },
   });
 
@@ -43,13 +64,17 @@ export default function HRManagement() {
   const { data: attendance } = useQuery({
     queryKey: ['staff-attendance'],
     queryFn: async () => {
-      try {
-        const response = await api.get('/staff_attendance');
-        return response.data.data || [];
-      } catch (error) {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('*')
+        .gte('date', today)
+        .lt('date', new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+      if (error) {
         console.error('Error fetching attendance:', error);
         return [];
       }
+      return data || [];
     },
   });
 
@@ -58,15 +83,23 @@ export default function HRManagement() {
     queryKey: ['payroll-data'],
     queryFn: async () => {
       const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-      const response = await api.get(`/hr/payroll/${currentMonth}`);
-      return response.data.data || [];
+      const { data, error } = await supabase
+        .from('staff_payroll')
+        .select('*')
+        .gte('pay_period', `${currentMonth}-01`)
+        .lt('pay_period', `${currentMonth}-31`);
+      if (error) throw error;
+      return data || [];
     },
   });
 
   // Add Employee Mutation
   const addEmployeeMutation = useMutation({
     mutationFn: async (formData: any) => {
-      await api.post('/staff', formData);
+      const { error } = await supabase
+        .from('profiles')
+        .insert([formData]);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success('Employee added successfully!');
@@ -78,19 +111,180 @@ export default function HRManagement() {
     },
   });
 
-  const handleAddEmployee = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddEmployee = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    addEmployeeMutation.mutate({
-      full_name: formData.get('full_name'),
-      email: formData.get('email'),
-      phone: formData.get('phone'),
-      position: formData.get('position'),
-      department: formData.get('department'),
-      salary: parseFloat(formData.get('salary') as string),
-      hire_date: formData.get('hire_date'),
-      status: 'active',
-    });
+    
+    // Extract and validate form values
+    const full_name = (formData.get('full_name') as string) || '';
+    const email = (formData.get('email') as string) || '';
+    const position = (formData.get('position') as string) || '';
+    const department = (formData.get('department') as string) || '';
+    const hire_date = (formData.get('hire_date') as string) || '';
+    const phone = (formData.get('phone') as string) || null;
+    const avatar_url = (formData.get('avatar_url') as string) || null;
+    const salary_str = formData.get('salary') as string;
+    
+    // Validate required fields
+    if (!full_name || !email || !position || !department || !hire_date) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+    
+    // Parse salary safely
+    const salary = salary_str ? parseFloat(salary_str) : 0;
+    if (salary_str && isNaN(salary)) {
+      toast.error('Please enter a valid salary');
+      return;
+    }
+    
+    try {
+      // 1. Check for duplicate email
+      const isDuplicate = await checkDuplicateEmail(email);
+      if (isDuplicate) {
+        toast.error(`Email ${email} is already registered`);
+        return;
+      }
+      
+      // 2. Validate department
+      const isDepartmentValid = await validateDepartment(department);
+      if (!isDepartmentValid) {
+        toast.error(`Invalid department: ${department}. Please select a valid department.`);
+        return;
+      }
+      
+      // 3. Generate unique employee ID
+      const employeeId = await generateEmployeeId();
+      
+      // 4. Generate temporary password
+      const tempPassword = generateTemporaryPassword();
+      
+      // 5. Create auth user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: email,
+        password: tempPassword,
+        options: {
+          data: {
+            full_name: full_name,
+          },
+        },
+      });
+      
+      if (authError) {
+        toast.error(`Failed to create user: ${authError.message}`);
+        return;
+      }
+      
+      if (!authData.user) {
+        toast.error('Failed to create user account');
+        return;
+      }
+      
+      // 6. Update profile with employee details
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          employee_id: employeeId,
+          phone: phone,
+          avatar_url: avatar_url,
+          department: department,
+          position: position,
+          hire_date: hire_date,
+          salary: salary,
+          is_active: true,
+          status: 'active',
+        })
+        .eq('id', authData.user.id);
+      
+      if (profileError) {
+        toast.error(`Failed to update profile: ${profileError.message}`);
+        return;
+      }
+      
+      // 7. Create initial payroll record (if salary > 0)
+      if (salary > 0) {
+        try {
+          await createPayrollRecord(authData.user.id, salary);
+          toast.success('Payroll record initialized');
+        } catch (error) {
+          console.error('Failed to create payroll:', error);
+          toast.error('Employee created but payroll initialization failed');
+        }
+      }
+      
+      // 8. Send welcome email with credentials
+      try {
+        await sendWelcomeEmail(email, full_name, employeeId, tempPassword);
+        toast.success('Welcome email sent to employee');
+      } catch (error) {
+        console.error('Failed to send welcome email:', error);
+        toast.error('Employee created but welcome email failed');
+      }
+      
+      // Success!
+      toast.success(`Employee ${full_name} added successfully! ID: ${employeeId}`);
+      queryClient.invalidateQueries({ queryKey: ['admin-hr'] });
+      setAddEmployeeOpen(false);
+      e.currentTarget.reset();
+    } catch (error: any) {
+      console.error('Error in handleAddEmployee:', error);
+      toast.error(error.message || 'Failed to add employee');
+    }
+  };
+
+  // Handle bulk import
+  const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.name.endsWith('.csv')) {
+      toast.error('Please upload a CSV file');
+      return;
+    }
+    
+    setImporting(true);
+    
+    try {
+      const text = await file.text();
+      const employees = parseEmployeeCSV(text);
+      
+      if (employees.length === 0) {
+        toast.error('No valid employees found in CSV');
+        setImporting(false);
+        return;
+      }
+      
+      toast.info(`Importing ${employees.length} employees...`);
+      
+      const result = await bulkImportEmployees(employees);
+      
+      if (result.success > 0) {
+        toast.success(`Successfully imported ${result.success} employees!`);
+        queryClient.invalidateQueries({ queryKey: ['admin-hr'] });
+      }
+      
+      if (result.failed > 0) {
+        toast.error(`Failed to import ${result.failed} employees. Check console for details.`);
+        console.error('Import errors:', result.errors);
+      }
+      
+      setBulkImportOpen(false);
+    } catch (error: any) {
+      console.error('Bulk import error:', error);
+      toast.error(error.message || 'Failed to import employees');
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   // Calculate summary stats
@@ -244,7 +438,7 @@ export default function HRManagement() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {staffLoading ? (
+                    {isLoading ? (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center py-8">
                           Loading staff...

@@ -1,12 +1,15 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import socketService from '@/services/socket';
+import { Socket } from 'socket.io-client';
 
 export function useWebSocket() {
   const queryClient = useQueryClient();
+  const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
-    const socket = socketService.connect();
+    const socketInstance = socketService.connect();
+    setSocket(socketInstance);
 
     // Trip updates
     const handleTripUpdate = (data: any) => {
@@ -65,6 +68,9 @@ export function useWebSocket() {
       socketService.offWorkOrderUpdate(handleWorkOrderUpdate);
       socketService.offEmployeeUpdate(handleEmployeeUpdate);
       socketService.disconnect();
+      setSocket(null);
     };
   }, [queryClient]);
+
+  return { socket };
 }

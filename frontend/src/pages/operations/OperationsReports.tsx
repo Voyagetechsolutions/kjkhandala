@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import OperationsLayout from '@/components/operations/OperationsLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,11 +34,16 @@ export default function OperationsReports() {
   });
 
   // Fetch daily report
-  const { data: dailyReport, isLoading: isDailyLoading } = useQuery({
-    queryKey: ['operations-reports-daily', selectedDate],
+  const { data: reportsData, isLoading: isDailyLoading } = useQuery({
+    queryKey: ['operations-reports', dateRange],
     queryFn: async () => {
-      const response = await api.get(`/operations/reports/daily?date=${selectedDate}`);
-      return response.data;
+      const { data: trips, error } = await supabase
+        .from('trips')
+        .select('*')
+        .gte('scheduled_departure', dateRange.startDate)
+        .lte('scheduled_departure', dateRange.endDate);
+      if (error) throw error;
+      return { report: { trips: trips || [], totalTrips: trips?.length || 0 } };
     },
     enabled: reportType === 'daily',
   });
@@ -47,15 +52,18 @@ export default function OperationsReports() {
   const { data: performanceReport, isLoading: isPerformanceLoading } = useQuery({
     queryKey: ['operations-reports-performance', dateRange],
     queryFn: async () => {
-      const response = await api.get(
-        `/operations/reports/performance?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
-      );
-      return response.data;
+      const { data: trips, error } = await supabase
+        .from('trips')
+        .select('*')
+        .gte('scheduled_departure', dateRange.startDate)
+        .lte('scheduled_departure', dateRange.endDate);
+      if (error) throw error;
+      return { performance: { trips: trips || [], totalTrips: trips?.length || 0 } };
     },
     enabled: reportType === 'performance',
   });
 
-  const report = reportType === 'daily' ? dailyReport?.report : performanceReport?.performance;
+  const report = reportType === 'daily' ? reportsData?.report : performanceReport?.performance;
   const isLoading = reportType === 'daily' ? isDailyLoading : isPerformanceLoading;
 
   const handleExport = (format: string) => {

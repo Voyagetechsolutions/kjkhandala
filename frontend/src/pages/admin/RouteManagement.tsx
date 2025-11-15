@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/components/admin/AdminLayout';
+import OperationsLayout from '@/components/operations/OperationsLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,22 +16,22 @@ import RouteForm from '@/components/routes/RouteForm';
 import RouteMapView from '@/components/routes/RouteMapView';
 
 export default function RouteManagement() {
+  const location = useLocation();
+  const isOperationsRoute = location.pathname.startsWith('/operations');
+  const Layout = isOperationsRoute ? OperationsLayout : AdminLayout;
+  
   const [showForm, setShowForm] = useState(false);
   const [editingRoute, setEditingRoute] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const queryClient = useQueryClient();
 
   // Fetch routes with analytics
-  const { data: routes, isLoading } = useQuery({
-    queryKey: ['routes-management'],
+  const { data: routesData, isLoading } = useQuery({
+    queryKey: ['routes'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('routes')
-        .select(`
-          *,
-          schedules(count),
-          bookings:schedules(bookings(count, total_amount))
-        `)
+        .select('*')
         .order('origin');
       
       if (error) throw error;
@@ -41,26 +43,22 @@ export default function RouteManagement() {
   const { data: analytics } = useQuery({
     queryKey: ['route-analytics'],
     queryFn: async () => {
+      // Get bookings with trip info to access route_id
       const { data: bookingData, error } = await supabase
         .from('bookings')
-        .select(`
-          total_amount,
-          schedules(route_id, routes(origin, destination))
-        `)
-        .eq('status', 'confirmed');
+        .select('total_amount, trip_id, trips(route_id)')
+        .eq('status', 'CONFIRMED');
 
       if (error) throw error;
 
       // Aggregate by route
       const routeStats: any = {};
       bookingData?.forEach((booking: any) => {
-        const routeId = booking.schedules?.route_id;
+        const routeId = booking.trips?.route_id;
         if (routeId) {
           if (!routeStats[routeId]) {
             routeStats[routeId] = {
               routeId,
-              origin: booking.schedules?.routes?.origin,
-              destination: booking.schedules?.routes?.destination,
               revenue: 0,
               bookings: 0,
             };
@@ -100,19 +98,22 @@ export default function RouteManagement() {
     }
   };
 
-  const filteredRoutes = routes?.filter((route: any) =>
+  const routes = routesData || [];
+  const filteredRoutes = routes.filter((route: any) =>
     route.origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
     route.destination.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Calculate summary stats
-  const totalRoutes = routes?.length || 0;
-  const activeRoutes = routes?.filter((r: any) => r.active).length || 0;
+  const totalRoutes = routes.length;
+  const activeRoutes = routes.filter((r: any) => r.active).length;
   const totalRevenue = analytics?.reduce((sum: number, r: any) => sum + r.revenue, 0) || 0;
-  const avgDistance = routes?.reduce((sum: number, r: any) => sum + (r.distance_km || 0), 0) / (routes?.length || 1) || 0;
+  const avgDistance = routes.length > 0 
+    ? routes.reduce((sum: number, r: any) => sum + (r.distance_km || 0), 0) / routes.length 
+    : 0;
 
   return (
-    <AdminLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
@@ -149,7 +150,7 @@ export default function RouteManagement() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">P{totalRevenue.toFixed(2)}</p>
+              <p className="text-2xl font-bold">P{Number(totalRevenue).toFixed(2)}</p>
               <p className="text-xs text-muted-foreground">All routes combined</p>
             </CardContent>
           </Card>
@@ -330,6 +331,6 @@ export default function RouteManagement() {
           />
         )}
       </div>
-    </AdminLayout>
+    </Layout>
   );
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import FinanceLayout from '@/components/finance/FinanceLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -65,14 +65,20 @@ export default function Settings() {
   const { data: savedSettings } = useQuery({
     queryKey: ['finance-settings'],
     queryFn: async () => {
-      const response = await api.get('/finance/settings');
-      return response.data?.settings || {};
+      const { data, error } = await supabase
+        .from('finance_settings')
+        .select('*');
+      if (error) throw error;
+      return data[0] || {};
     },
   });
 
-  const saveMutation = useMutation({
+  const updateSettingsMutation = useMutation({
     mutationFn: async (data: any) => {
-      await api.post('/finance/settings', data);
+      const { error } = await supabase
+        .from('finance_settings')
+        .upsert(data);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['finance-settings'] });

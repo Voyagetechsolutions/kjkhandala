@@ -23,20 +23,15 @@ export async function sendBookingConfirmationEmail(booking: BookingNotification)
     const emailHtml = generateBookingEmailTemplate(booking);
     
     // In production, call your email service (SendGrid, Resend, etc.)
-    // For now, we'll use Supabase Edge Functions
-    const response = await fetch('/api/send-email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        to: booking.passengerEmail,
-        subject: `Booking Confirmation - ${booking.bookingReference}`,
-        html: emailHtml,
-      }),
+    // Route via Supabase Edge Function
+    const { default: api } = await import('@/lib/api');
+    const response = await api.post('/email/send', {
+      to: booking.passengerEmail,
+      subject: `Booking Confirmation - ${booking.bookingReference}`,
+      html: emailHtml,
     });
 
-    return response.ok;
+    return !!response.data?.ok;
   } catch (error) {
     console.error('Error sending email:', error);
     return false;
@@ -291,17 +286,14 @@ export async function sendPaymentReceiptEmail(
 </html>
     `;
 
-    const response = await fetch('/api/send-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to: booking.passengerEmail,
-        subject: `Payment Receipt - ${booking.bookingReference}`,
-        html: emailHtml,
-      }),
+    const { default: api } = await import('@/lib/api');
+    const response = await api.post('/email/send', {
+      to: booking.passengerEmail,
+      subject: `Payment Receipt - ${booking.bookingReference}`,
+      html: emailHtml,
     });
 
-    return response.ok;
+    return !!response.data?.ok;
   } catch (error) {
     console.error('Error sending payment receipt:', error);
     return false;

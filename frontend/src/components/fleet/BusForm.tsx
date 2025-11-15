@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,13 +19,13 @@ export default function BusForm({ bus, onClose, onSuccess }: BusFormProps) {
     name: bus?.name || '',
     number_plate: bus?.number_plate || '',
     model: bus?.model || '',
-    year: bus?.year || new Date().getFullYear(),
-    seating_capacity: bus?.seating_capacity || 40,
-    layout_rows: bus?.layout_rows || 10,
-    layout_columns: bus?.layout_columns || 4,
-    status: bus?.status || 'active',
+    year: bus?.year?.toString() || new Date().getFullYear().toString(),
+    seating_capacity: bus?.seating_capacity?.toString() || '40',
+    bus_type: bus?.bus_type || 'STANDARD',
+    fuel_type: bus?.fuel_type || 'DIESEL',
+    status: bus?.status || 'ACTIVE',
     gps_device_id: bus?.gps_device_id || '',
-    total_mileage: bus?.total_mileage || 0,
+    total_mileage: bus?.total_mileage?.toString() || '0',
     last_service_date: bus?.last_service_date || '',
     next_service_date: bus?.next_service_date || '',
     insurance_expiry: bus?.insurance_expiry || '',
@@ -34,17 +34,21 @@ export default function BusForm({ bus, onClose, onSuccess }: BusFormProps) {
 
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
+      let result;
       if (bus) {
-        const { error } = await supabase
+        // @ts-ignore - Supabase query chain works correctly despite TypeScript inference issue
+        result = await supabase
           .from('buses')
           .update(data)
           .eq('id', bus.id);
-        if (error) throw error;
       } else {
-        const { error } = await supabase
+        result = await supabase
           .from('buses')
           .insert([data]);
-        if (error) throw error;
+      }
+      
+      if (result.error) {
+        throw result.error;
       }
     },
     onSuccess: () => {
@@ -58,7 +62,23 @@ export default function BusForm({ bus, onClose, onSuccess }: BusFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    saveMutation.mutate(formData);
+    
+    // Convert string values to numbers for database
+    const payload = {
+      ...formData,
+      status: formData.status.toUpperCase(), // Ensure UPPERCASE enum value
+      year: parseInt(formData.year) || new Date().getFullYear(),
+      seating_capacity: parseInt(formData.seating_capacity) || 40,
+      total_mileage: parseFloat(formData.total_mileage) || 0,
+      // Remove empty strings for optional fields
+      gps_device_id: formData.gps_device_id || null,
+      last_service_date: formData.last_service_date || null,
+      next_service_date: formData.next_service_date || null,
+      insurance_expiry: formData.insurance_expiry || null,
+      license_expiry: formData.license_expiry || null,
+    };
+    
+    saveMutation.mutate(payload);
   };
 
   const handleChange = (field: string, value: any) => {
@@ -114,8 +134,8 @@ export default function BusForm({ bus, onClose, onSuccess }: BusFormProps) {
               <Input
                 id="year"
                 type="number"
-                value={formData.year}
-                onChange={(e) => handleChange('year', parseInt(e.target.value))}
+                value={formData.year || ""}
+                onChange={(e) => handleChange('year', e.target.value)}
                 min="1990"
                 max={new Date().getFullYear() + 1}
               />
@@ -126,11 +146,41 @@ export default function BusForm({ bus, onClose, onSuccess }: BusFormProps) {
               <Input
                 id="seating_capacity"
                 type="number"
-                value={formData.seating_capacity}
-                onChange={(e) => handleChange('seating_capacity', parseInt(e.target.value))}
+                value={formData.seating_capacity || ""}
+                onChange={(e) => handleChange('seating_capacity', e.target.value)}
                 min="1"
                 required
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="bus_type">Bus Type</Label>
+              <Select value={formData.bus_type} onValueChange={(value) => handleChange('bus_type', value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="STANDARD">Standard</SelectItem>
+                  <SelectItem value="LUXURY">Luxury</SelectItem>
+                  <SelectItem value="DOUBLE_DECKER">Double Decker</SelectItem>
+                  <SelectItem value="SLEEPER">Sleeper</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fuel_type">Fuel Type</Label>
+              <Select value={formData.fuel_type} onValueChange={(value) => handleChange('fuel_type', value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DIESEL">Diesel</SelectItem>
+                  <SelectItem value="PETROL">Petrol</SelectItem>
+                  <SelectItem value="ELECTRIC">Electric</SelectItem>
+                  <SelectItem value="HYBRID">Hybrid</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -140,10 +190,10 @@ export default function BusForm({ bus, onClose, onSuccess }: BusFormProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="maintenance">Maintenance</SelectItem>
-                  <SelectItem value="out_of_service">Out of Service</SelectItem>
-                  <SelectItem value="retired">Retired</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                  <SelectItem value="OUT_OF_SERVICE">Out of Service</SelectItem>
+                  <SelectItem value="RETIRED">Retired</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -164,8 +214,8 @@ export default function BusForm({ bus, onClose, onSuccess }: BusFormProps) {
                 id="total_mileage"
                 type="number"
                 step="0.01"
-                value={formData.total_mileage}
-                onChange={(e) => handleChange('total_mileage', parseFloat(e.target.value))}
+                value={formData.total_mileage || ""}
+                onChange={(e) => handleChange('total_mileage', e.target.value)}
                 min="0"
               />
             </div>

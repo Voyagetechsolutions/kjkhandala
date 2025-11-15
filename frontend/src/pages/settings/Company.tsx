@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Building2, Mail, Phone, MapPin, Globe, DollarSign, Clock, Save, Upload } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const companySchema = z.object({
   name: z.string().min(2, 'Company name is required'),
@@ -58,15 +59,14 @@ const Company = () => {
 
   const fetchSettings = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/settings/company', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setSettings(data.data);
-        reset(data.data);
-      }
+      const { data, error } = await supabase
+        .from('company_settings')
+        .select('*')
+        .single();
+
+      if (error) throw error;
+      setSettings(data);
+      reset(data);
     } catch (error) {
       console.error('Failed to fetch company settings:', error);
     } finally {
@@ -78,22 +78,20 @@ const Company = () => {
     setUpdating(true);
     setMessage(null);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/settings/company', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(data)
-      });
+      const { error } = await supabase
+        .from('company_settings')
+        .upsert({
+          company_name: data.name,
+          email: data.email,
+          phone: data.phone,
+          address: data.address,
+          tax_id: data.taxId,
+          registration_number: data.registrationNumber
+        });
 
-      if (response.ok) {
-        setMessage({ type: 'success', text: 'Company settings updated successfully!' });
-        await fetchSettings();
-      } else {
-        setMessage({ type: 'error', text: 'Failed to update settings' });
-      }
+      if (error) throw error;
+      setMessage({ type: 'success', text: 'Company settings updated successfully!' });
+      await fetchSettings();
     } catch (error) {
       setMessage({ type: 'error', text: 'An error occurred' });
     } finally {
@@ -105,23 +103,28 @@ const Company = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const formData = new FormData();
-    formData.append('logo', file);
-
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/settings/company/logo', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        body: formData
-      });
+      const fileExt = file.name.split('.').pop();
+      const fileName = `company-logo.${fileExt}`;
+      const filePath = `logos/${fileName}`;
 
-      if (response.ok) {
-        setMessage({ type: 'success', text: 'Company logo updated!' });
-        await fetchSettings();
-      }
+      const { error: uploadError } = await supabase.storage
+        .from('company')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('company')
+        .getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from('company_settings')
+        .update({ logo_url: publicUrl });
+
+      if (updateError) throw updateError;
+      setMessage({ type: 'success', text: 'Company logo updated!' });
+      await fetchSettings();
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to upload logo' });
     }

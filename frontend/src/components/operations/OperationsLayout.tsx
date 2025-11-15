@@ -12,7 +12,9 @@ import {
   Clock,
   Building2,
   Settings,
-  LogOut 
+  LogOut,
+  MapPinned,
+  MapPin
 } from "lucide-react";
 
 interface OperationsLayoutProps {
@@ -24,14 +26,17 @@ export default function OperationsLayout({ children }: OperationsLayoutProps) {
   const { signOut } = useAuth();
 
   const navItems = [
-    { path: "/operations", icon: LayoutDashboard, label: "Control Center" },
+    { path: "/operations", icon: LayoutDashboard, label: "Command Center" },
     { path: "/operations/trips", icon: Activity, label: "Trip Management" },
-    { path: "/operations/fleet", icon: Bus, label: "Fleet Operations" },
-    { path: "/operations/drivers", icon: Users, label: "Driver Operations" },
-    { path: "/operations/incidents", icon: AlertTriangle, label: "Incident Management" },
-    { path: "/operations/delays", icon: Clock, label: "Delay Management" },
-    { path: "/operations/reports", icon: BarChart3, label: "Reports & Analytics" },
-    { path: "/operations/terminal", icon: Building2, label: "Terminal Operations" },
+    { path: "/operations/fleet", icon: Bus, label: "Fleet Management" },
+    { path: "/operations/drivers", icon: Users, label: "Driver Management" },
+    { path: "/operations/tracking", icon: MapPin, label: "Live Tracking" },
+    { path: "/operations/cities", icon: MapPinned, label: "City Management" },
+    { path: "/operations/routes", icon: MapPin, label: "Route Management" },
+    { path: "/admin/incidents", icon: AlertTriangle, label: "Incident Management" },
+    { path: "/admin/delays", icon: Clock, label: "Delay Management" },
+    { path: "/operations/reports", icon: BarChart3, label: "Reports and Analytics" },
+    { path: "/admin/terminal", icon: Building2, label: "Terminal Operations" },
     { path: "/operations/settings", icon: Settings, label: "Settings" },
   ];
 

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import FinanceLayout from '@/components/finance/FinanceLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +28,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 
 export default function FuelAllowance() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : FinanceLayout;
   const [filters, setFilters] = useState({
     status: 'all',
     driver: 'all',
@@ -38,13 +43,21 @@ export default function FuelAllowance() {
   const { data: fuelLogs = [] } = useQuery({
     queryKey: ['finance-fuel'],
     queryFn: async () => {
-      const response = await api.get('/finance/fuel');
-      return Array.isArray(response.data) ? response.data : (response.data?.fuelLogs || []);
+      const { data, error } = await supabase
+        .from('fuel_logs')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
     },
   });
 
   const approveMutation = useMutation({
     mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('fuel_logs')
+        .update({ id: id, status: 'approved' });
+      if (error) throw error;
       await api.put(`/finance/fuel/${id}/approve`);
     },
     onSuccess: () => {
@@ -150,7 +163,7 @@ export default function FuelAllowance() {
   };
 
   return (
-    <FinanceLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -398,6 +411,6 @@ export default function FuelAllowance() {
           </Card>
         </div>
       </div>
-    </FinanceLayout>
+    </Layout>
   );
 }

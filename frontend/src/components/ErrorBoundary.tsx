@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface Props {
   children: ReactNode;
@@ -52,21 +53,17 @@ class ErrorBoundary extends Component<Props, State> {
 
   logErrorToBackend = async (error: Error, errorInfo: ErrorInfo) => {
     try {
-      await fetch('http://localhost:3001/api/errors/log', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include',
-        body: JSON.stringify({
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      await supabase
+        .from('error_logs')
+        .insert([{
+          user_id: user?.id,
           message: error.message,
           stack: error.stack,
-          componentStack: errorInfo.componentStack,
-          url: window.location.href,
-          userAgent: navigator.userAgent,
+          component_stack: errorInfo.componentStack,
           timestamp: new Date().toISOString()
-        })
-      });
+        }]);
     } catch (err) {
       console.error('Failed to log error to backend:', err);
     }

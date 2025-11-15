@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import FinanceLayout from '@/components/finance/FinanceLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +19,9 @@ import {
 import { Download, TrendingUp, TrendingDown, BarChart3, FileText } from 'lucide-react';
 
 export default function Reports() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : FinanceLayout;
   const [selectedReport, setSelectedReport] = useState('revenue');
   const [period, setPeriod] = useState('month');
   const [dateRange, setDateRange] = useState({
@@ -38,16 +43,17 @@ export default function Reports() {
   const { data: income = [] } = useQuery({
     queryKey: ['finance-income'],
     queryFn: async () => {
-      const response = await api.get('/finance/income');
-      return Array.isArray(response.data) ? response.data : (response.data?.income || []);
-    },
-  });
-
-  const { data: expenses = [] } = useQuery({
-    queryKey: ['finance-expenses'],
-    queryFn: async () => {
-      const response = await api.get('/finance/expenses');
-      return Array.isArray(response.data) ? response.data : (response.data?.expenses || []);
+      const { data: income, error: incomeError } = await supabase
+        .from('income')
+        .select('*');
+      if (incomeError) throw incomeError;
+      
+      const { data: expenses, error: expensesError } = await supabase
+        .from('expenses')
+        .select('*');
+      if (expensesError) throw expensesError;
+      
+      return { income: income || [], expenses: expenses || [] };
     },
   });
 
@@ -60,7 +66,7 @@ export default function Reports() {
   };
 
   return (
-    <FinanceLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -172,6 +178,6 @@ export default function Reports() {
           </CardContent>
         </Card>
       </div>
-    </FinanceLayout>
+    </Layout>
   );
 }

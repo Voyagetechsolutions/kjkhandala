@@ -1,75 +1,65 @@
 // =====================================================
 // AUTHENTICATION SERVICE
-// Handles user registration, login, and JWT tokens
+// Production-ready with email verification and role-based access
 // =====================================================
 
-import { PrismaClient, AppRole } from '@prisma/client';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import { supabase } from '../lib/supabase';
 
-const prisma = new PrismaClient();
+export interface UserRole {
+  role: string;
+  role_level: number;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  phone?: string;
+  avatar_url?: string;
+  is_active: boolean;
+  roles: UserRole[];
+}
 
 export class AuthService {
   // =====================================================
-  // REGISTER NEW USER
+  // REGISTER NEW USER (WITH EMAIL VERIFICATION)
   // =====================================================
   async register(data: {
     email: string;
     password: string;
     fullName: string;
     phone?: string;
-    role?: AppRole;
   }) {
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email: data.email },
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: data.email,
+      password: data.password,
+      options: {
+        data: {
+          full_name: data.fullName,
+          phone: data.phone,
+        },
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
     });
 
-    if (existingUser) {
-      throw new Error('User with this email already exists');
+    if (authError) {
+      throw new Error(authError.message);
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(data.password, 10);
-
-    // Create user with profile and role
-    const user = await prisma.user.create({
-      data: {
-        email: data.email,
-        password: hashedPassword,
-        emailVerified: new Date(),
-        profile: {
-          create: {
-            fullName: data.fullName,
-            email: data.email,
-            phone: data.phone,
-          },
-        },
-        userRoles: {
-          create: {
-            role: data.role || AppRole.PASSENGER,
-            roleLevel: this.getRoleLevel(data.role || AppRole.PASSENGER),
-            isActive: true,
-          },
-        },
-      },
-      include: {
-        profile: true,
-        userRoles: {
-          where: { isActive: true },
-        },
-      },
-    });
-
-    // Generate JWT token
-    const token = this.generateToken(user.id, user.email);
-
-    // Remove password from response
-    const { password, ...userWithoutPassword } = user;
+    // Check if email confirmation is required
+    if (authData.user && !authData.session) {
+      return {
+        user: authData.user,
+        session: null,
+        requiresEmailVerification: true,
+        message: 'Please check your email to verify your account.',
+      };
+    }
 
     return {
-      user: userWithoutPassword,
-      token,
+      user: authData.user,
+      session: authData.session,
+      requiresEmailVerification: false,
     };
   }
 
@@ -77,142 +67,178 @@ export class AuthService {
   // LOGIN
   // =====================================================
   async login(email: string, password: string) {
-    // Find user
-    const user = await prisma.user.findUnique({
-      where: { email },
-      include: {
-        profile: true,
-        userRoles: {
-          where: { isActive: true },
-        },
-      },
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
 
-    if (!user) {
-      throw new Error('Invalid email or password');
+    if (error) {
+      throw new Error(error.message);
     }
 
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      throw new Error('Invalid email or password');
+    // Update last login in profile
+    if (data.user) {
+      await supabase
+        .from('profiles')
+        .update({ last_login: new Date().toISOString() })
+        .eq('id', data.user.id);
     }
-
-    // Update last login
-    await prisma.profile.update({
-      where: { id: user.id },
-      data: { lastLogin: new Date() },
-    });
-
-    // Generate token
-    const token = this.generateToken(user.id, user.email);
-
-    // Remove password from response
-    const { password: _, ...userWithoutPassword } = user;
 
     return {
-      user: userWithoutPassword,
-      token,
+      user: data.user,
+      session: data.session,
     };
   }
 
   // =====================================================
-  // GENERATE JWT TOKEN
+  // LOGOUT
   // =====================================================
-  generateToken(userId: string, email: string): string {
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      throw new Error('JWT_SECRET is not defined in environment variables');
-    }
-
-    return jwt.sign(
-      { userId, email },
-      secret,
-      { expiresIn: process.env.JWT_EXPIRATION || '7d' }
-    );
-  }
-
-  // =====================================================
-  // VERIFY TOKEN
-  // =====================================================
-  verifyToken(token: string): any {
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      throw new Error('JWT_SECRET is not defined in environment variables');
-    }
-
-    try {
-      return jwt.verify(token, secret);
-    } catch (error) {
-      throw new Error('Invalid or expired token');
+  async logout() {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      throw new Error(error.message);
     }
   }
 
   // =====================================================
-  // GET ROLE LEVEL
+  // GET CURRENT USER
   // =====================================================
-  private getRoleLevel(role: AppRole): number {
-    const levels: Record<AppRole, number> = {
-      [AppRole.SUPER_ADMIN]: 5,
-      [AppRole.ADMIN]: 4,
-      [AppRole.OPERATIONS_MANAGER]: 3,
-      [AppRole.MAINTENANCE_MANAGER]: 3,
-      [AppRole.HR_MANAGER]: 3,
-      [AppRole.FINANCE_MANAGER]: 3,
-      [AppRole.TICKETING_OFFICER]: 2,
-      [AppRole.BOOKING_OFFICER]: 2,
-      [AppRole.DRIVER]: 1,
-      [AppRole.PASSENGER]: 0,
+  async getCurrentUser() {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) {
+      throw new Error(error.message);
+    }
+    return user;
+  }
+
+  // =====================================================
+  // GET USER PROFILE WITH ROLES
+  // =====================================================
+  async getUserProfile(userId: string): Promise<UserProfile> {
+    // Get profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (profileError) {
+      throw new Error(profileError.message);
+    }
+
+    // Get roles
+    const { data: roles, error: rolesError } = await supabase
+      .from('user_roles')
+      .select('role, role_level')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('role_level', { ascending: false });
+
+    if (rolesError) {
+      throw new Error(rolesError.message);
+    }
+
+    return {
+      ...profile,
+      roles: roles || [],
     };
-    return levels[role] || 0;
+  }
+
+  // =====================================================
+  // CHECK USER ROLE
+  // =====================================================
+  async hasRole(userId: string, roleName: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('role', roleName)
+      .eq('is_active', true)
+      .single();
+
+    return !error && !!data;
+  }
+
+  // =====================================================
+  // CHECK IF USER HAS ANY OF MULTIPLE ROLES
+  // =====================================================
+  async hasAnyRole(userId: string, roleNames: string[]): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .in('role', roleNames)
+      .eq('is_active', true)
+      .limit(1);
+
+    return !error && data && data.length > 0;
+  }
+
+  // =====================================================
+  // GET USER ROLES
+  // =====================================================
+  async getUserRoles(userId: string): Promise<UserRole[]> {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role, role_level')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('role_level', { ascending: false });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data || [];
+  }
+
+  // =====================================================
+  // GET PRIMARY ROLE (HIGHEST LEVEL)
+  // =====================================================
+  async getPrimaryRole(userId: string): Promise<string | null> {
+    const roles = await this.getUserRoles(userId);
+    return roles.length > 0 ? roles[0].role : null;
   }
 
   // =====================================================
   // CHANGE PASSWORD
   // =====================================================
-  async changePassword(userId: string, oldPassword: string, newPassword: string) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+  async changePassword(newPassword: string) {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
     });
 
-    if (!user) {
-      throw new Error('User not found');
+    if (error) {
+      throw new Error(error.message);
     }
-
-    // Verify old password
-    const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
-    if (!isPasswordValid) {
-      throw new Error('Current password is incorrect');
-    }
-
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    // Update password
-    await prisma.user.update({
-      where: { id: userId },
-      data: { password: hashedPassword },
-    });
 
     return { message: 'Password changed successfully' };
   }
 
   // =====================================================
-  // RESET PASSWORD (TODO: Implement email verification)
+  // RESET PASSWORD
   // =====================================================
   async resetPassword(email: string) {
-    const user = await prisma.user.findUnique({
-      where: { email },
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
     });
 
-    if (!user) {
-      // Don't reveal if user exists
-      return { message: 'If the email exists, a reset link will be sent' };
+    if (error) {
+      throw new Error(error.message);
     }
 
-    // TODO: Generate reset token and send email
-    // For now, just return success message
     return { message: 'Password reset email sent' };
+  }
+
+  // =====================================================
+  // GET SESSION
+  // =====================================================
+  async getSession() {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) {
+      throw new Error(error.message);
+    }
+    return session;
   }
 }
 

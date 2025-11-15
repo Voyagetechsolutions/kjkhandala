@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Calendar, DollarSign, TrendingUp, TrendingDown, CheckCircle } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface ReconciliationData {
   date: string;
@@ -35,14 +36,14 @@ const Reconciliation = () => {
 
   const fetchReconciliations = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/finance/reconciliation', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setReconciliations(data.data || []);
-      }
+      const { data, error } = await supabase
+        .from('daily_reconciliation')
+        .select('*')
+        .order('date', { ascending: false })
+        .limit(30);
+
+      if (error) throw error;
+      setReconciliations(data || []);
     } catch (error) {
       console.error('Failed to fetch reconciliations:', error);
     } finally {
@@ -52,14 +53,14 @@ const Reconciliation = () => {
 
   const fetchDailyData = async (date: string) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/finance/reconciliation/${date}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setCurrentData(data.data);
-      }
+      const { data, error } = await supabase
+        .from('daily_reconciliation')
+        .select('*')
+        .eq('date', date)
+        .single();
+
+      if (error) throw error;
+      setCurrentData(data);
     } catch (error) {
       console.error('Failed to fetch daily data:', error);
     }
@@ -67,20 +68,22 @@ const Reconciliation = () => {
 
   const reconcileDay = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/finance/reconcile/${selectedDate}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (response.ok) {
-        await fetchReconciliations();
-        await fetchDailyData(selectedDate);
-        alert('Day reconciled successfully!');
-      }
+      const { error } = await supabase
+        .from('daily_reconciliation')
+        .update({ 
+          status: 'RECONCILED',
+          reconciledBy: user.id,
+          reconciledAt: new Date().toISOString()
+        })
+        .eq('date', selectedDate);
+
+      if (error) throw error;
+      await fetchReconciliations();
+      await fetchDailyData(selectedDate);
+      alert('Day reconciled successfully!');
     } catch (error) {
       console.error('Failed to reconcile:', error);
     }

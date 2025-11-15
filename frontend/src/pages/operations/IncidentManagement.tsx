@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import OperationsLayout from '@/components/operations/OperationsLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,6 +36,10 @@ import { AlertCircle, Plus, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function IncidentManagement() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : OperationsLayout;
+
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showResolveDialog, setShowResolveDialog] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<any>(null);
@@ -41,7 +47,7 @@ export default function IncidentManagement() {
 
   const [newIncident, setNewIncident] = useState({
     tripId: '',
-    type: 'breakdown',
+    incidentType: 'BREAKDOWN',
     severity: 'MEDIUM',
     description: '',
     location: '',
@@ -55,11 +61,26 @@ export default function IncidentManagement() {
   const { data: incidentsData, isLoading } = useQuery({
     queryKey: ['operations-incidents', statusFilter],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (statusFilter !== 'all') params.append('status', statusFilter);
+      let query = supabase
+        .from('incidents')
+        .select(`
+          *,
+          trip:trips(
+            *,
+            route:routes(*),
+            bus:buses(*),
+            driver:drivers(*)
+          )
+        `)
+        .order('created_at', { ascending: false });
       
-      const response = await api.get(`/operations/incidents?${params}`);
-      return response.data;
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      return { incidents: data || [] };
     },
     refetchInterval: 30000,
   });
@@ -68,15 +89,49 @@ export default function IncidentManagement() {
   const { data: tripsData } = useQuery({
     queryKey: ['operations-trips'],
     queryFn: async () => {
-      const response = await api.get('/operations/trips');
-      return response.data;
+      const { data, error } = await supabase
+        .from('trips')
+        .select('*')
+        .eq('status', 'in_progress')
+        .order('scheduled_departure', { ascending: false });
+      if (error) throw error;
+      return { trips: data || [] };
     },
   });
 
   // Create incident mutation
   const createMutation = useMutation({
-    mutationFn: async (data: any) => {
-      await api.post('/operations/incidents', data);
+    mutationFn: async () => {
+      const typeLabelMap: Record<string, string> = {
+        BREAKDOWN: 'Bus Breakdown',
+        ACCIDENT: 'Accident',
+        DELAY: 'Delay',
+        PASSENGER_COMPLAINT: 'Passenger Complaint',
+        TRAFFIC: 'Traffic',
+        WEATHER: 'Weather',
+        MECHANICAL: 'Mechanical Issue',
+        MEDICAL_EMERGENCY: 'Medical Emergency',
+        SECURITY: 'Security Incident',
+        OTHER: 'Other Incident',
+      };
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      const payload = {
+        trip_id: newIncident.tripId || null,
+        incident_type: newIncident.incidentType,
+        severity: newIncident.severity,
+        description: newIncident.description,
+        location: newIncident.location || null,
+        reported_by: user?.id || null,
+      };
+
+      const { error } = await supabase
+        .from('incidents')
+        .insert([payload]);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['operations-incidents'] });
@@ -84,24 +139,29 @@ export default function IncidentManagement() {
       setShowCreateDialog(false);
       setNewIncident({
         tripId: '',
-        type: 'breakdown',
+        incidentType: 'BREAKDOWN',
         severity: 'MEDIUM',
         description: '',
         location: '',
       });
     },
-    onError: () => {
-      toast.error('Failed to create incident');
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to create incident');
     },
   });
 
   // Resolve incident mutation
   const resolveMutation = useMutation({
     mutationFn: async ({ id, resolution }: any) => {
-      await api.put(`/operations/incidents/${id}`, {
-        status: 'RESOLVED',
-        resolution,
-      });
+      const { error } = await supabase
+        .from('incidents')
+        .update({
+          status: 'RESOLVED',
+          resolution,
+          resolved_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['operations-incidents'] });
@@ -117,33 +177,39 @@ export default function IncidentManagement() {
   const incidents = incidentsData?.incidents || [];
   const trips = tripsData?.trips || [];
 
+  const normalizeStatus = (status: string) => (status || '').toUpperCase();
+  const normalizeSeverity = (severity: string) => (severity || '').toUpperCase();
+
   const stats = {
     total: incidents.length,
-    open: incidents.filter((i: any) => i.status === 'OPEN').length,
-    investigating: incidents.filter((i: any) => i.status === 'INVESTIGATING').length,
-    resolved: incidents.filter((i: any) => i.status === 'RESOLVED').length,
-    critical: incidents.filter((i: any) => i.severity === 'CRITICAL').length,
+    reported: incidents.filter((i: any) => normalizeStatus(i.status) === 'REPORTED').length,
+    investigating: incidents.filter((i: any) => normalizeStatus(i.status) === 'INVESTIGATING').length,
+    resolved: incidents.filter((i: any) => normalizeStatus(i.status) === 'RESOLVED').length,
+    closed: incidents.filter((i: any) => normalizeStatus(i.status) === 'CLOSED').length,
+    critical: incidents.filter((i: any) => normalizeSeverity(i.severity) === 'CRITICAL').length,
   };
 
   const getSeverityBadge = (severity: string) => {
+    const value = normalizeSeverity(severity);
     const config: any = {
       LOW: { variant: 'outline', label: 'Low', color: 'text-gray-600' },
       MEDIUM: { variant: 'secondary', label: 'Medium', color: 'text-yellow-600' },
       HIGH: { variant: 'default', label: 'High', color: 'text-orange-600' },
       CRITICAL: { variant: 'destructive', label: 'Critical', color: 'text-red-600' },
     };
-    const c = config[severity] || config.MEDIUM;
+    const c = config[value] || config.MEDIUM;
     return <Badge variant={c.variant as any}>{c.label}</Badge>;
   };
 
   const getStatusBadge = (status: string) => {
+    const value = normalizeStatus(status);
     const config: any = {
-      OPEN: { variant: 'destructive', label: 'Open', icon: AlertCircle },
+      REPORTED: { variant: 'destructive', label: 'Reported', icon: AlertCircle },
       INVESTIGATING: { variant: 'secondary', label: 'Investigating', icon: Clock },
       RESOLVED: { variant: 'outline', label: 'Resolved', icon: CheckCircle },
       CLOSED: { variant: 'outline', label: 'Closed', icon: XCircle },
     };
-    const c = config[status] || config.OPEN;
+    const c = config[value] || config.REPORTED;
     const Icon = c.icon;
     return (
       <div className="flex items-center gap-2">
@@ -154,21 +220,24 @@ export default function IncidentManagement() {
   };
 
   const getTypeLabel = (type: string) => {
+    const key = (type || '').toUpperCase();
     const labels: any = {
-      breakdown: 'Bus Breakdown',
-      accident: 'Accident',
-      driver_emergency: 'Driver Emergency',
-      passenger_emergency: 'Passenger Emergency',
-      route_blockage: 'Route Blockage',
-      overspeed: 'Over-speeding',
-      unauthorized_stop: 'Unauthorized Stop',
-      delay: 'Delay',
+      BREAKDOWN: 'Bus Breakdown',
+      ACCIDENT: 'Accident',
+      DELAY: 'Delay',
+      PASSENGER_COMPLAINT: 'Passenger Complaint',
+      TRAFFIC: 'Traffic',
+      WEATHER: 'Weather',
+      MECHANICAL: 'Mechanical Issue',
+      MEDICAL_EMERGENCY: 'Medical Emergency',
+      SECURITY: 'Security Incident',
+      OTHER: 'Other',
     };
-    return labels[type] || type;
+    return labels[key] || key || 'Incident';
   };
 
   return (
-    <OperationsLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -197,11 +266,11 @@ export default function IncidentManagement() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Open</CardTitle>
+              <CardTitle className="text-sm font-medium">Reported</CardTitle>
               <AlertCircle className="h-4 w-4 text-red-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.open}</div>
+              <div className="text-2xl font-bold">{stats.reported}</div>
               <p className="text-xs text-muted-foreground">Needs attention</p>
             </CardContent>
           </Card>
@@ -254,10 +323,10 @@ export default function IncidentManagement() {
                 All Incidents
               </Button>
               <Button
-                variant={statusFilter === 'OPEN' ? 'default' : 'outline'}
-                onClick={() => setStatusFilter('OPEN')}
+                variant={statusFilter === 'REPORTED' ? 'default' : 'outline'}
+                onClick={() => setStatusFilter('REPORTED')}
               >
-                Open
+                Reported
               </Button>
               <Button
                 variant={statusFilter === 'INVESTIGATING' ? 'default' : 'outline'}
@@ -270,6 +339,12 @@ export default function IncidentManagement() {
                 onClick={() => setStatusFilter('RESOLVED')}
               >
                 Resolved
+              </Button>
+              <Button
+                variant={statusFilter === 'CLOSED' ? 'default' : 'outline'}
+                onClick={() => setStatusFilter('CLOSED')}
+              >
+                Closed
               </Button>
             </div>
           </CardContent>
@@ -306,7 +381,7 @@ export default function IncidentManagement() {
                   {incidents.map((incident: any) => (
                     <TableRow key={incident.id}>
                       <TableCell>
-                        <div className="font-medium">{getTypeLabel(incident.type)}</div>
+                        <div className="font-medium">{getTypeLabel(incident.incident_type)}</div>
                       </TableCell>
                       <TableCell>{getSeverityBadge(incident.severity)}</TableCell>
                       <TableCell>
@@ -316,9 +391,11 @@ export default function IncidentManagement() {
                         <div className="text-sm">
                           {incident.trip ? (
                             <>
-                              <div className="font-medium">{incident.trip.route?.name}</div>
+                              <div className="font-medium">
+                                {incident.trip.route?.name || incident.trip.trip_number || 'N/A'}
+                              </div>
                               <div className="text-xs text-muted-foreground">
-                                {incident.trip.bus?.registrationNumber}
+                                {incident.trip.bus?.number_plate || incident.trip.bus?.registration_number || 'N/A'}
                               </div>
                             </>
                           ) : (
@@ -332,7 +409,7 @@ export default function IncidentManagement() {
                       <TableCell>{getStatusBadge(incident.status)}</TableCell>
                       <TableCell>
                         <div className="text-sm">
-                          {new Date(incident.createdAt).toLocaleString('en-US', {
+                          {new Date(incident.created_at).toLocaleString('en-US', {
                             month: 'short',
                             day: 'numeric',
                             hour: '2-digit',
@@ -341,7 +418,8 @@ export default function IncidentManagement() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {incident.status !== 'RESOLVED' && incident.status !== 'CLOSED' && (
+                        {normalizeStatus(incident.status) !== 'RESOLVED' &&
+                          normalizeStatus(incident.status) !== 'CLOSED' && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -373,19 +451,24 @@ export default function IncidentManagement() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <Label>Incident Type</Label>
-                  <Select value={newIncident.type} onValueChange={(value) => setNewIncident({ ...newIncident, type: value })}>
+                  <Select
+                    value={newIncident.incidentType}
+                    onValueChange={(value) => setNewIncident({ ...newIncident, incidentType: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="breakdown">Bus Breakdown</SelectItem>
-                      <SelectItem value="accident">Accident</SelectItem>
-                      <SelectItem value="driver_emergency">Driver Emergency</SelectItem>
-                      <SelectItem value="passenger_emergency">Passenger Emergency</SelectItem>
-                      <SelectItem value="route_blockage">Route Blockage</SelectItem>
-                      <SelectItem value="overspeed">Over-speeding</SelectItem>
-                      <SelectItem value="unauthorized_stop">Unauthorized Stop</SelectItem>
-                      <SelectItem value="delay">Delay</SelectItem>
+                      <SelectItem value="BREAKDOWN">Bus Breakdown</SelectItem>
+                      <SelectItem value="ACCIDENT">Accident</SelectItem>
+                      <SelectItem value="DELAY">Delay</SelectItem>
+                      <SelectItem value="PASSENGER_COMPLAINT">Passenger Complaint</SelectItem>
+                      <SelectItem value="TRAFFIC">Traffic</SelectItem>
+                      <SelectItem value="WEATHER">Weather</SelectItem>
+                      <SelectItem value="MECHANICAL">Mechanical Issue</SelectItem>
+                      <SelectItem value="MEDICAL_EMERGENCY">Medical Emergency</SelectItem>
+                      <SelectItem value="SECURITY">Security Incident</SelectItem>
+                      <SelectItem value="OTHER">Other</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -413,7 +496,7 @@ export default function IncidentManagement() {
                   <SelectContent>
                     {trips.map((trip: any) => (
                       <SelectItem key={trip.id} value={trip.id}>
-                        {trip.route?.name} - {trip.bus?.registrationNumber}
+                        {trip.route?.name || trip.trip_number || 'Trip'} - {trip.bus?.number_plate || trip.bus?.registration_number || 'N/A'}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -434,13 +517,14 @@ export default function IncidentManagement() {
                   rows={4}
                   value={newIncident.description}
                   onChange={(e) => setNewIncident({ ...newIncident, description: e.target.value })}
+                  required
                 />
               </div>
               <div className="flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
                   Cancel
                 </Button>
-                <Button onClick={() => createMutation.mutate(newIncident)} disabled={createMutation.isPending}>
+                <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>
                   {createMutation.isPending ? 'Creating...' : 'Log Incident'}
                 </Button>
               </div>
@@ -487,6 +571,6 @@ export default function IncidentManagement() {
           </DialogContent>
         </Dialog>
       </div>
-    </OperationsLayout>
+    </Layout>
   );
 }

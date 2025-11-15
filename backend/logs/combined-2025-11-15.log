@@ -1,0 +1,6 @@
+{"level":"info","message":"🚀 Server running on port 3001","service":"bus-management-api","timestamp":"2025-11-15 18:17:05"}
+{"level":"info","message":"📡 WebSocket server ready","service":"bus-management-api","timestamp":"2025-11-15 18:17:05"}
+{"level":"info","message":"🌍 Environment: development","service":"bus-management-api","timestamp":"2025-11-15 18:17:05"}
+{"level":"info","message":"🔒 Security: httpOnly cookies, input sanitization, rate limiting enabled","service":"bus-management-api","timestamp":"2025-11-15 18:17:05"}
+{"level":"info","message":"⏰ Scheduler temporarily disabled (Prisma migration pending)","service":"bus-management-api","timestamp":"2025-11-15 18:17:05"}
+{"level":"info","message":"📨 Queue processor temporarily disabled (Prisma migration pending)","service":"bus-management-api","timestamp":"2025-11-15 18:17:05"}

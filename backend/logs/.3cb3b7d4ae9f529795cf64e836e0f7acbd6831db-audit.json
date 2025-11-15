@@ -1,0 +1,45 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\.3cb3b7d4ae9f529795cf64e836e0f7acbd6831db-audit.json",
+    "files": [
+        {
+            "date": 1762725424814,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\exceptions-2025-11-09.log",
+            "hash": "23a10207b90cb6e8e229524111510f5a93dd6675f4239618434ae3b47337aae3"
+        },
+        {
+            "date": 1762726107522,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\exceptions-2025-11-10.log",
+            "hash": "e2c35a8430d96561266aa4608cbfd81b9a0ebb52a64f957f21ff07b2d3462990"
+        },
+        {
+            "date": 1762814377965,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\exceptions-2025-11-11.log",
+            "hash": "961fd8b236df1d00276bb7a8795e6a3a5f5dc5544302d6e2fcd35c33666a23b5"
+        },
+        {
+            "date": 1762900576771,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\exceptions-2025-11-12.log",
+            "hash": "46502678b7e0846196dc3508aba345e93769e6ef0b87129fa397ba8636e807f6"
+        },
+        {
+            "date": 1762990344949,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\exceptions-2025-11-13.log",
+            "hash": "d3b0e924d257e18ff82b8b69dd6756589672897eb7aea799ffb2a3e4d53a4273"
+        },
+        {
+            "date": 1763072809113,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\exceptions-2025-11-14.log",
+            "hash": "2ef09f39506cf5ae9a0ba24555bdb7ad7325685c4cb1feb96936e7cfe6d21fde"
+        },
+        {
+            "date": 1763223425172,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\exceptions-2025-11-15.log",
+            "hash": "dff521b1e03482d410e2e43dbe997b25ec359a027df87f2fade9644da004a624"
+        }
+    ],
+    "hashType": "sha256"
+}

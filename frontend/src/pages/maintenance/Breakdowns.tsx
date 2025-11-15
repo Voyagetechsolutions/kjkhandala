@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { useLocation } from 'react-router-dom';
+import AdminLayout from '@/components/admin/AdminLayout';
+import MaintenanceLayout from '@/components/maintenance/MaintenanceLayout';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { AlertTriangle, Plus, X, Upload, MapPin, Calendar } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const breakdownSchema = z.object({
   busId: z.string().min(1, 'Bus is required'),
@@ -28,7 +32,11 @@ interface Breakdown {
   photos?: string[];
 }
 
-const Breakdowns = () => {
+export default function Breakdowns() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : MaintenanceLayout;
+  
   const [breakdowns, setBreakdowns] = useState<Breakdown[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -44,14 +52,14 @@ const Breakdowns = () => {
 
   const fetchBreakdowns = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/maintenance/breakdowns', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setBreakdowns(data.data || []);
-      }
+      const { data, error } = await supabase
+        .from('incidents')
+        .select('*, buses(*)')
+        .eq('type', 'breakdown')
+        .order('created_at', { ascending: false});
+
+      if (error) throw error;
+      setBreakdowns(data || []);
     } catch (error) {
       console.error('Failed to fetch breakdowns:', error);
     } finally {
@@ -61,21 +69,27 @@ const Breakdowns = () => {
 
   const onSubmit = async (data: BreakdownFormData) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/maintenance/breakdowns', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(data)
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (response.ok) {
-        await fetchBreakdowns();
-        setShowModal(false);
-        reset();
-      }
+      const { error } = await supabase
+        .from('incidents')
+        .insert([{
+          bus_id: data.busId,
+          driver_id: data.driverId,
+          trip_id: data.tripId,
+          type: 'breakdown',
+          severity: data.severity,
+          description: data.description,
+          location: data.location,
+          status: 'OPEN',
+          reported_by_id: user.id
+        }]);
+
+      if (error) throw error;
+      await fetchBreakdowns();
+      setShowModal(false);
+      reset();
     } catch (error) {
       console.error('Failed to report breakdown:', error);
     }
@@ -83,19 +97,16 @@ const Breakdowns = () => {
 
   const updateStatus = async (id: string, status: string) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/maintenance/breakdowns/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ status })
-      });
+      const { error } = await supabase
+        .from('incidents')
+        .update({ 
+          status: status,
+          resolved_at: status === 'RESOLVED' ? new Date().toISOString() : null
+        })
+        .eq('id', id);
 
-      if (response.ok) {
-        await fetchBreakdowns();
-      }
+      if (error) throw error;
+      await fetchBreakdowns();
     } catch (error) {
       console.error('Failed to update status:', error);
     }
@@ -125,7 +136,7 @@ const Breakdowns = () => {
   }
 
   return (
-    <div className="p-6">
+    <Layout className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Breakdown Reports</h1>
@@ -370,8 +381,6 @@ const Breakdowns = () => {
           </div>
         </div>
       )}
-    </div>
+    </Layout>
   );
-};
-
-export default Breakdowns;
+}

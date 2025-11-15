@@ -1,119 +1,149 @@
-import api from './api';
+import { supabase } from '@/lib/supabase';
 
 export const hrService = {
   // Employee Management
-  getEmployees: (filters?: any) => api.get('/hr/employees', { params: filters }),
-  getEmployeeById: (id: string) => api.get(`/hr/employees/${id}`),
-  createEmployee: (data: FormData) => api.post('/hr/employees', data, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
-  updateEmployee: (id: string, data: any) => api.put(`/hr/employees/${id}`, data),
-  deleteEmployee: (id: string) => api.delete(`/hr/employees/${id}`),
+  getEmployees: (filters?: any) => supabase.from('employees').select('*').eq('filters', filters),
+  getEmployeeById: (id: string) => supabase.from('employees').select('*').eq('id', id),
+  createEmployee: (data: any) => supabase.from('employees').insert([data]),
+  updateEmployee: (id: string, data: any) => supabase.from('employees').update(data).eq('id', id),
+  deleteEmployee: (id: string) => supabase.from('employees').delete().eq('id', id),
   uploadDocument: (employeeId: string, file: File, documentType: string) => {
     const formData = new FormData();
     formData.append('document', file);
     formData.append('type', documentType);
-    return api.post(`/hr/employees/${employeeId}/documents`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    return supabase.from('employee_documents').insert([{
+      employee_id: employeeId,
+      document: file,
+      type: documentType
+    }]);
   },
-  getEmployeeDocuments: (employeeId: string) => api.get(`/hr/employees/${employeeId}/documents`),
+  getEmployeeDocuments: (employeeId: string) => supabase.from('employee_documents').select('*').eq('employee_id', employeeId),
   updateEmploymentStatus: (id: string, status: string) => 
-    api.put(`/hr/employees/${id}/status`, { status }),
+    supabase.from('employees').update({ employment_status: status }).eq('id', id),
 
   // Recruitment & Onboarding
-  getJobPostings: (filters?: any) => api.get('/hr/recruitment/jobs', { params: filters }),
-  createJobPosting: (data: any) => api.post('/hr/recruitment/jobs', data),
-  updateJobPosting: (id: string, data: any) => api.put(`/hr/recruitment/jobs/${id}`, data),
-  closeJobPosting: (id: string) => api.put(`/hr/recruitment/jobs/${id}/close`),
-  getApplications: (jobId?: string) => api.get('/hr/recruitment/applications', { params: { jobId } }),
-  createApplication: (data: any) => api.post('/hr/recruitment/applications', data),
+  getJobPostings: (filters?: any) => supabase.from('job_postings').select('*').eq('filters', filters),
+  createJobPosting: (data: any) => supabase.from('job_postings').insert([data]),
+  updateJobPosting: (id: string, data: any) => supabase.from('job_postings').update(data).eq('id', id),
+  closeJobPosting: (id: string) => supabase.from('job_postings').update({ status: 'closed' }).eq('id', id),
+  getApplications: (jobId?: string) => supabase.from('job_applications').select('*').eq('job_id', jobId),
+  createApplication: (data: any) => supabase.from('job_applications').insert([data]),
   updateApplicationStatus: (id: string, status: string, notes?: string) => 
-    api.put(`/hr/recruitment/applications/${id}/status`, { status, notes }),
+    supabase.from('job_applications').update({ status, notes }).eq('id', id),
   scheduleInterview: (applicationId: string, data: any) => 
-    api.post(`/hr/recruitment/applications/${applicationId}/interview`, data),
+    supabase.from('interviews').insert([{
+      application_id: applicationId,
+      ...data
+    }]),
   generateOfferLetter: (applicationId: string, data: any) => 
-    api.post(`/hr/recruitment/applications/${applicationId}/offer`, data, { responseType: 'blob' }),
+    supabase.from('offer_letters').insert([{
+      application_id: applicationId,
+      ...data
+    }]),
   getOnboardingChecklist: (employeeId: string) => 
-    api.get(`/hr/onboarding/${employeeId}/checklist`),
+    supabase.from('onboarding_checklist').select('*').eq('employee_id', employeeId),
   updateOnboardingItem: (employeeId: string, itemId: string, completed: boolean) => 
-    api.put(`/hr/onboarding/${employeeId}/checklist/${itemId}`, { completed }),
+    supabase.from('onboarding_checklist').update({ completed }).eq('id', itemId),
 
   // Attendance & Shift Management
-  getAttendance: (filters: any) => api.get('/hr/attendance', { params: filters }),
-  checkIn: (employeeId: string) => api.post('/hr/attendance/check-in', { employeeId }),
-  checkOut: (employeeId: string) => api.post('/hr/attendance/check-out', { employeeId }),
+  getAttendance: (filters?: any) => supabase.from('attendance').select('*').eq('filters', filters),
+  checkIn: (employeeId: string) => supabase.from('attendance').insert([{
+    employee_id: employeeId,
+    check_in: new Date()
+  }]),
+  checkOut: (employeeId: string) => supabase.from('attendance').update({ check_out: new Date() }).eq('employee_id', employeeId),
   getAttendanceSummary: (employeeId: string, month: string) => 
-    api.get(`/hr/attendance/summary/${employeeId}/${month}`),
+    supabase.from('attendance').select('*').eq('employee_id', employeeId).eq('month', month),
   markAbsence: (employeeId: string, date: string, reason: string) => 
-    api.post('/hr/attendance/absence', { employeeId, date, reason }),
-  getShifts: (filters?: any) => api.get('/hr/shifts', { params: filters }),
-  createShift: (data: any) => api.post('/hr/shifts', data),
-  updateShift: (id: string, data: any) => api.put(`/hr/shifts/${id}`, data),
+    supabase.from('absences').insert([{
+      employee_id: employeeId,
+      date,
+      reason
+    }]),
+  getShifts: (filters?: any) => supabase.from('shifts').select('*').eq('filters', filters),
+  createShift: (data: any) => supabase.from('shifts').insert([data]),
+  updateShift: (id: string, data: any) => supabase.from('shifts').update(data).eq('id', id),
   assignShift: (shiftId: string, employeeId: string) => 
-    api.post(`/hr/shifts/${shiftId}/assign`, { employeeId }),
-  getOvertimeReport: (period: string) => api.get(`/hr/attendance/overtime?period=${period}`),
+    supabase.from('shift_assignments').insert([{
+      shift_id: shiftId,
+      employee_id: employeeId
+    }]),
+  getOvertimeReport: (period: string) => 
+    supabase.from('overtime').select('*').eq('period', period),
 
   // Payroll Management (HR View)
-  getPayrollRecords: (month: string) => api.get(`/hr/payroll/${month}`),
+  getPayrollRecords: (month: string) => supabase.from('payroll').select('*').eq('month', month),
   getEmployeePayroll: (employeeId: string, month: string) => 
-    api.get(`/hr/payroll/employee/${employeeId}/${month}`),
+    supabase.from('payroll').select('*').eq('employee_id', employeeId).eq('month', month),
   updateSalary: (employeeId: string, data: any) => 
-    api.put(`/hr/employees/${employeeId}/salary`, data),
+    supabase.from('salaries').update(data).eq('employee_id', employeeId),
   addBonus: (employeeId: string, data: any) => 
-    api.post(`/hr/payroll/bonus`, { employeeId, ...data }),
+    supabase.from('bonuses').insert([{
+      employee_id: employeeId,
+      ...data
+    }]),
   addDeduction: (employeeId: string, data: any) => 
-    api.post(`/hr/payroll/deduction`, { employeeId, ...data }),
+    supabase.from('deductions').insert([{
+      employee_id: employeeId,
+      ...data
+    }]),
   getPayrollHistory: (employeeId: string) => 
-    api.get(`/hr/payroll/history/${employeeId}`),
+    supabase.from('payroll_history').select('*').eq('employee_id', employeeId),
 
   // Performance Evaluation
-  getEvaluations: (filters?: any) => api.get('/hr/performance/evaluations', { params: filters }),
-  createEvaluation: (data: any) => api.post('/hr/performance/evaluations', data),
-  updateEvaluation: (id: string, data: any) => api.put(`/hr/performance/evaluations/${id}`, data),
-  submitEvaluation: (id: string) => api.put(`/hr/performance/evaluations/${id}/submit`),
-  getEvaluationTemplates: () => api.get('/hr/performance/templates'),
+  getEvaluations: (filters?: any) => supabase.from('evaluations').select('*').eq('filters', filters),
+  createEvaluation: (data: any) => supabase.from('evaluations').insert([data]),
+  updateEvaluation: (id: string, data: any) => supabase.from('evaluations').update(data).eq('id', id),
+  submitEvaluation: (id: string) => supabase.from('evaluations').update({ status: 'submitted' }).eq('id', id),
+  getEvaluationTemplates: () => supabase.from('evaluation_templates').select('*'),
   getEmployeePerformance: (employeeId: string) => 
-    api.get(`/hr/performance/employee/${employeeId}`),
+    supabase.from('employee_performance').select('*').eq('employee_id', employeeId),
   setPerformanceGoals: (employeeId: string, goals: any[]) => 
-    api.post(`/hr/performance/goals`, { employeeId, goals }),
+    supabase.from('performance_goals').insert(goals.map(goal => ({ employee_id: employeeId, ...goal }))),
   recordFeedback: (employeeId: string, data: any) => 
-    api.post(`/hr/performance/feedback`, { employeeId, ...data }),
+    supabase.from('feedback').insert([{
+      employee_id: employeeId,
+      ...data
+    }]),
 
   // Compliance & Certifications
-  getCertifications: (filters?: any) => api.get('/hr/compliance/certifications', { params: filters }),
+  getCertifications: (filters?: any) => supabase.from('certifications').select('*').eq('filters', filters),
   addCertification: (employeeId: string, data: any) => 
-    api.post('/hr/compliance/certifications', { employeeId, ...data }),
+    supabase.from('certifications').insert([{
+      employee_id: employeeId,
+      ...data
+    }]),
   updateCertification: (id: string, data: any) => 
-    api.put(`/hr/compliance/certifications/${id}`, data),
+    supabase.from('certifications').update(data).eq('id', id),
   getExpiringCertifications: (days: number) => 
-    api.get(`/hr/compliance/expiring?days=${days}`),
+    supabase.from('certifications').select('*').lt('expiration_date', new Date().getTime() + days * 24 * 60 * 60 * 1000),
   uploadCertificate: (certificationId: string, file: File) => {
     const formData = new FormData();
     formData.append('certificate', file);
-    return api.post(`/hr/compliance/certifications/${certificationId}/upload`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    return supabase.from('certifications').update({ certificate: file }).eq('id', certificationId);
   },
   getMedicalRecords: (employeeId: string) => 
-    api.get(`/hr/compliance/medical/${employeeId}`),
+    supabase.from('medical_records').select('*').eq('employee_id', employeeId),
   addMedicalRecord: (employeeId: string, data: any) => 
-    api.post('/hr/compliance/medical', { employeeId, ...data }),
-  getComplianceSummary: () => api.get('/hr/compliance/summary'),
+    supabase.from('medical_records').insert([{
+      employee_id: employeeId,
+      ...data
+    }]),
+  getComplianceSummary: () => supabase.from('compliance_summary').select('*'),
 
   // Leave & Time-Off Management
-  getLeaveRequests: (filters?: any) => api.get('/hr/leave/requests', { params: filters }),
-  createLeaveRequest: (data: any) => api.post('/hr/leave/requests', data),
+  getLeaveRequests: (filters?: any) => supabase.from('leave_requests').select('*').eq('filters', filters),
+  createLeaveRequest: (data: any) => supabase.from('leave_requests').insert([data]),
   approveLeaveRequest: (id: string, notes?: string) => 
-    api.put(`/hr/leave/requests/${id}/approve`, { notes }),
+    supabase.from('leave_requests').update({ status: 'approved', notes }).eq('id', id),
   rejectLeaveRequest: (id: string, reason: string) => 
-    api.put(`/hr/leave/requests/${id}/reject`, { reason }),
+    supabase.from('leave_requests').update({ status: 'rejected', rejection_reason: reason }).eq('id', id),
   getLeaveBalance: (employeeId: string) => 
-    api.get(`/hr/leave/balance/${employeeId}`),
+    supabase.from('leave_balance').select('*').eq('employee_id', employeeId),
   getLeaveHistory: (employeeId: string) => 
-    api.get(`/hr/leave/history/${employeeId}`),
+    supabase.from('leave_history').select('*').eq('employee_id', employeeId),
   getLeaveCalendar: (month: string) => 
-    api.get(`/hr/leave/calendar/${month}`),
+    supabase.from('leave_calendar').select('*').eq('month', month),
   updateLeaveBalance: (employeeId: string, leaveType: string, days: number) => 
     api.put(`/hr/leave/balance/${employeeId}`, { leaveType, days }),
 

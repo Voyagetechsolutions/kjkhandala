@@ -37,7 +37,7 @@ import {
   SteeringWheel
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { createClient } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 interface User {
   user_id: string;

@@ -4,6 +4,7 @@ import { Icon } from 'leaflet';
 import { useTrackingStore } from '../../store';
 import { Bus, Navigation, Clock } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
+import { supabase } from '@/lib/supabase';
 
 // Fix for default marker icons in React-Leaflet
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -35,17 +36,21 @@ const LiveMap = () => {
 
   const fetchBusLocations = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/tracking/buses', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const { data, error } = await supabase
+        .from('bus_locations')
+        .select('*, buses(*)')
+        .order('timestamp', { ascending: false });
 
-      if (response.ok) {
-        const data = await response.json();
-        setBuses(data.data || []);
-      }
+      if (error) throw error;
+      
+      const latestLocations = data?.reduce((acc: any[], loc: any) => {
+        if (!acc.find(l => l.bus_id === loc.bus_id)) {
+          acc.push(loc);
+        }
+        return acc;
+      }, []);
+      
+      setBuses(latestLocations || []);
     } catch (error) {
       console.error('Failed to fetch bus locations:', error);
     } finally {

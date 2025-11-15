@@ -1,16 +1,20 @@
-import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
 import DriverLayout from '@/components/driver/DriverLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { UserCircle, Award, TrendingUp, Calendar } from 'lucide-react';
 
 export default function Profile() {
-  const { data, isLoading } = useQuery({
+  const { data: profileData, isLoading } = useQuery({
     queryKey: ['driver-profile'],
     queryFn: async () => {
-      const response = await api.get('/driver/profile');
-      return response.data;
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('*')
+        .single();
+      if (error) throw error;
+      return { driver: data };
     },
   });
 

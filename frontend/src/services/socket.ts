@@ -12,9 +12,17 @@ class SocketService {
       return this.socket;
     }
 
+    const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+    
+    // Don't connect if no token available
+    if (!token) {
+      console.warn('🔴 No authentication token available for WebSocket connection');
+      return null;
+    }
+
     this.socket = io(SOCKET_URL, {
       auth: {
-        token: localStorage.getItem('authToken'),
+        token: token,
       },
       transports: ['websocket', 'polling'],
       reconnection: true,

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import FinanceLayout from '@/components/finance/FinanceLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,6 +36,10 @@ import {
 import { Badge } from '@/components/ui/badge';
 
 export default function ExpenseManagement() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : FinanceLayout;
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [filters, setFilters] = useState({
     category: 'all',
@@ -53,20 +59,34 @@ export default function ExpenseManagement() {
 
   const queryClient = useQueryClient();
 
-  const { data: expenses = [] } = useQuery({
-    queryKey: ['finance-expenses'],
+  const { data: expensesData, isLoading } = useQuery({
+    queryKey: ['expenses', filters],
     queryFn: async () => {
-      const response = await api.get('/finance/expenses');
-      return Array.isArray(response.data) ? response.data : (response.data?.expenses || []);
+      let query = supabase
+        .from('expenses')
+        .select('*')
+        .order('date', { ascending: false });
+      
+      if (filters.category !== 'all') query = query.eq('category', filters.category);
+      if (filters.dateFrom) query = query.gte('date', filters.dateFrom);
+      if (filters.dateTo) query = query.lte('date', filters.dateTo);
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      return { expenses: data || [] };
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      await api.post('/finance/expenses', data);
+      const { data: newExpenseData, error } = await supabase
+        .from('expenses')
+        .insert([data]);
+      if (error) throw error;
+      return newExpenseData;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['finance-expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['expenses', filters] });
       toast.success('Expense added successfully');
       setShowAddForm(false);
       setNewExpense({
@@ -109,6 +129,8 @@ export default function ExpenseManagement() {
     },
   });
 
+  const expenses = expensesData?.expenses || [];
+  
   const filteredExpenses = expenses.filter((exp: any) => {
     if (filters.category !== 'all' && exp.category !== filters.category) return false;
     if (filters.status !== 'all' && exp.status !== filters.status) return false;
@@ -140,7 +162,7 @@ export default function ExpenseManagement() {
   };
 
   return (
-    <FinanceLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -409,6 +431,6 @@ export default function ExpenseManagement() {
           </DialogContent>
         </Dialog>
       </div>
-    </FinanceLayout>
+    </Layout>
   );
 }

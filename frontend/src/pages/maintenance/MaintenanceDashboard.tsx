@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import api from '@/lib/api';
+import AdminLayout from '@/components/admin/AdminLayout';
 import MaintenanceLayout from '@/components/maintenance/MaintenanceLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +21,9 @@ import {
 export default function MaintenanceDashboard() {
   const { user, userRoles, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const Layout = isAdminRoute ? AdminLayout : MaintenanceLayout;
 
   useEffect(() => {
     if (!loading && (!user || !userRoles?.includes('MAINTENANCE_MANAGER'))) {
@@ -32,8 +36,9 @@ export default function MaintenanceDashboard() {
   const { data: buses = [] } = useQuery({
     queryKey: ['buses'],
     queryFn: async () => {
-      const response = await api.get('/buses');
-      return Array.isArray(response.data) ? response.data : (response.data?.buses || []);
+      const { data, error } = await supabase.from('buses').select('*');
+      if (error) throw error;
+      return data || [];
     },
   });
 
@@ -41,8 +46,9 @@ export default function MaintenanceDashboard() {
   const { data: workOrdersData = [] } = useQuery({
     queryKey: ['work-orders'],
     queryFn: async () => {
-      const response = await api.get('/work-orders');
-      return Array.isArray(response.data) ? response.data : (response.data?.workOrders || []);
+      const { data, error } = await supabase.from('work_orders').select('*');
+      if (error) throw error;
+      return data || [];
     },
   });
 
@@ -50,8 +56,9 @@ export default function MaintenanceDashboard() {
   const { data: costsData = [] } = useQuery({
     queryKey: ['maintenance-costs'],
     queryFn: async () => {
-      const response = await api.get('/maintenance-costs');
-      return Array.isArray(response.data) ? response.data : (response.data?.costs || []);
+      const { data, error } = await supabase.from('maintenance_costs').select('*');
+      if (error) throw error;
+      return data || [];
     },
   });
 
@@ -59,8 +66,9 @@ export default function MaintenanceDashboard() {
   const { data: schedulesData = [] } = useQuery({
     queryKey: ['maintenance-schedules'],
     queryFn: async () => {
-      const response = await api.get('/maintenance-schedules');
-      return Array.isArray(response.data) ? response.data : (response.data?.schedules || []);
+      const { data, error } = await supabase.from('maintenance_schedules').select('*, bus:buses(*)');
+      if (error) throw error;
+      return data || [];
     },
   });
 
@@ -68,8 +76,9 @@ export default function MaintenanceDashboard() {
   const { data: repairsData = [] } = useQuery({
     queryKey: ['repairs'],
     queryFn: async () => {
-      const response = await api.get('/repairs');
-      return Array.isArray(response.data) ? response.data : (response.data?.repairs || []);
+      const { data, error } = await supabase.from('repairs').select('*, bus:buses(*)');
+      if (error) throw error;
+      return data || [];
     },
   });
 
@@ -160,7 +169,7 @@ export default function MaintenanceDashboard() {
     });
 
   return (
-    <MaintenanceLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -373,6 +382,6 @@ export default function MaintenanceDashboard() {
           </CardContent>
         </Card>
       </div>
-    </MaintenanceLayout>
+    </Layout>
   );
 }
