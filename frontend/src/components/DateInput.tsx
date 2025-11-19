@@ -1,6 +1,6 @@
 import { Input } from '@/components/ui/input';
 import { Calendar } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface DateInputProps {
   id: string;
@@ -13,6 +13,8 @@ interface DateInputProps {
 
 export default function DateInput({ id, value, onChange, min, required, className }: DateInputProps) {
   const [displayValue, setDisplayValue] = useState('');
+  const [showPicker, setShowPicker] = useState(false);
+  const hiddenInputRef = useRef<HTMLInputElement>(null);
 
   // Convert yyyy-mm-dd to dd-mm-yyyy for display
   useEffect(() => {
@@ -24,7 +26,7 @@ export default function DateInput({ id, value, onChange, min, required, classNam
     }
   }, [value]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let input = e.target.value.replace(/[^0-9]/g, ''); // Remove non-numeric characters
     
     // Format as dd-mm-yyyy
@@ -55,6 +57,12 @@ export default function DateInput({ id, value, onChange, min, required, classNam
     }
   };
 
+  const handleDatePickerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const dateValue = e.target.value; // yyyy-mm-dd
+    onChange(dateValue);
+    setShowPicker(false);
+  };
+
   const handleBlur = () => {
     // Validate on blur
     if (displayValue.length === 10) {
@@ -69,20 +77,38 @@ export default function DateInput({ id, value, onChange, min, required, classNam
     }
   };
 
+  const handleCalendarClick = () => {
+    hiddenInputRef.current?.showPicker?.();
+  };
+
   return (
     <div className="relative">
       <Input
         id={id}
         type="text"
         value={displayValue}
-        onChange={handleChange}
+        onChange={handleTextChange}
         onBlur={handleBlur}
         placeholder="dd-mm-yyyy"
-        className={className || "w-full"}
+        className={className || "w-full pr-10"}
         required={required}
         maxLength={10}
       />
-      <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+      {/* Hidden native date picker */}
+      <input
+        ref={hiddenInputRef}
+        type="date"
+        value={value}
+        onChange={handleDatePickerChange}
+        min={min}
+        className="absolute opacity-0 pointer-events-none"
+        tabIndex={-1}
+      />
+      {/* Calendar icon - clickable to open picker */}
+      <Calendar 
+        className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground cursor-pointer hover:text-primary transition-colors" 
+        onClick={handleCalendarClick}
+      />
     </div>
   );
 }
