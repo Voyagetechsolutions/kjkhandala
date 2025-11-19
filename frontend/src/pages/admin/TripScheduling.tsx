@@ -74,10 +74,13 @@ export default function TripScheduling() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('drivers')
-        .select('id, full_name, license_number, status')
-        .eq('status', 'active')
+        .select('*')
         .order('full_name');
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching drivers:', error);
+        throw error;
+      }
+      console.log('Fetched drivers:', data);
       return data || [];
     },
   });
@@ -793,11 +796,18 @@ export default function TripScheduling() {
                     <SelectValue placeholder="Choose a driver" />
                   </SelectTrigger>
                   <SelectContent>
-                    {drivers?.map((driver: any) => (
-                      <SelectItem key={driver.id} value={driver.id}>
-                        {driver.full_name} - {driver.license_number}
+                    {drivers && drivers.length > 0 ? (
+                      drivers.map((driver: any) => (
+                        <SelectItem key={driver.id} value={driver.id}>
+                          {driver.full_name || driver.name || 'Unknown Driver'}
+                          {driver.license_number && ` - ${driver.license_number}`}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-drivers" disabled>
+                        No drivers available
                       </SelectItem>
-                    ))}
+                    )}
                   </SelectContent>
                 </Select>
               </div>
