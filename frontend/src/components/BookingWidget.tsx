@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Calendar, Users, MapPin, ArrowRight, Clock, Bus, DollarSign, Loader2 
+  Calendar, Users, MapPin, ArrowRight, Clock, Bus, Loader2 
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -480,7 +480,7 @@ export default function BookingWidget() {
                       <div className="text-right space-y-3 flex-shrink-0">
                         <div>
                           <div className="text-2xl font-bold flex items-center gap-1">
-                            <DollarSign className="h-5 w-5" />
+                            <span className="font-bold">P</span>
                             {trip.fare.toFixed(2)}
                           </div>
                           <div className="text-xs text-muted-foreground">per seat</div>
