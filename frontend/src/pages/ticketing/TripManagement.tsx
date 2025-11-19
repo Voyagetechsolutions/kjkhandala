@@ -157,8 +157,6 @@ export default function TripManagement() {
       case 'BOARDING':
         return 'default';
       case 'DEPARTED':
-        return 'outline';
-      case 'IN_PROGRESS':
         return 'default';
       case 'COMPLETED':
         return 'outline';

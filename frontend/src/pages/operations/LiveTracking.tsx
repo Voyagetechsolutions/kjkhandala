@@ -138,7 +138,7 @@ export default function LiveTracking() {
           name
         )
       `)
-      .in('status', ['SCHEDULED', 'BOARDING', 'DEPARTED', 'IN_PROGRESS'])
+      .in('status', ['SCHEDULED', 'BOARDING', 'DEPARTED'])
       .gte('scheduled_departure', today)
       .order('scheduled_departure', { ascending: true });
     
@@ -209,8 +209,9 @@ export default function LiveTracking() {
       case 'BOARDING':
         return 'bg-orange-500';
       case 'DEPARTED':
-      case 'IN_PROGRESS':
         return 'bg-green-500';
+      case 'COMPLETED':
+        return 'bg-gray-500';
       default:
         return 'bg-gray-500';
     }

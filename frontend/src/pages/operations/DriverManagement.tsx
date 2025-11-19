@@ -75,7 +75,7 @@ export default function DriverManagement() {
         .from('trips')
         .select('id, driver_id, bus_id, route_id, status, scheduled_departure')
         .in('driver_id', driverIds)
-        .in('status', ['SCHEDULED', 'BOARDING', 'DEPARTED', 'IN_PROGRESS']);
+        .in('status', ['SCHEDULED', 'BOARDING', 'DEPARTED']);
 
       // Fetch buses for active trips
       const busIds = activeTrips?.map(t => t.bus_id).filter(Boolean) || [];

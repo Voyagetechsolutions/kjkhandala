@@ -106,7 +106,8 @@ export default function DriverHome() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'SCHEDULED': return 'bg-blue-500';
-      case 'IN_PROGRESS': return 'bg-green-500';
+      case 'BOARDING': return 'bg-orange-500';
+      case 'DEPARTED': return 'bg-green-500';
       case 'COMPLETED': return 'bg-gray-500';
       case 'CANCELLED': return 'bg-red-500';
       default: return 'bg-gray-500';
@@ -116,7 +117,8 @@ export default function DriverHome() {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'SCHEDULED': return 'Awaiting Boarding';
-      case 'IN_PROGRESS': return 'Trip in Progress';
+      case 'BOARDING': return 'Boarding Passengers';
+      case 'DEPARTED': return 'Trip in Progress';
       case 'COMPLETED': return 'Trip Completed';
       case 'CANCELLED': return 'Trip Cancelled';
       default: return status;
@@ -272,7 +274,7 @@ export default function DriverHome() {
               )}
 
               {/* Live Trip */}
-              {trip.status === 'IN_PROGRESS' && (
+              {trip.status === 'DEPARTED' && (
                 <Button
                   onClick={() => navigate('/driver/live')}
                   className="h-24 text-xl font-bold bg-blue-600 hover:bg-blue-700"

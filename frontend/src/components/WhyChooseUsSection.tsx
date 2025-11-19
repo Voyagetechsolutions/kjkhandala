@@ -31,7 +31,7 @@ export default function WhyChooseUsSection() {
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Why Travel with KJ Khandala?</h2>
           <p className="text-lg text-muted-foreground">
-            Premium comfort backed by 40+ years of trusted service.
+            Premium comfort backed by trusted service since 2013.
           </p>
         </div>
 

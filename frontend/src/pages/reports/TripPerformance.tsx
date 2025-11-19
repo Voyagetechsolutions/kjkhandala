@@ -226,7 +226,8 @@ const TripPerformance = () => {
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                       trip.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                      trip.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
+                      trip.status === 'DEPARTED' ? 'bg-blue-100 text-blue-800' :
+                      trip.status === 'BOARDING' ? 'bg-orange-100 text-orange-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
                       {trip.status}

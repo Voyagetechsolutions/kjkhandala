@@ -42,7 +42,7 @@ export default function OperationsDashboard() {
       
       const tripsSummary = {
         total: trips?.length || 0,
-        departed: trips?.filter(t => t.status === 'DEPARTED' || t.status === 'IN_PROGRESS').length || 0,
+        departed: trips?.filter(t => t.status === 'DEPARTED').length || 0,
         delayed: trips?.filter(t => t.status === 'DELAYED').length || 0,
         cancelled: trips?.filter(t => t.status === 'CANCELLED').length || 0,
         arrived: trips?.filter(t => t.status === 'COMPLETED').length || 0,

@@ -216,7 +216,8 @@ export default function TripManagement() {
   const getStatusBadge = (status: string) => {
     const statusConfig: any = {
       SCHEDULED: { variant: 'secondary', label: 'Scheduled' },
-      IN_PROGRESS: { variant: 'default', label: 'In Progress' },
+      BOARDING: { variant: 'default', label: 'Boarding' },
+      DEPARTED: { variant: 'default', label: 'Departed' },
       COMPLETED: { variant: 'outline', label: 'Completed' },
       CANCELLED: { variant: 'destructive', label: 'Cancelled' },
       DELAYED: { variant: 'secondary', label: 'Delayed' },
@@ -265,7 +266,8 @@ export default function TripManagement() {
                   <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="SCHEDULED">Scheduled</SelectItem>
-                    <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                    <SelectItem value="BOARDING">Boarding</SelectItem>
+                    <SelectItem value="DEPARTED">Departed</SelectItem>
                     <SelectItem value="COMPLETED">Completed</SelectItem>
                     <SelectItem value="DELAYED">Delayed</SelectItem>
                     <SelectItem value="CANCELLED">Cancelled</SelectItem>
@@ -388,7 +390,8 @@ export default function TripManagement() {
                           <SelectContent>
                             <SelectItem value="driver">Replace Driver</SelectItem>
                             <SelectItem value="bus">Replace Bus</SelectItem>
-                            <SelectItem value="status:IN_PROGRESS">Start Trip</SelectItem>
+                            <SelectItem value="status:BOARDING">Start Boarding</SelectItem>
+                            <SelectItem value="status:DEPARTED">Depart Trip</SelectItem>
                             <SelectItem value="status:COMPLETED">Complete Trip</SelectItem>
                             <SelectItem value="status:CANCELLED">Cancel Trip</SelectItem>
                           </SelectContent>

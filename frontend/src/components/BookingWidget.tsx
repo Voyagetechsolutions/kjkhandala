@@ -311,7 +311,7 @@ export default function BookingWidget() {
             {/* Travel Date */}
             <div>
               <Label htmlFor="travelDate" className="text-sm font-medium mb-2 block">
-                {form.tripType === 'return' ? 'Departure Date' : 'Travel Date'}
+                {form.tripType === 'return' ? 'Departure Date' : 'Travel Date'} <span className="text-xs text-muted-foreground">(dd-mm-yyyy)</span>
               </Label>
               <div className="relative">
                 <Input
@@ -331,7 +331,7 @@ export default function BookingWidget() {
             {form.tripType === 'return' && (
               <div>
                 <Label htmlFor="returnDate" className="text-sm font-medium mb-2 block">
-                  Return Date
+                  Return Date <span className="text-xs text-muted-foreground">(dd-mm-yyyy)</span>
                 </Label>
                 <div className="relative">
                   <Input

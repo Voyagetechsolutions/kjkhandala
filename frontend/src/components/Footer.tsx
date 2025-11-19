@@ -96,6 +96,12 @@ export default function Footer() {
                 </a>
               </li>
               <li>
+                <a href="tel:+26772692610" className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  +267 72 692 610
+                </a>
+              </li>
+              <li>
                 <a 
                   href="https://wa.me/26773442135" 
                   target="_blank" 

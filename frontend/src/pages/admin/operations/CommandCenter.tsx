@@ -293,7 +293,7 @@ export default function CommandCenter() {
   // Active buses = buses assigned to active trips
   const activeBusIds = new Set(
     tripsToday
-      .filter((t: any) => t.status === 'IN_PROGRESS' || t.status === 'BOARDING' || t.status === 'DEPARTED')
+      .filter((t: any) => t.status === 'BOARDING' || t.status === 'DEPARTED')
       .map((t: any) => t.bus_id)
       .filter(Boolean)
   );
@@ -356,7 +356,7 @@ export default function CommandCenter() {
     // Trips
     tripsToday: tripsToday.length,
     activeTrips: tripsToday.filter((t: any) => 
-      t.status === 'IN_PROGRESS' || t.status === 'BOARDING' || t.status === 'DEPARTED'
+      t.status === 'BOARDING' || t.status === 'DEPARTED'
     ).length,
     completedTrips,
     delayedTrips: tripsToday.filter((t: any) => t.status === 'DELAYED').length,

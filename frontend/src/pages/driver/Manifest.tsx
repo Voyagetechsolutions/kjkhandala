@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import api from '@/lib/api';
 import DriverLayout from '@/components/driver/DriverLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,11 +51,6 @@ export default function Manifest() {
       return data[0];
     },
     enabled: !!manifestData?.passengers[0]?.trip_id,
-    queryFn: async () => {
-      const response = await api.get(`/driver/manifest/${tripData.trip.id}`);
-      return response.data;
-    },
-    enabled: !!tripData?.trip?.id,
   });
 
   const noShowMutation = useMutation({
@@ -71,7 +67,7 @@ export default function Manifest() {
     },
   });
 
-  if (isLoading || !data) {
+  if (isLoading || !manifestData) {
     return (
       <DriverLayout>
         <div className="flex items-center justify-center h-96">
@@ -81,7 +77,7 @@ export default function Manifest() {
     );
   }
 
-  const passengers = data.passengers.filter((p: any) =>
+  const passengers = manifestData.passengers.filter((p: any) =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.ticketNumber.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -143,9 +139,9 @@ export default function Manifest() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Route</p>
-                <p className="text-2xl font-bold">{data.trip.route}</p>
+                <p className="text-2xl font-bold">{manifestData.trip?.route || 'N/A'}</p>
                 <p className="text-lg text-muted-foreground">
-                  {new Date(data.trip.departureTime).toLocaleString()}
+                  {manifestData.trip?.departureTime ? new Date(manifestData.trip.departureTime).toLocaleString() : 'N/A'}
                 </p>
               </div>
             </div>
@@ -160,7 +156,7 @@ export default function Manifest() {
               <Users className="h-6 w-6 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold">{data.stats.total}</div>
+              <div className="text-4xl font-bold">{manifestData.stats?.total || 0}</div>
             </CardContent>
           </Card>
 
@@ -170,7 +166,7 @@ export default function Manifest() {
               <CheckCircle className="h-6 w-6 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-green-600">{data.stats.checkedIn}</div>
+              <div className="text-4xl font-bold text-green-600">{manifestData.stats?.checkedIn || 0}</div>
             </CardContent>
           </Card>
 
@@ -180,7 +176,7 @@ export default function Manifest() {
               <XCircle className="h-6 w-6 text-red-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-red-600">{data.stats.notBoarded}</div>
+              <div className="text-4xl font-bold text-red-600">{manifestData.stats?.notBoarded || 0}</div>
             </CardContent>
           </Card>
         </div>

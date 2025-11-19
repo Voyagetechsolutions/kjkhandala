@@ -98,7 +98,7 @@ export default function TripScheduling() {
           drivers:driver_id (id, full_name, phone, license_number)
         `)
         .gte('scheduled_departure', today)
-        .in('status', ['DEPARTED', 'IN_PROGRESS', 'BOARDING'])
+        .in('status', ['DEPARTED', 'BOARDING'])
         .order('scheduled_departure', { ascending: true });
       
       if (error) {
@@ -552,7 +552,7 @@ export default function TripScheduling() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">In Transit</p>
                       <p className="text-2xl font-bold text-orange-600">
-                        {liveTrips?.filter((t: any) => t.status === 'DEPARTED' || t.status === 'IN_PROGRESS').length || 0}
+                        {liveTrips?.filter((t: any) => t.status === 'DEPARTED').length || 0}
                       </p>
                     </div>
                     <div className="p-3 bg-orange-100 rounded-full">

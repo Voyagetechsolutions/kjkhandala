@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import api from '@/lib/api';
 import DriverLayout from '@/components/driver/DriverLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,10 @@ import {
   XCircle, 
   Phone, 
   Luggage,
-  Download
+  Download,
+  AlertCircle,
+  Mail,
+  MapPin
 } from 'lucide-react';
 import {
   Table,
@@ -32,10 +36,12 @@ export default function DriverManifest() {
   const { data: tripData } = useQuery({
     queryKey: ['driver-trip'],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
       const { data, error } = await supabase
         .from('trips')
         .select('*')
-        .eq('driver_id', supabase.auth.user().id);
+        .eq('driver_id', user.id);
       if (error) throw error;
       return data[0];
     },
@@ -64,7 +70,7 @@ export default function DriverManifest() {
     },
   });
 
-  if (isLoading || !data) {
+  if (isLoading || !manifestData) {
     return (
       <DriverLayout>
         <div className="flex items-center justify-center h-96">
@@ -74,43 +80,18 @@ export default function DriverManifest() {
     );
   }
 
-  const passengers = data.passengers.filter((p: any) =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.ticketNumber.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-      boardingStatus: 'not-boarded',
-      luggage: '1 bag',
-      specialNeeds: null,
-    },
-    {
-      id: 2,
-      name: 'Jane Smith',
-      seatNumber: 'A2',
-      ticketNumber: 'TKT-001235',
-      phone: '+267 72345678',
-      email: 'jane@example.com',
-      pickup: 'Gaborone Main Terminal',
-      dropoff: 'Francistown Station',
-      paymentStatus: 'paid',
-      boardingStatus: 'boarded',
-      luggage: '2 bags',
-      specialNeeds: 'Wheelchair',
-    },
-    {
-      id: 3,
-      name: 'Mike Johnson',
-      seatNumber: 'B1',
-      ticketNumber: 'TKT-001236',
-      phone: '+267 73456789',
-      email: 'mike@example.com',
-      pickup: 'Gaborone Main Terminal',
-      dropoff: 'Francistown Station',
-      paymentStatus: 'paid',
-      boardingStatus: 'not-boarded',
-      luggage: '1 bag',
-      specialNeeds: null,
-    },
-  ];
+  const passengers = manifestData.passengers?.filter((p: any) =>
+    p.passenger?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.ticket_number?.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
+
+  const tripInfo = {
+    date: tripData?.trip_date || 'N/A',
+    route: `${tripData?.origin} → ${tripData?.destination}` || 'N/A',
+    departureTime: tripData?.departure_time || 'N/A',
+    arrivalTime: tripData?.arrival_time || 'N/A',
+    busNumber: tripData?.bus_id || 'N/A',
+  };
 
   const getBoardingColor = (status: string) => {
     switch (status) {
