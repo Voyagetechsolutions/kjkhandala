@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Calendar, Users, MapPin, ArrowRight, Clock, Bus, Loader2 
+  Users, MapPin, ArrowRight, Clock, Bus, Loader2 
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import DateInput from './DateInput';
 
 interface Trip {
   id: string;
@@ -311,40 +312,30 @@ export default function BookingWidget() {
             {/* Travel Date */}
             <div>
               <Label htmlFor="travelDate" className="text-sm font-medium mb-2 block">
-                {form.tripType === 'return' ? 'Departure Date' : 'Travel Date'} <span className="text-xs text-muted-foreground">(dd-mm-yyyy)</span>
+                {form.tripType === 'return' ? 'Departure Date' : 'Travel Date'}
               </Label>
-              <div className="relative">
-                <Input
-                  id="travelDate"
-                  type="date"
-                  value={form.travelDate}
-                  onChange={(e) => setForm({ ...form, travelDate: e.target.value })}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="w-full"
-                  required
-                />
-                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-              </div>
+              <DateInput
+                id="travelDate"
+                value={form.travelDate}
+                onChange={(value) => setForm({ ...form, travelDate: value })}
+                min={new Date().toISOString().split('T')[0]}
+                required
+              />
             </div>
 
             {/* Return Date */}
             {form.tripType === 'return' && (
               <div>
                 <Label htmlFor="returnDate" className="text-sm font-medium mb-2 block">
-                  Return Date <span className="text-xs text-muted-foreground">(dd-mm-yyyy)</span>
+                  Return Date
                 </Label>
-                <div className="relative">
-                  <Input
-                    id="returnDate"
-                    type="date"
-                    value={form.returnDate}
-                    onChange={(e) => setForm({ ...form, returnDate: e.target.value })}
-                    min={form.travelDate || new Date().toISOString().split('T')[0]}
-                    className="w-full"
-                    required
-                  />
-                  <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                </div>
+                <DateInput
+                  id="returnDate"
+                  value={form.returnDate}
+                  onChange={(value) => setForm({ ...form, returnDate: value })}
+                  min={form.travelDate || new Date().toISOString().split('T')[0]}
+                  required
+                />
               </div>
             )}
 
