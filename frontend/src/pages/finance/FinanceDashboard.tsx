@@ -21,14 +21,14 @@ export default function FinanceDashboard() {
   const isAdminRoute = location.pathname.startsWith('/admin');
   const Layout = isAdminRoute ? AdminLayout : FinanceLayout;
 
-  const { data: income = [] } = useQuery({
-    queryKey: ['finance-income'],
+  const { data: bookings = [] } = useQuery({
+    queryKey: ['finance-bookings'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('income_records')
+        .from('bookings')
         .select('*')
-        .eq('status', 'confirmed')
-        .order('date', { ascending: false });
+        .eq('payment_status', 'paid')
+        .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -38,10 +38,9 @@ export default function FinanceDashboard() {
     queryKey: ['finance-expenses'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('expense_records')
+        .from('expenses')
         .select('*')
-        .in('status', ['approved', 'paid'])
-        .order('date', { ascending: false });
+        .order('expense_date', { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -65,7 +64,8 @@ export default function FinanceDashboard() {
       const { data, error } = await supabase
         .from('refund_requests')
         .select('*')
-        .eq('status', 'pending');
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -96,21 +96,39 @@ export default function FinanceDashboard() {
     },
   });
 
+  const { data: trips = [] } = useQuery({
+    queryKey: ['finance-trips'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('trips')
+        .select(`
+          id,
+          trip_number,
+          route:routes(id, origin, destination)
+        `);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   const today = new Date().toISOString().split('T')[0];
   const thisMonth = new Date().toISOString().slice(0, 7);
   const thisYear = new Date().getFullYear().toString();
 
-  const todayRevenue = income.filter((i: any) => i.date === today).reduce((sum: number, i: any) => sum + parseFloat(i.amount || 0), 0);
-  const monthRevenue = income.filter((i: any) => i.date?.startsWith(thisMonth)).reduce((sum: number, i: any) => sum + parseFloat(i.amount || 0), 0);
-  const yearRevenue = income.filter((i: any) => i.date?.startsWith(thisYear)).reduce((sum: number, i: any) => sum + parseFloat(i.amount || 0), 0);
+  // Revenue from bookings
+  const todayRevenue = bookings.filter((b: any) => b.created_at?.startsWith(today)).reduce((sum: number, b: any) => sum + parseFloat(b.total_amount || 0), 0);
+  const monthRevenue = bookings.filter((b: any) => b.created_at?.startsWith(thisMonth)).reduce((sum: number, b: any) => sum + parseFloat(b.total_amount || 0), 0);
+  const yearRevenue = bookings.filter((b: any) => b.created_at?.startsWith(thisYear)).reduce((sum: number, b: any) => sum + parseFloat(b.total_amount || 0), 0);
 
-  const todayExpenses = expenses.filter((e: any) => e.date === today).reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0);
-  const monthExpenses = expenses.filter((e: any) => e.date?.startsWith(thisMonth)).reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0);
-  const yearExpenses = expenses.filter((e: any) => e.date?.startsWith(thisYear)).reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0);
+  // Expenses
+  const todayExpenses = expenses.filter((e: any) => e.expense_date === today).reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0);
+  const monthExpenses = expenses.filter((e: any) => e.expense_date?.startsWith(thisMonth)).reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0);
+  const yearExpenses = expenses.filter((e: any) => e.expense_date?.startsWith(thisYear)).reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0);
 
-  const ticketSales = income.filter((i: any) => i.source === 'ticket_sales' && i.date?.startsWith(thisMonth)).reduce((sum: number, i: any) => sum + parseFloat(i.amount || 0), 0);
-  const fuelCost = fuelLogs.reduce((sum: number, f: any) => sum + parseFloat(f.total_cost || 0), 0);
-  const payrollCost = payrollData.reduce((sum: number, p: any) => sum + parseFloat(p.net_salary || 0), 0);
+  // Category breakdowns
+  const ticketSales = monthRevenue; // All bookings are ticket sales
+  const fuelCost = expenses.filter((e: any) => e.category === 'fuel' && e.expense_date?.startsWith(thisMonth)).reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0);
+  const payrollCost = expenses.filter((e: any) => e.category === 'payroll' && e.expense_date?.startsWith(thisMonth)).reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0);
 
   const profitLoss = monthRevenue - monthExpenses;
   const profitMargin = monthRevenue > 0 ? ((profitLoss / monthRevenue) * 100).toFixed(1) : 0;
@@ -132,27 +150,79 @@ export default function FinanceDashboard() {
   });
 
   const pendingRefunds = refunds.length;
-  const totalRefundAmount = refunds.reduce((sum: number, r: any) => sum + parseFloat(r.refunded_amount || 0), 0);
+  const totalRefundAmount = refunds.reduce((sum: number, r: any) => sum + parseFloat(r.net_refund || 0), 0);
+
+  // Fuel variance check
+  const highVarianceFuel = fuelLogs.filter((f: any) => {
+    const expected = parseFloat(f.expected_consumption || 0);
+    const actual = parseFloat(f.actual_consumption || 0);
+    const variance = Math.abs(actual - expected) / expected;
+    return variance > 0.15; // 15% variance threshold
+  });
+
+  // Low ticket sales check
+  const dailyThreshold = 5000; // P5000 daily target
+  const lowSalesToday = todayRevenue < dailyThreshold;
 
   const alerts = [
-    overdueInvoices.length > 0 && { id: 1, type: 'warning', message: `${overdueInvoices.length} overdue invoices`, priority: 'high' },
-    pendingRefunds > 0 && { id: 2, type: 'info', message: `${pendingRefunds} pending refund requests`, priority: 'medium' },
+    overdueInvoices.length > 0 && { 
+      id: 1, 
+      type: 'warning', 
+      icon: '⚠️',
+      message: `Overdue Invoices: ${overdueInvoices.length} invoice${overdueInvoices.length > 1 ? 's' : ''} overdue`, 
+      amount: overdueInvoices.reduce((sum: number, inv: any) => sum + parseFloat(inv.amount || 0), 0),
+      priority: 'high' 
+    },
+    pendingRefunds > 0 && { 
+      id: 2, 
+      type: 'info',
+      icon: '⚠️', 
+      message: `Pending Refund Requests: ${pendingRefunds} request${pendingRefunds > 1 ? 's' : ''} awaiting approval`, 
+      amount: totalRefundAmount,
+      priority: 'medium' 
+    },
+    highVarianceFuel.length > 0 && {
+      id: 3,
+      type: 'warning',
+      icon: '⛽',
+      message: `Fuel Variance Warning: ${highVarianceFuel.length} log${highVarianceFuel.length > 1 ? 's' : ''} show high variance`,
+      priority: 'medium'
+    },
+    lowSalesToday && {
+      id: 4,
+      type: 'warning',
+      icon: '📉',
+      message: `Low Ticket Sales Today: Sales below daily threshold (P${todayRevenue.toFixed(0)} / P${dailyThreshold})`,
+      priority: 'medium'
+    },
   ].filter(Boolean);
 
-  const routeRevenue = income.reduce((acc: any[], inc: any) => {
-    if (inc.route_id) {
-      const existing = acc.find(r => r.route_id === inc.route_id);
-      if (existing) {
-        existing.revenue += parseFloat(inc.amount || 0);
-        existing.count += 1;
-      } else {
-        acc.push({ route_id: inc.route_id, revenue: parseFloat(inc.amount || 0), count: 1 });
+  // Group bookings by trip to get route revenue
+  const tripRevenue = bookings
+    .filter((b: any) => b.created_at?.startsWith(thisMonth))
+    .reduce((acc: any, booking: any) => {
+      const tripId = booking.trip_id;
+      if (!acc[tripId]) {
+        acc[tripId] = { trip_id: tripId, revenue: 0, count: 0 };
       }
-    }
-    return acc;
-  }, []);
+      acc[tripId].revenue += parseFloat(booking.total_amount || 0);
+      acc[tripId].count += 1;
+      return acc;
+    }, {});
 
-  const topRoutes = routeRevenue.sort((a, b) => b.revenue - a.revenue).slice(0, 3);
+  // Map trip revenue to route names
+  const topRoutes = Object.values(tripRevenue)
+    .sort((a: any, b: any) => b.revenue - a.revenue)
+    .slice(0, 5)
+    .map((tripRev: any) => {
+      const trip = trips.find((t: any) => t.id === tripRev.trip_id);
+      const route = Array.isArray(trip?.route) ? trip.route[0] : trip?.route;
+      return {
+        ...tripRev,
+        route_name: route ? `${route.origin} → ${route.destination}` : 'Unknown Route',
+        trip_number: trip?.trip_number || 'N/A',
+      };
+    });
 
   return (
     <Layout>
@@ -265,17 +335,24 @@ export default function FinanceDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {alerts.map((alert) => (
-                <div key={alert.id} className="flex items-start gap-3 p-3 border rounded-lg">
-                  <AlertCircle className={`h-5 w-5 ${alert.priority === 'high' ? 'text-red-500' : 'text-yellow-500'}`} />
-                  <div className="flex-1">
-                    <p className="text-sm">{alert.message}</p>
+              {alerts.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No alerts at this time</p>
+              ) : (
+                alerts.map((alert: any) => (
+                  <div key={alert.id} className="flex items-start gap-3 p-3 border rounded-lg">
+                    <span className="text-2xl">{alert.icon}</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{alert.message}</p>
+                      {alert.amount && (
+                        <p className="text-xs text-muted-foreground mt-1">Amount: P {alert.amount.toFixed(2)}</p>
+                      )}
+                    </div>
+                    <Badge variant={alert.priority === 'high' ? 'destructive' : 'secondary'}>
+                      {alert.priority}
+                    </Badge>
                   </div>
-                  <Badge className={alert.priority === 'high' ? 'bg-red-500' : alert.priority === 'medium' ? 'bg-yellow-500' : 'bg-blue-500'}>
-                    {alert.priority}
-                  </Badge>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
@@ -291,15 +368,15 @@ export default function FinanceDashboard() {
               {topRoutes.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">No route data available</p>
               ) : (
-                topRoutes.map((route, index) => (
+                topRoutes.map((route: any, index: number) => (
                   <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
                     <div>
-                      <div className="font-medium">Route #{route.route_id?.slice(0, 8)}</div>
-                      <div className="text-sm text-muted-foreground">{route.count} transactions</div>
+                      <div className="font-medium">{route.route_name}</div>
+                      <div className="text-sm text-muted-foreground">{route.count} trip{route.count > 1 ? 's' : ''}</div>
                     </div>
                     <div className="text-right">
                       <div className="font-bold text-green-600">P {route.revenue.toLocaleString()}</div>
-                      <div className="text-xs text-muted-foreground">Revenue</div>
+                      <div className="text-xs text-muted-foreground">revenue</div>
                     </div>
                   </div>
                 ))

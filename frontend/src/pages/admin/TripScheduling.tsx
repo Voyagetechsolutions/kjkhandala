@@ -36,13 +36,18 @@ export default function TripScheduling() {
   });
   const queryClient = useQueryClient();
 
-  // Fetch all trips/schedules
+  // Fetch all trips/schedules with route, bus, and driver info
   const { data: tripsData, isLoading } = useQuery({
     queryKey: ['trips'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('trips')
-        .select('*')
+        .select(`
+          *,
+          routes:route_id (id, origin, destination),
+          buses:bus_id (id, registration_number, model),
+          drivers:driver_id (id, full_name, phone)
+        `)
         .order('scheduled_departure', { ascending: false });
       if (error) throw error;
       return { trips: data || [] };
@@ -55,9 +60,9 @@ export default function TripScheduling() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('buses')
-        .select('id, bus_number, name, status')
-        .eq('status', 'active')
-        .order('bus_number');
+        .select('id, registration_number, model, status')
+        .eq('status', 'ACTIVE')
+        .order('registration_number');
       if (error) throw error;
       return data || [];
     },
@@ -88,12 +93,9 @@ export default function TripScheduling() {
         .from('trips')
         .select(`
           *,
-          routes (id, origin, destination, distance),
-          buses (id, bus_number, name, gps_device_id),
-          driver_assignments (
-            id,
-            drivers (id, full_name, phone, license_number)
-          )
+          routes:route_id (id, origin, destination, distance_km),
+          buses:bus_id (id, registration_number, model, gps_device_id),
+          drivers:driver_id (id, full_name, phone, license_number)
         `)
         .gte('scheduled_departure', today)
         .in('status', ['DEPARTED', 'IN_PROGRESS', 'BOARDING'])
@@ -152,7 +154,7 @@ export default function TripScheduling() {
     },
   });
 
-  // Assign bus and driver mutation
+  // Assign bus and driver mutation with auto-population for 3 months
   const assignBusDriverMutation = useMutation({
     mutationFn: async () => {
       if (!selectedTrip || !assignmentData.bus_id || !assignmentData.driver_id) {
@@ -164,26 +166,76 @@ export default function TripScheduling() {
         .from('trips')
         .update({
           bus_id: assignmentData.bus_id,
+          driver_id: assignmentData.driver_id,
           operating_days: assignmentData.days.length > 0 ? assignmentData.days : null,
         })
         .eq('id', selectedTrip.id);
 
       if (tripError) throw tripError;
 
-      // Create driver assignment
-      const { error: assignError } = await supabase
-        .from('driver_assignments')
-        .insert({
-          trip_id: selectedTrip.id,
-          driver_id: assignmentData.driver_id,
-          assignment_date: new Date().toISOString(),
-          status: 'active',
-        });
+      // Auto-populate trips for 3 months if operating days are selected
+      if (assignmentData.days.length > 0) {
+        const tripsToCreate = [];
+        const startDate = new Date(selectedTrip.scheduled_departure);
+        const endDate = new Date();
+        endDate.setMonth(endDate.getMonth() + 3); // 3 months from now
 
-      if (assignError) throw assignError;
+        const dayMap: { [key: string]: number } = {
+          'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+          'Thursday': 4, 'Friday': 5, 'Saturday': 6
+        };
+
+        // Generate trips for each selected day within 3 months
+        let currentDate = new Date(startDate);
+        currentDate.setDate(currentDate.getDate() + 1); // Start from next day
+
+        while (currentDate <= endDate) {
+          const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][currentDate.getDay()];
+          
+          if (assignmentData.days.includes(dayName)) {
+            // Calculate departure and arrival times
+            const departure = new Date(currentDate);
+            departure.setHours(startDate.getHours(), startDate.getMinutes(), 0, 0);
+            
+            const arrival = selectedTrip.scheduled_arrival ? new Date(departure) : null;
+            if (arrival && selectedTrip.scheduled_arrival) {
+              const originalArrival = new Date(selectedTrip.scheduled_arrival);
+              arrival.setHours(originalArrival.getHours(), originalArrival.getMinutes(), 0, 0);
+            }
+
+            tripsToCreate.push({
+              route_id: selectedTrip.route_id,
+              bus_id: assignmentData.bus_id,
+              driver_id: assignmentData.driver_id,
+              scheduled_departure: departure.toISOString(),
+              scheduled_arrival: arrival?.toISOString(),
+              status: 'SCHEDULED',
+              operating_days: assignmentData.days,
+              total_seats: selectedTrip.total_seats,
+              available_seats: selectedTrip.total_seats,
+              fare: selectedTrip.fare,
+            });
+          }
+          
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        // Insert all generated trips
+        if (tripsToCreate.length > 0) {
+          const { data: createdTrips, error: createError } = await supabase
+            .from('trips')
+            .insert(tripsToCreate)
+            .select();
+
+          if (createError) throw createError;
+        }
+      }
     },
     onSuccess: () => {
-      toast.success('Bus and driver assigned successfully');
+      const message = assignmentData.days.length > 0 
+        ? `Bus and driver assigned! ${assignmentData.days.length} day(s) selected - trips auto-populated for 3 months.`
+        : 'Bus and driver assigned successfully';
+      toast.success(message);
       setShowAssignDialog(false);
       setSelectedTrip(null);
       setAssignmentData({ bus_id: '', driver_id: '', days: [] });
@@ -337,7 +389,6 @@ export default function TripScheduling() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Trip ID</TableHead>
                       <TableHead>Route</TableHead>
                       <TableHead>Bus</TableHead>
                       <TableHead>Driver</TableHead>
@@ -350,41 +401,63 @@ export default function TripScheduling() {
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8">
+                        <TableCell colSpan={7} className="text-center py-8">
                           Loading trips...
                         </TableCell>
                       </TableRow>
                     ) : trips?.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                           No trips scheduled
                         </TableCell>
                       </TableRow>
                     ) : (
                       trips?.slice(0, 50).map((trip: any) => (
                         <TableRow key={trip.id}>
-                          <TableCell className="font-mono text-xs">{trip.id.slice(0, 8)}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <MapPin className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-sm">
-                                {trip.routes?.origin} → {trip.routes?.destination}
-                              </span>
+                              <div>
+                                <p className="text-sm font-medium">
+                                  {trip.routes?.origin} → {trip.routes?.destination}
+                                </p>
+                                {trip.operating_days && trip.operating_days.length > 0 && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {trip.operating_days.join(', ')}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Bus className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-sm">{trip.buses?.bus_number || 'N/A'}</span>
-                            </div>
+                            {trip.buses ? (
+                              <div className="flex items-center gap-2">
+                                <Bus className="h-3 w-3 text-muted-foreground" />
+                                <div>
+                                  <p className="text-sm font-medium">{trip.buses.registration_number}</p>
+                                  <p className="text-xs text-muted-foreground">{trip.buses.model}</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground italic">Not assigned</span>
+                            )}
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <User className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-sm">
-                                {trip.driver_assignments?.[0]?.drivers?.full_name || 'Unassigned'}
-                              </span>
-                            </div>
+                            {trip.drivers ? (
+                              <div className="flex items-center gap-2">
+                                <User className="h-3 w-3 text-muted-foreground" />
+                                <div>
+                                  <p className="text-sm font-medium">
+                                    {trip.drivers.full_name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {trip.drivers.phone}
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground italic">Not assigned</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="text-sm">
@@ -557,8 +630,8 @@ export default function TripScheduling() {
                                 <Bus className="h-3 w-3" />
                                 Bus
                               </p>
-                              <p className="font-semibold text-sm">{trip.buses?.bus_number || 'N/A'}</p>
-                              <p className="text-xs text-muted-foreground">{trip.buses?.name || ''}</p>
+                              <p className="font-semibold text-sm">{trip.buses?.registration_number || 'N/A'}</p>
+                              <p className="text-xs text-muted-foreground">{trip.buses?.model || ''}</p>
                             </div>
                             <div className="space-y-1">
                               <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -566,10 +639,10 @@ export default function TripScheduling() {
                                 Driver
                               </p>
                               <p className="font-semibold text-sm">
-                                {trip.driver_assignments?.[0]?.drivers?.full_name || 'Unassigned'}
+                                {trip.drivers?.full_name || 'Unassigned'}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {trip.driver_assignments?.[0]?.drivers?.phone || ''}
+                                {trip.drivers?.phone || ''}
                               </p>
                             </div>
                             <div className="space-y-1">
@@ -593,7 +666,7 @@ export default function TripScheduling() {
                                 {trip.scheduled_arrival ? format(new Date(trip.scheduled_arrival), 'HH:mm') : 'N/A'}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {trip.routes?.distance ? `${trip.routes.distance} km` : ''}
+                                {trip.routes?.distance_km ? `${trip.routes.distance_km} km` : 'N/A'}
                               </p>
                             </div>
                           </div>
@@ -702,7 +775,7 @@ export default function TripScheduling() {
                   <SelectContent>
                     {buses?.map((bus: any) => (
                       <SelectItem key={bus.id} value={bus.id}>
-                        {bus.bus_number} - {bus.name}
+                        {bus.registration_number} - {bus.model}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -731,10 +804,17 @@ export default function TripScheduling() {
 
               {/* Operating Days */}
               <div className="space-y-3">
-                <Label>Operating Days (Optional)</Label>
+                <Label>Operating Days</Label>
                 <p className="text-sm text-muted-foreground">
-                  Select which days this trip operates. Leave empty for one-time trips.
+                  Select days to auto-populate trips for 3 months. Leave empty for one-time trip.
                 </p>
+                {assignmentData.days.length > 0 && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800 font-medium">
+                      ✓ Trips will be created for {assignmentData.days.length} day(s) over the next 3 months
+                    </p>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   {daysOfWeek.map((day) => (
                     <div key={day} className="flex items-center space-x-2">

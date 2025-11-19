@@ -33,17 +33,17 @@ export default function Attendance() {
   });
 
   const { data: employees = [] } = useQuery({
-    queryKey: ['employees-list'],
+    queryKey: ['employees-all'],
     queryFn: async () => {
+      // Fetch all employees from employees table
       const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, employee_id, department, email')
+        .from('employees')
+        .select('id, full_name, employee_number, department, user_id')
         .order('full_name');
       if (error) {
         console.error('Error fetching employees:', error);
         throw error;
       }
-      console.log('Fetched employees:', data);
       return data || [];
     },
   });
@@ -263,7 +263,7 @@ export default function Attendance() {
                     ) : (
                       employees.map((emp: any) => (
                         <SelectItem key={emp.id} value={emp.id}>
-                          {emp.full_name} {emp.employee_id ? `(${emp.employee_id})` : emp.email ? `(${emp.email})` : ''}
+                          {emp.full_name} {emp.employee_number ? `(${emp.employee_number})` : ''} {!emp.user_id ? '(No Dashboard)' : ''}
                         </SelectItem>
                       ))
                     )}

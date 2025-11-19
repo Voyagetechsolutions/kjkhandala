@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAddEmployee, useUpdateEmployee, useDepartments, usePositions } from '@/hooks/useEmployees';
 
 interface EmployeeFormProps {
@@ -22,6 +23,8 @@ interface EmployeeFormData {
   hire_date?: string;
   salary?: number;
   password?: string;
+  has_dashboard?: boolean;
+  role?: string;
 }
 
 export default function EmployeeForm({ employee, open, onClose }: EmployeeFormProps) {
@@ -31,6 +34,8 @@ export default function EmployeeForm({ employee, open, onClose }: EmployeeFormPr
   
   const [selectedDepartment, setSelectedDepartment] = useState(employee?.department || '');
   const [selectedPosition, setSelectedPosition] = useState(employee?.position || '');
+  const [hasDashboard, setHasDashboard] = useState(employee?.has_dashboard || false);
+  const [selectedRole, setSelectedRole] = useState(employee?.role || '');
   
   const addEmployee = useAddEmployee();
   const updateEmployee = useUpdateEmployee();
@@ -44,6 +49,8 @@ export default function EmployeeForm({ employee, open, onClose }: EmployeeFormPr
         department: selectedDepartment || undefined,
         position: selectedPosition || undefined,
         salary: data.salary ? Number(data.salary) : undefined,
+        has_dashboard: hasDashboard,
+        role: hasDashboard ? selectedRole : undefined,
       };
 
       if (employee) {
@@ -195,6 +202,49 @@ export default function EmployeeForm({ employee, open, onClose }: EmployeeFormPr
               {...register('salary')}
               placeholder="0.00"
             />
+          </div>
+
+          {/* Dashboard Access */}
+          <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="has_dashboard" 
+                checked={hasDashboard}
+                onCheckedChange={(checked) => setHasDashboard(checked as boolean)}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="has_dashboard" className="cursor-pointer font-medium">
+                  Create Dashboard Account
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Enable this to give the employee access to the system dashboard
+                </p>
+              </div>
+            </div>
+
+            {hasDashboard && (
+              <div className="space-y-2 ml-6">
+                <Label htmlFor="role">Dashboard Role *</Label>
+                <Select value={selectedRole} onValueChange={setSelectedRole} required>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select dashboard role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="OPERATIONS_MANAGER">Operations Manager</SelectItem>
+                    <SelectItem value="FINANCE_MANAGER">Finance Manager</SelectItem>
+                    <SelectItem value="HR_MANAGER">HR Manager</SelectItem>
+                    <SelectItem value="MAINTENANCE_MANAGER">Maintenance Manager</SelectItem>
+                    <SelectItem value="TICKETING_SUPERVISOR">Ticketing Supervisor</SelectItem>
+                    <SelectItem value="TICKETING_AGENT">Ticketing Agent</SelectItem>
+                    <SelectItem value="DRIVER">Driver</SelectItem>
+                    <SelectItem value="MECHANIC">Mechanic</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  This role determines which modules the employee can access
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Submit Button */}

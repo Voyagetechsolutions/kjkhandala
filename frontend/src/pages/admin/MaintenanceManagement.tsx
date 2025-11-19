@@ -31,7 +31,15 @@ export default function MaintenanceManagement() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('work_orders')
-        .select('*')
+        .select(`
+          *,
+          buses (
+            id,
+            bus_number,
+            name,
+            model
+          )
+        `)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
@@ -321,7 +329,7 @@ export default function MaintenanceManagement() {
                             <Badge variant="secondary">{record.service_type}</Badge>
                           </TableCell>
                           <TableCell>
-                            {format(new Date(record.maintenance_date), 'MMM dd, yyyy')}
+                            {record.scheduled_date ? format(new Date(record.scheduled_date), 'MMM dd, yyyy') : 'Not scheduled'}
                           </TableCell>
                           <TableCell className="max-w-xs truncate">
                             {record.description || 'No description'}

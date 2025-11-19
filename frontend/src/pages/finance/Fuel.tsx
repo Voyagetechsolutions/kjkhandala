@@ -61,7 +61,7 @@ export default function Fuel() {
       const { data, error } = await supabase
         .from('buses')
         .select('id, name, number_plate, registration_number, model')
-        .eq('status', 'ACTIVE')
+        .eq('status', 'active')
         .order('name');
       if (error) {
         console.error('Error fetching buses:', error);

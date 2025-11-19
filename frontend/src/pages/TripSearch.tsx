@@ -13,28 +13,34 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { MapPin, Clock, Bus, Users, ArrowRight } from "lucide-react";
 
-interface Schedule {
+interface Trip {
   id: string;
-  departure_date: string;
+  trip_number: string;
   departure_time: string;
+  arrival_time: string;
+  base_fare: number;
+  status: string;
+  total_seats: number;
   available_seats: number;
   routes: {
     origin: string;
     destination: string;
-    price: number;
-    duration_hours: number;
-    route_type: 'local' | 'cross_border';
   };
   buses: {
     name: string;
-    number_plate: string;
+    bus_type: string;
   };
 }
 
 export default function TripSearch() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { data: cities, isLoading: citiesLoading } = useCities();
+  const { data: cities, isLoading: citiesLoading, error: citiesError } = useCities();
+  
+  // Debug logging
+  console.log('Cities data:', cities);
+  console.log('Cities loading:', citiesLoading);
+  console.log('Cities error:', citiesError);
   
   const [form, setForm] = useState({
     origin: "",
@@ -42,7 +48,7 @@ export default function TripSearch() {
     date: "",
     seats: 1,
   });
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Handle search params from homepage
@@ -70,19 +76,64 @@ export default function TripSearch() {
   const handleSearchWithParams = async (params: typeof form) => {
     setLoading(true);
     try {
-      let query = supabase
-        .from("schedules")
-        .select(`*, routes (origin, destination, price, duration_hours, route_type), buses (name, number_plate)`)
-        .eq("routes.origin", params.origin)
-        .eq("routes.destination", params.destination)
-        .gte("available_seats", params.seats);
-      if (params.date) {
-        query = query.eq("departure_date", params.date);
-      }
-      const { data, error } = await query;
+      // Search for trips
+      const { data, error } = await supabase
+        .from('trips')
+        .select(`
+          id,
+          trip_number,
+          departure_time,
+          arrival_time,
+          base_fare,
+          status,
+          routes (origin, destination),
+          buses (name, bus_type)
+        `)
+        .gte('departure_time', `${params.date}T00:00:00`)
+        .lte('departure_time', `${params.date}T23:59:59`)
+        .in('status', ['SCHEDULED', 'BOARDING'])
+        .order('departure_time');
+
       if (error) throw error;
-      setSchedules(data || []);
-      if (!data || data.length === 0) {
+
+      // Get seat counts for each trip
+      const tripsWithSeats = await Promise.all(
+        (data || []).map(async (trip: any) => {
+          const { count: bookedCount } = await supabase
+            .from('booking_seats')
+            .select('*', { count: 'exact', head: true })
+            .eq('trip_id', trip.id)
+            .in('status', ['reserved', 'sold']);
+
+          const booked = bookedCount || 0;
+          const total = 60; // Fixed 60 seats
+          const available = total - booked;
+
+          return {
+            id: trip.id,
+            trip_number: trip.trip_number,
+            departure_time: trip.departure_time,
+            arrival_time: trip.arrival_time,
+            base_fare: trip.base_fare,
+            status: trip.status,
+            total_seats: total,
+            available_seats: available,
+            routes: trip.routes,
+            buses: trip.buses,
+          };
+        })
+      );
+
+      // Filter by origin, destination and available seats
+      const filtered = tripsWithSeats.filter(
+        (trip) =>
+          trip.routes?.origin?.toLowerCase() === params.origin.toLowerCase() &&
+          trip.routes?.destination?.toLowerCase() === params.destination.toLowerCase() &&
+          trip.available_seats >= params.seats
+      );
+
+      setTrips(filtered);
+      if (filtered.length === 0) {
         toast.info("No trips found matching your criteria");
       }
     } catch (err: any) {
@@ -94,33 +145,19 @@ export default function TripSearch() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    try {
-      let query = supabase
-        .from("schedules")
-        .select(`*, routes (origin, destination, price, duration_hours, route_type), buses (name, number_plate)`)
-        .eq("routes.origin", form.origin)
-        .eq("routes.destination", form.destination)
-        .gte("available_seats", form.seats);
-      if (form.date) {
-        query = query.eq("departure_date", form.date);
-      }
-      const { data, error } = await query;
-      if (error) throw error;
-      setSchedules(data || []);
-      if (!data || data.length === 0) {
-        toast.info("No trips found matching your criteria");
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to search trips");
-    } finally {
-      setLoading(false);
+    if (!form.origin || !form.destination || !form.date) {
+      toast.error("Please fill in all required fields");
+      return;
     }
+    await handleSearchWithParams(form);
   };
 
-  const handleSelectTrip = (schedule: Schedule) => {
-    // Pass selected trip and form data to next step (passenger details)
-    navigate("/book/passengers", { state: { schedule, form } });
+  const handleSelectTrip = (trip: Trip) => {
+    // Store trip and passenger count in sessionStorage
+    sessionStorage.setItem('selectedTrip', JSON.stringify(trip));
+    sessionStorage.setItem('passengers', form.seats.toString());
+    // Navigate to passenger details
+    navigate("/book/passengers");
   };
 
   return (
@@ -199,66 +236,79 @@ export default function TripSearch() {
           </Card>
 
           {/* Trip Results */}
-          {schedules.length > 0 && (
+          {trips.length > 0 && (
             <div>
-              <h2 className="text-2xl font-bold mb-4">Available Trips</h2>
+              <h2 className="text-2xl font-bold mb-4">Available Trips ({trips.length})</h2>
               <div className="space-y-4">
-                {schedules.map(schedule => (
-                  <Card key={schedule.id} className="p-6 hover:shadow-lg transition-shadow">
-                    <div className="grid md:grid-cols-5 gap-4 items-center">
-                      {/* Route Info */}
-                      <div className="md:col-span-2">
-                        <div className="flex items-center gap-2 mb-2">
-                          <MapPin className="h-5 w-5 text-primary" />
-                          <span className="font-semibold text-lg">{schedule.routes.origin}</span>
-                          <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-semibold text-lg">{schedule.routes.destination}</span>
-                        </div>
-                        <Badge variant={schedule.routes.route_type === 'local' ? 'secondary' : 'default'}>
-                          {schedule.routes.route_type === 'local' ? 'STANDARD' : 'PREMIUM'}
-                        </Badge>
-                      </div>
+                {trips.map(trip => {
+                  const departure = new Date(trip.departure_time);
+                  const arrival = trip.arrival_time ? new Date(trip.arrival_time) : null;
+                  const duration = arrival 
+                    ? `${Math.floor((arrival.getTime() - departure.getTime()) / (1000 * 60 * 60))}h ${Math.floor(((arrival.getTime() - departure.getTime()) % (1000 * 60 * 60)) / (1000 * 60))}m`
+                    : 'N/A';
 
-                      {/* Time & Date */}
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Clock className="h-4 w-4 text-primary" />
-                          <span className="font-medium">{schedule.departure_time}</span>
+                  return (
+                    <Card key={trip.id} className="p-6 hover:shadow-lg transition-shadow">
+                      <div className="grid md:grid-cols-5 gap-4 items-center">
+                        {/* Route Info */}
+                        <div className="md:col-span-2">
+                          <div className="flex items-center gap-2 mb-2">
+                            <MapPin className="h-5 w-5 text-primary" />
+                            <span className="font-semibold text-lg">{trip.routes?.origin}</span>
+                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-semibold text-lg">{trip.routes?.destination}</span>
+                          </div>
+                          <Badge variant="secondary">
+                            {trip.buses?.bus_type || 'Standard'}
+                          </Badge>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          {new Date(schedule.departure_date).toLocaleDateString()}
-                        </div>
-                      </div>
 
-                      {/* Bus & Duration */}
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Bus className="h-4 w-4 text-primary" />
-                          <span>{schedule.buses.name}</span>
+                        {/* Time & Date */}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-sm">
+                            <Clock className="h-4 w-4 text-primary" />
+                            <span className="font-medium">
+                              {departure.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {departure.toLocaleDateString()}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Trip #{trip.trip_number}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Clock className="h-4 w-4" />
-                          <span>{schedule.routes.duration_hours}h duration</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Users className="h-4 w-4" />
-                          <span>{schedule.available_seats} seats left</span>
-                        </div>
-                      </div>
 
-                      {/* Price & Action */}
-                      <div className="text-right space-y-2">
-                        <div className="text-3xl font-bold text-primary">
-                          P{schedule.routes.price}
+                        {/* Bus & Duration */}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-sm">
+                            <Bus className="h-4 w-4 text-primary" />
+                            <span>{trip.buses?.name || 'TBA'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Clock className="h-4 w-4" />
+                            <span>{duration} duration</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Users className="h-4 w-4" />
+                            <span>{trip.available_seats} seats left</span>
+                          </div>
                         </div>
-                        <div className="text-sm text-muted-foreground">per passenger</div>
-                        <Button onClick={() => handleSelectTrip(schedule)} className="w-full" size="lg">
-                          Select Trip
-                        </Button>
+
+                        {/* Price & Action */}
+                        <div className="text-right space-y-2">
+                          <div className="text-3xl font-bold text-primary">
+                            P{trip.base_fare?.toFixed(2)}
+                          </div>
+                          <div className="text-sm text-muted-foreground">per passenger</div>
+                          <Button onClick={() => handleSelectTrip(trip)} className="w-full" size="lg">
+                            Select Trip
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  </Card>
-                ))}
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           )}

@@ -129,19 +129,18 @@ export default function LiveTracking() {
       .from('trips')
       .select(`
         *,
-        routes (
+        routes:route_id (
           origin,
           destination
         ),
-        buses (
+        buses:bus_id (
           registration_number,
-          make,
-          model
+          name
         )
       `)
       .in('status', ['SCHEDULED', 'BOARDING', 'DEPARTED', 'IN_PROGRESS'])
-      .gte('departure_time', today)
-      .order('departure_time', { ascending: true });
+      .gte('scheduled_departure', today)
+      .order('scheduled_departure', { ascending: true });
     
     if (error) {
       console.error('Error fetching trips:', error);

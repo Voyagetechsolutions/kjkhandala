@@ -1,6 +1,7 @@
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Bus, Globe, Briefcase, Users, Package } from "lucide-react";
+import { Bus, Globe, Briefcase, Users, Package, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const services = [
@@ -43,6 +44,29 @@ const services = [
 
 export default function ServicesSection() {
   const navigate = useNavigate();
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const itemsPerPage = 3;
+  const totalPages = Math.ceil(services.length / itemsPerPage);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % totalPages);
+    }, 4000); // Auto-slide every 4 seconds
+    return () => clearInterval(interval);
+  }, [totalPages]);
+
+  const nextSlide = () => {
+    setCurrentIndex((prev) => (prev + 1) % totalPages);
+  };
+
+  const prevSlide = () => {
+    setCurrentIndex((prev) => (prev - 1 + totalPages) % totalPages);
+  };
+
+  const visibleServices = services.slice(
+    currentIndex * itemsPerPage,
+    (currentIndex + 1) * itemsPerPage
+  );
 
   return (
     <div className="py-16 bg-muted/30">
@@ -54,8 +78,9 @@ export default function ServicesSection() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {services.map((service) => {
+        <div className="relative">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 transition-all duration-500">
+          {visibleServices.map((service) => {
             const Icon = service.icon;
             return (
               <Card key={service.title} className="p-6 hover:shadow-lg transition-shadow">
@@ -76,6 +101,37 @@ export default function ServicesSection() {
               </Card>
             );
           })}
+          </div>
+
+          {/* Navigation Arrows */}
+          <button
+            onClick={prevSlide}
+            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100 transition-colors z-10"
+            aria-label="Previous services"
+          >
+            <ChevronLeft className="h-6 w-6 text-primary" />
+          </button>
+          <button
+            onClick={nextSlide}
+            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100 transition-colors z-10"
+            aria-label="Next services"
+          >
+            <ChevronRight className="h-6 w-6 text-primary" />
+          </button>
+
+          {/* Dots Indicator */}
+          <div className="flex justify-center gap-2 mt-8">
+            {Array.from({ length: totalPages }).map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentIndex(index)}
+                className={`h-2 rounded-full transition-all ${
+                  index === currentIndex ? 'w-8 bg-primary' : 'w-2 bg-gray-300'
+                }`}
+                aria-label={`Go to slide ${index + 1}`}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </div>

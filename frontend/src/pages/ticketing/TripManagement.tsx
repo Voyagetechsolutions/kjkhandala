@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/components/admin/AdminLayout';
 import TicketingLayout from '@/components/ticketing/TicketingLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,43 +42,63 @@ export default function TripManagement() {
         .from('trips')
         .select(`
           *,
-          routes (origin, destination),
-          buses (name, number_plate),
-          drivers (full_name)
+          route:routes(id, origin, destination),
+          bus:buses(id, name, number_plate, seating_capacity),
+          driver:drivers(id, full_name, phone)
         `)
-        .gte('departure_time', `${filterDate}T00:00:00`)
-        .lte('departure_time', `${filterDate}T23:59:59`)
-        .order('departure_time');
+        .gte('scheduled_departure', `${filterDate}T00:00:00`)
+        .lte('scheduled_departure', `${filterDate}T23:59:59`)
+        .order('scheduled_departure');
 
       if (filterStatus !== 'all') {
         query = query.eq('status', filterStatus.toUpperCase());
       }
 
-      const { data, error } = await query;
+      const { data: trips, error } = await query;
 
       if (error) throw error;
 
-      // Get seat counts for each trip
-      const tripsWithSeats = await Promise.all(
-        (data || []).map(async (trip) => {
-          const { count: bookedCount } = await supabase
-            .from('booking_seats')
-            .select('*', { count: 'exact', head: true })
-            .eq('trip_id', trip.id)
-            .in('status', ['reserved', 'sold']);
+      // Fetch bookings for all trips
+      const tripIds = trips?.map(t => t.id) || [];
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('trip_id, seat_number')
+        .in('trip_id', tripIds)
+        .neq('booking_status', 'cancelled');
 
-          const booked = bookedCount || 0;
-          const total = 60;
-          const available = total - booked;
+      // Calculate seats for each trip
+      const tripsWithSeats = trips?.map(trip => {
+        const tripBookings = bookings?.filter(b => b.trip_id === trip.id) || [];
+        const bookedSeats = tripBookings.length;
+        const bus = Array.isArray(trip.bus) ? trip.bus[0] : trip.bus;
+        const totalSeats = bus?.seating_capacity || trip.total_seats || 60;
+        const availableSeats = totalSeats - bookedSeats;
+        const occupancyRate = (bookedSeats / totalSeats) * 100;
 
-          return {
-            ...trip,
-            total_seats: total,
-            booked_seats: booked,
-            available_seats: available,
-          };
-        })
-      );
+        // Determine zone
+        let zone = 'red';
+        let zoneLabel = '🟥 RED';
+        if (bookedSeats >= 36) {
+          zone = 'green';
+          zoneLabel = '🟩 GREEN';
+        } else if (bookedSeats >= 21) {
+          zone = 'yellow';
+          zoneLabel = '🟨 YELLOW';
+        }
+
+        return {
+          ...trip,
+          bus,
+          route: Array.isArray(trip.route) ? trip.route[0] : trip.route,
+          driver: Array.isArray(trip.driver) ? trip.driver[0] : trip.driver,
+          total_seats: totalSeats,
+          booked_seats: bookedSeats,
+          available_seats: availableSeats,
+          occupancy_rate: occupancyRate,
+          zone,
+          zone_label: zoneLabel,
+        };
+      }) || [];
 
       setTrips(tripsWithSeats);
 

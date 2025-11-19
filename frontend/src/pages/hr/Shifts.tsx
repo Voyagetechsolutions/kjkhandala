@@ -68,7 +68,7 @@ export default function Shifts() {
       const { data, error } = await supabase
         .from('buses')
         .select('id, name, number_plate, registration_number')
-        .eq('status', 'ACTIVE')
+        .eq('status', 'active')
         .order('name');
       if (error) throw error;
       return data || [];

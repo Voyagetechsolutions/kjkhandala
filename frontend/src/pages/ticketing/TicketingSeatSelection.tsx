@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/components/admin/AdminLayout';
 import TicketingLayout from '@/components/ticketing/TicketingLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,17 +32,19 @@ export default function TicketingSeatSelection() {
   const [loadingSeats, setLoadingSeats] = useState(true);
 
   useEffect(() => {
-    // Get trip from sessionStorage
+    // Get trip and passenger details from sessionStorage
     const tripData = sessionStorage.getItem('selectedTrip');
     const passengersData = sessionStorage.getItem('passengers');
+    const passengerDetails = sessionStorage.getItem('passengerDetails');
 
-    if (!tripData) {
+    if (!tripData || !passengerDetails) {
       toast({
         variant: 'destructive',
-        title: 'No trip selected',
-        description: 'Please search and select a trip first',
+        title: 'Missing data',
+        description: 'Please complete passenger details first',
       });
-      navigate('/ticketing/search-trips');
+      const basePath = isAdminRoute ? '/admin/ticketing' : '/ticketing';
+      navigate(`${basePath}/passenger-details`);
       return;
     }
 
@@ -56,50 +58,61 @@ export default function TicketingSeatSelection() {
     try {
       setLoadingSeats(true);
 
-      // Fetch booked seats
-      const { data: bookedSeats, error } = await supabase
-        .from('booking_seats')
-        .select('seat_number, status, seat_price, seat_type')
-        .eq('trip_id', tripId)
-        .in('status', ['reserved', 'sold', 'blocked']);
+      // Fetch all bookings for this trip
+      const { data: bookings, error } = await supabase
+        .from('bookings')
+        .select('seat_number, booking_status, payment_status')
+        .eq('trip_id', tripId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching seat status:', error);
+        throw error;
+      }
+
+      // Categorize seats by status
+      const seatStatusMap: { [key: number]: 'reserved' | 'sold' } = {};
+      bookings?.forEach(b => {
+        const seatNum = typeof b.seat_number === 'string' ? parseInt(b.seat_number) : b.seat_number;
+        if (!isNaN(seatNum)) {
+          const paymentStatus = b.payment_status?.toLowerCase();
+          const bookingStatus = b.booking_status?.toLowerCase();
+          
+          // Reserved: payment_status = 'reserved' OR 'pending' with confirmed booking
+          // Sold: payment_status = 'paid', 'completed', or 'settled'
+          if (paymentStatus === 'reserved' || (paymentStatus === 'pending' && bookingStatus === 'confirmed')) {
+            seatStatusMap[seatNum] = 'reserved';
+          } else if (['paid', 'completed', 'settled'].includes(paymentStatus) && ['confirmed', 'checked_in', 'boarded'].includes(bookingStatus)) {
+            seatStatusMap[seatNum] = 'sold';
+          } else if (['confirmed', 'checked_in', 'boarded'].includes(bookingStatus)) {
+            seatStatusMap[seatNum] = 'sold';
+          }
+        }
+      });
 
       // Create seat map (60 seats, 2x2 configuration)
       const seatMap: SeatStatus[] = [];
       for (let i = 1; i <= 60; i++) {
-        const booked = bookedSeats?.find((s) => s.seat_number === i);
-        
-        if (booked) {
-          seatMap.push({
-            seat_number: i,
-            status: booked.status as any,
-            price: booked.seat_price,
-            seat_type: booked.seat_type,
-          });
-        } else {
-          // Determine seat type and price
-          let seatType = 'standard';
-          let extraPrice = 0;
+        // Determine seat type and price
+        let seatType = 'standard';
+        let extraPrice = 0;
 
-          // Front row (seats 1-4)
-          if (i <= 4) {
-            seatType = 'front';
-            extraPrice = 10;
-          }
-          // Window seats (1, 4, 5, 8, 9, 12, etc.)
-          else if (i % 4 === 1 || i % 4 === 0) {
-            seatType = 'window';
-            extraPrice = 5;
-          }
-
-          seatMap.push({
-            seat_number: i,
-            status: 'available',
-            price: (trip?.base_fare || 0) + extraPrice,
-            seat_type: seatType,
-          });
+        // Front row (seats 1-4)
+        if (i <= 4) {
+          seatType = 'front';
+          extraPrice = 10;
         }
+        // Window seats (1, 4, 5, 8, 9, 12, etc.)
+        else if (i % 4 === 1 || i % 4 === 0) {
+          seatType = 'window';
+          extraPrice = 5;
+        }
+
+        seatMap.push({
+          seat_number: i,
+          status: seatStatusMap[i] || 'available',
+          price: (trip?.base_fare || 0) + extraPrice,
+          seat_type: seatType,
+        });
       }
 
       setSeats(seatMap);
@@ -146,7 +159,7 @@ export default function TicketingSeatSelection() {
     });
   };
 
-  const proceedToPassengerDetails = () => {
+  const proceedToPayment = () => {
     if (selectedSeats.length !== passengers) {
       toast({
         variant: 'destructive',
@@ -156,11 +169,20 @@ export default function TicketingSeatSelection() {
       return;
     }
 
-    // Store selected seats
+    // Get passenger details and assign seats
+    const passengerDetails = JSON.parse(sessionStorage.getItem('passengerDetails') || '[]');
+    const updatedPassengers = passengerDetails.map((passenger: any, index: number) => ({
+      ...passenger,
+      seat_number: selectedSeats[index],
+    }));
+
+    // Store updated passenger details with seat assignments
+    sessionStorage.setItem('passengerDetails', JSON.stringify(updatedPassengers));
     sessionStorage.setItem('selectedSeats', JSON.stringify(selectedSeats));
     
-    // Navigate to passenger details
-    navigate('/ticketing/passenger-details');
+    // Navigate to payment
+    const basePath = isAdminRoute ? '/admin/ticketing' : '/ticketing';
+    navigate(`${basePath}/payment`);
   };
 
   const getSeatColor = (seat: SeatStatus, isSelected: boolean) => {
@@ -200,9 +222,12 @@ export default function TicketingSeatSelection() {
               Choose {passengers} seat(s) for your journey
             </p>
           </div>
-          <Button variant="outline" onClick={() => navigate('/ticketing/search-trips')}>
+          <Button variant="outline" onClick={() => {
+            const basePath = isAdminRoute ? '/admin/ticketing' : '/ticketing';
+            navigate(`${basePath}/passenger-details`);
+          }}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Search
+            Back to Passenger Details
           </Button>
         </div>
 
@@ -382,12 +407,12 @@ export default function TicketingSeatSelection() {
               </div>
 
               <Button
-                onClick={proceedToPassengerDetails}
+                onClick={proceedToPayment}
                 className="w-full"
                 disabled={selectedSeats.length !== passengers}
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
-                Continue to Passenger Details
+                Continue to Payment
               </Button>
 
               {selectedSeats.length !== passengers && (

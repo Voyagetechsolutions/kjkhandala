@@ -21,19 +21,40 @@ export default function FinanceManagement() {
 
   // Fetch finance data
   const { data: financeData, isLoading } = useQuery({
-    queryKey: ['admin-finance'],
+    queryKey: ['admin-finance', dateRange],
     queryFn: async () => {
-      const { data: income, error: incomeError } = await supabase
-        .from('income')
-        .select('*');
-      if (incomeError) throw incomeError;
+      // Calculate date range
+      const today = new Date();
+      let startDate: Date;
       
+      if (dateRange === 'week') {
+        startDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+      } else if (dateRange === 'month') {
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      } else if (dateRange === 'year') {
+        startDate = new Date(today.getFullYear(), 0, 1);
+      } else {
+        startDate = new Date(today.getFullYear(), 0, 1); // All time
+      }
+
+      // Fetch bookings (revenue)
+      const { data: bookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('payment_status', 'paid')
+        .gte('created_at', startDate.toISOString())
+        .order('created_at', { ascending: false });
+      if (bookingsError) throw bookingsError;
+      
+      // Fetch expenses
       const { data: expenses, error: expensesError } = await supabase
         .from('expenses')
-        .select('*');
+        .select('*')
+        .gte('expense_date', startDate.toISOString().split('T')[0])
+        .order('expense_date', { ascending: false });
       if (expensesError) throw expensesError;
       
-      return { income: income || [], expenses: expenses || [] };
+      return { income: bookings || [], expenses: expenses || [] };
     },
   });
 
@@ -56,28 +77,33 @@ export default function FinanceManagement() {
   const income = financeData?.income || [];
   const expenses = financeData?.expenses || [];
   
-  const totalIncome = income.reduce((sum: number, r: any) => sum + parseFloat(r.amount || 0), 0);
-  const totalExpenses = expenses
-    .filter((e: any) => e.status === 'approved')
-    .reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0);
+  const totalIncome = income.reduce((sum: number, r: any) => sum + parseFloat(r.total_amount || 0), 0);
+  const totalExpenses = expenses.reduce((sum: number, e: any) => sum + parseFloat(e.amount || 0), 0);
   const netProfit = totalIncome - totalExpenses;
   const profitMargin = totalIncome > 0 ? ((netProfit / totalIncome) * 100).toFixed(1) : '0';
 
-  const pendingExpenses = expenses.filter((e: any) => e.status === 'pending').length;
+  const pendingExpenses = expenses.filter((e: any) => e.approval_status === 'pending').length;
 
-  // Prepare chart data
-  const chartData = income.slice(0, 30).reverse().map((r: any) => ({
-    date: format(new Date(r.created_at), 'MMM dd'),
-    revenue: parseFloat(r.amount),
-  }));
+  // Prepare chart data - group by date
+  const revenueByDate = income.reduce((acc: any, booking: any) => {
+    const date = booking.created_at?.split('T')[0];
+    if (!acc[date]) acc[date] = 0;
+    acc[date] += parseFloat(booking.total_amount || 0);
+    return acc;
+  }, {});
+
+  const chartData = Object.entries(revenueByDate)
+    .slice(-30)
+    .map(([date, revenue]) => ({
+      date: format(new Date(date), 'MMM dd'),
+      revenue: revenue as number,
+    }));
 
   // Expense breakdown
   const expenseBreakdown = expenses?.reduce((acc: any, exp: any) => {
     const category = exp.category || 'Other';
     if (!acc[category]) acc[category] = 0;
-    if (exp.status === 'approved') {
-      acc[category] += parseFloat(exp.amount);
-    }
+    acc[category] += parseFloat(exp.amount || 0);
     return acc;
   }, {});
 
@@ -96,6 +122,17 @@ export default function FinanceManagement() {
             <p className="text-muted-foreground">Track revenue, expenses, and financial performance</p>
           </div>
           <div className="flex gap-2">
+            <Select value={dateRange} onValueChange={setDateRange}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="week">Last 7 Days</SelectItem>
+                <SelectItem value="month">This Month</SelectItem>
+                <SelectItem value="year">This Year</SelectItem>
+                <SelectItem value="all">All Time</SelectItem>
+              </SelectContent>
+            </Select>
             <Button variant="outline">
               <Download className="h-4 w-4 mr-2" />
               Export Report
@@ -234,12 +271,12 @@ export default function FinanceManagement() {
                         <TableCell>
                           <Badge className="bg-green-500">Income</Badge>
                         </TableCell>
-                        <TableCell>Ticket Sale</TableCell>
-                        <TableCell className="font-bold text-green-600">+P{parseFloat(transaction.amount).toFixed(2)}</TableCell>
+                        <TableCell>Ticket Sale - {transaction.booking_reference}</TableCell>
+                        <TableCell className="font-bold text-green-600">+P{parseFloat(transaction.total_amount).toFixed(2)}</TableCell>
                         <TableCell>
                           <Badge className="bg-green-500">
                             <CheckCircle className="h-3 w-3 mr-1" />
-                            Confirmed
+                            Paid
                           </Badge>
                         </TableCell>
                       </TableRow>
@@ -292,36 +329,41 @@ export default function FinanceManagement() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      expenses?.map((expense: any) => (
+                      expenses
+                        ?.filter((exp: any) => expenseFilter === 'all' || exp.category === expenseFilter)
+                        .map((expense: any) => (
                         <TableRow key={expense.id}>
                           <TableCell>{format(new Date(expense.expense_date), 'MMM dd, yyyy')}</TableCell>
                           <TableCell>
-                            <Badge variant="secondary">{expense.category}</Badge>
+                            <Badge variant="secondary">{expense.category || 'Other'}</Badge>
                           </TableCell>
-                          <TableCell>{expense.description}</TableCell>
+                          <TableCell>{expense.description || 'N/A'}</TableCell>
                           <TableCell className="font-bold text-red-600">-P{parseFloat(expense.amount).toFixed(2)}</TableCell>
                           <TableCell>
-                            {expense.status === 'approved' && (
+                            {expense.approval_status === 'approved' && (
                               <Badge className="bg-green-500">
                                 <CheckCircle className="h-3 w-3 mr-1" />
                                 Approved
                               </Badge>
                             )}
-                            {expense.status === 'pending' && (
+                            {expense.approval_status === 'pending' && (
                               <Badge className="bg-orange-500">
                                 <Clock className="h-3 w-3 mr-1" />
                                 Pending
                               </Badge>
                             )}
-                            {expense.status === 'rejected' && (
+                            {expense.approval_status === 'rejected' && (
                               <Badge className="bg-red-500">
                                 <XCircle className="h-3 w-3 mr-1" />
                                 Rejected
                               </Badge>
                             )}
+                            {!expense.approval_status && (
+                              <Badge variant="secondary">N/A</Badge>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">
-                            {expense.status === 'pending' && (
+                            {expense.approval_status === 'pending' && (
                               <Button 
                                 size="sm" 
                                 onClick={() => approveMutation.mutate(expense.id)}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/components/admin/AdminLayout';
 import TicketingLayout from '@/components/ticketing/TicketingLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +25,7 @@ export default function CancelRefund() {
   const Layout = isAdminRoute ? AdminLayout : TicketingLayout;
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchType, setSearchType] = useState<'reference' | 'phone' | 'id'>('reference');
   const [searching, setSearching] = useState(false);
   const [booking, setBooking] = useState<any>(null);
   const [processing, setProcessing] = useState(false);
@@ -48,8 +49,8 @@ export default function CancelRefund() {
     if (!searchRef) {
       toast({
         variant: 'destructive',
-        title: 'Enter booking reference',
-        description: 'Please enter a booking reference',
+        title: 'Enter search term',
+        description: 'Please enter a booking reference, phone, or ID number',
       });
       return;
     }
@@ -57,46 +58,97 @@ export default function CancelRefund() {
     try {
       setSearching(true);
 
-      const { data, error } = await supabase
-        .from('bookings')
-        .select(`
-          *,
-          trips (
-            trip_number,
-            departure_time,
-            routes (origin, destination)
-          ),
-          passengers (full_name, phone)
-        `)
-        .eq('booking_reference', searchRef)
-        .single();
+      // Extract base reference if searching by reference
+      const baseRef = searchType === 'reference' ? searchRef.split('-')[0] : null;
 
-      if (error) {
-        if (error.code === 'PGRST116') {
+      // Search bookings
+      let bookingsQuery = supabase.from('bookings').select('*');
+
+      if (searchType === 'reference') {
+        bookingsQuery = bookingsQuery.or(`booking_reference.eq.${searchRef},booking_reference.like.${baseRef}-%`);
+      } else if (searchType === 'phone') {
+        bookingsQuery = bookingsQuery.eq('passenger_phone', searchRef);
+      } else if (searchType === 'id') {
+        const { data: passenger } = await supabase
+          .from('passengers')
+          .select('phone')
+          .eq('id_number', searchRef)
+          .maybeSingle();
+
+        if (!passenger) {
           toast({
             title: 'Not found',
-            description: 'No booking found with this reference',
+            description: 'No passenger found with this ID number',
           });
-        } else {
-          throw error;
+          setSearching(false);
+          return;
         }
+
+        bookingsQuery = bookingsQuery.eq('passenger_phone', passenger.phone);
+      }
+
+      const { data: allBookings, error: bookingsError } = await bookingsQuery.order('created_at', { ascending: false });
+
+      if (bookingsError) throw bookingsError;
+
+      if (!allBookings || allBookings.length === 0) {
+        toast({
+          title: 'Not found',
+          description: 'No booking found matching your search',
+        });
+        setSearching(false);
         return;
       }
 
+      // Use first booking
+      const firstBooking = allBookings[0];
+
       // Check if already cancelled
-      if (data.status === 'cancelled') {
+      if (firstBooking.booking_status === 'cancelled') {
         toast({
           variant: 'destructive',
           title: 'Already cancelled',
           description: 'This booking has already been cancelled',
         });
+        setSearching(false);
         return;
       }
 
-      setBooking(data);
+      // Fetch trip details
+      const { data: trip } = await supabase
+        .from('trips')
+        .select('id, trip_number, scheduled_departure, route_id')
+        .eq('id', firstBooking.trip_id)
+        .single();
 
-      // Calculate cancellation charge (example: 10% of total)
-      const charge = data.total_amount * 0.1;
+      let tripData = null;
+      if (trip) {
+        const { data: route } = await supabase
+          .from('routes')
+          .select('origin, destination')
+          .eq('id', trip.route_id)
+          .single();
+
+        tripData = {
+          trip_number: trip.trip_number,
+          departure_time: trip.scheduled_departure,
+          routes: route,
+        };
+      }
+
+      // Calculate totals
+      const totalAmount = allBookings.reduce((sum, b) => sum + (parseFloat(b.total_amount) || 0), 0);
+
+      setBooking({
+        ...firstBooking,
+        trips: tripData,
+        passengers: allBookings,
+        total_amount: totalAmount,
+        passenger_count: allBookings.length,
+      });
+
+      // Calculate cancellation charge (10% of total)
+      const charge = totalAmount * 0.1;
       setRefundData({ ...refundData, cancellation_charge: charge });
 
     } catch (error: any) {
@@ -124,56 +176,40 @@ export default function CancelRefund() {
     try {
       setProcessing(true);
 
-      // Get agent ID
-      const { data: agentData } = await supabase
-        .from('ticketing_agents')
-        .select('id')
-        .eq('profile_id', user?.id)
-        .single();
-
-      const refundAmount = booking.amount_paid;
+      const refundAmount = booking.total_amount;
       const netRefund = refundAmount - refundData.cancellation_charge;
+
+      // Cancel all bookings for this group
+      const bookingIds = booking.passengers.map((p: any) => p.id);
+      const { error: cancelError } = await supabase
+        .from('bookings')
+        .update({ 
+          booking_status: 'cancelled',
+          updated_at: new Date().toISOString()
+        })
+        .in('id', bookingIds);
+
+      if (cancelError) throw cancelError;
 
       // Create refund record
       const { error: refundError } = await supabase
-        .from('booking_refunds')
+        .from('refund_requests')
         .insert({
           booking_id: booking.id,
           refund_amount: refundAmount,
-          cancellation_charge: refundData.cancellation_charge,
+          cancellation_fee: refundData.cancellation_charge,
           net_refund: netRefund,
-          refund_reason: refundData.reason,
+          reason: refundData.reason,
           refund_method: refundData.refund_method,
-          requested_by: agentData?.id,
+          requested_by: user?.id,
           status: 'pending', // Requires approval
         });
 
       if (refundError) throw refundError;
 
-      // Update booking status
-      const { error: updateError } = await supabase
-        .from('bookings')
-        .update({
-          status: 'cancelled',
-          cancellation_date: new Date().toISOString(),
-          cancellation_reason: refundData.reason,
-          cancelled_by: agentData?.id,
-        })
-        .eq('id', booking.id);
-
-      if (updateError) throw updateError;
-
-      // Update seat status
-      const { error: seatError } = await supabase
-        .from('booking_seats')
-        .update({ status: 'cancelled' })
-        .eq('booking_id', booking.id);
-
-      if (seatError) throw seatError;
-
       toast({
-        title: 'Refund requested',
-        description: 'Cancellation and refund request submitted for approval',
+        title: 'Booking cancelled',
+        description: `Cancelled ${booking.passenger_count} passenger(s). Refund: P${netRefund.toFixed(2)}`,
       });
 
       // Clear and navigate

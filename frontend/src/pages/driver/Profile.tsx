@@ -28,7 +28,9 @@ export default function Profile() {
     );
   }
 
-  const profile = data || {};
+  const profile = profileData?.driver || {};
+  const stats = { totalTrips: 0, safetyScore: 100, incidents: 0 };
+  const recentTrips: any[] = [];
 
   return (
     <DriverLayout>
@@ -47,19 +49,19 @@ export default function Profile() {
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <p className="text-sm text-muted-foreground">Name</p>
-                <p className="text-2xl font-bold">{profile.driver?.name || 'N/A'}</p>
+                <p className="text-2xl font-bold">{profile.full_name || 'N/A'}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Email</p>
-                <p className="text-xl font-medium">{profile.driver?.email || 'N/A'}</p>
+                <p className="text-xl font-medium">{profile.email || 'N/A'}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Phone</p>
-                <p className="text-xl font-medium">{profile.driver?.phone || 'N/A'}</p>
+                <p className="text-xl font-medium">{profile.phone || 'N/A'}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Role</p>
-                <Badge className="text-lg px-4 py-1">{profile.driver?.role || 'DRIVER'}</Badge>
+                <Badge className="text-lg px-4 py-1">{profile.status || 'DRIVER'}</Badge>
               </div>
             </div>
           </CardContent>
@@ -73,7 +75,7 @@ export default function Profile() {
               <Calendar className="h-6 w-6 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold">{profile.stats?.totalTrips || 0}</div>
+              <div className="text-4xl font-bold">{stats.totalTrips}</div>
               <p className="text-sm text-muted-foreground mt-1">Completed</p>
             </CardContent>
           </Card>
@@ -85,7 +87,7 @@ export default function Profile() {
             </CardHeader>
             <CardContent>
               <div className="text-4xl font-bold text-green-600">
-                {profile.stats?.safetyScore || 100}
+                {stats.safetyScore}
               </div>
               <p className="text-sm text-muted-foreground mt-1">Out of 100</p>
             </CardContent>
@@ -97,7 +99,7 @@ export default function Profile() {
               <TrendingUp className="h-6 w-6 text-orange-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold">{profile.stats?.incidents || 0}</div>
+              <div className="text-4xl font-bold">{stats.incidents}</div>
               <p className="text-sm text-muted-foreground mt-1">Reported</p>
             </CardContent>
           </Card>
@@ -109,13 +111,13 @@ export default function Profile() {
             <CardTitle className="text-2xl">Recent Trips</CardTitle>
           </CardHeader>
           <CardContent>
-            {!profile.recentTrips || profile.recentTrips.length === 0 ? (
+            {recentTrips.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <p className="text-xl">No recent trips</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {profile.recentTrips.map((trip: any) => (
+                {recentTrips.map((trip: any) => (
                   <div key={trip.id} className="flex items-center justify-between p-4 bg-muted rounded-lg">
                     <div>
                       <p className="text-lg font-bold">{trip.route}</p>

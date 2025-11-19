@@ -10,16 +10,18 @@ interface EmployeeInput {
   position?: string;
   hire_date?: string;
   salary?: number;
-  password?: string; // For creating auth user
+  password?: string;
+  has_dashboard?: boolean;
+  role?: string;
 }
 
-// Fetch all employees/profiles
+// Fetch all employees
 export function useEmployees() {
   return useQuery({
     queryKey: ['employees'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('employees')
         .select('*')
         .order('created_at', { ascending: false });
       
@@ -35,7 +37,7 @@ export function useEmployee(id: string) {
     queryKey: ['employee', id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('employees')
         .select('*')
         .eq('id', id)
         .single();
@@ -53,59 +55,81 @@ export function useAddEmployee() {
   
   return useMutation({
     mutationFn: async (employee: EmployeeInput) => {
-      // Step 1: Create auth user first
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: employee.email,
-        password: employee.password || generateRandomPassword(),
-        options: {
-          data: {
-            full_name: employee.full_name,
-          },
-        },
-      });
-
-      if (authError) throw new Error(`Auth creation failed: ${authError.message}`);
-      if (!authData.user) throw new Error('Failed to create user');
-
-      // Step 2: Generate employee_id
+      // Generate employee_number
       const { data: lastEmployee } = await supabase
-        .from('profiles')
-        .select('employee_id')
-        .not('employee_id', 'is', null)
+        .from('employees')
+        .select('employee_number')
+        .not('employee_number', 'is', null)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
       
-      const lastNumber = lastEmployee?.employee_id 
-        ? parseInt(lastEmployee.employee_id.split('-')[1]) 
+      const lastNumber = lastEmployee?.employee_number 
+        ? parseInt(lastEmployee.employee_number.split('-')[1]) 
         : 0;
       
-      const employeeId = `EMP-${String(lastNumber + 1).padStart(5, '0')}`;
+      const employeeNumber = `EMP-${String(lastNumber + 1).padStart(5, '0')}`;
 
-      // Step 3: Update profile with additional info
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          employee_id: employeeId,
+      let userId = null;
+
+      // If has_dashboard is true, create auth user and profile
+      if (employee.has_dashboard) {
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: employee.email,
+          password: employee.password || generateRandomPassword(),
+          options: {
+            data: {
+              full_name: employee.full_name,
+              role: employee.role,
+            },
+          },
+        });
+
+        if (authError) throw new Error(`Auth creation failed: ${authError.message}`);
+        if (!authData.user) throw new Error('Failed to create user');
+
+        userId = authData.user.id;
+
+        // Update profile with role
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            role: employee.role,
+          })
+          .eq('id', authData.user.id);
+
+        if (profileError) throw new Error(`Profile update failed: ${profileError.message}`);
+      }
+
+      // Create employee record
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('employees')
+        .insert({
+          employee_number: employeeNumber,
+          full_name: employee.full_name,
+          email: employee.email,
           phone: employee.phone || null,
           department: employee.department || null,
           position: employee.position || null,
-          hire_date: employee.hire_date || null,
+          hire_date: employee.hire_date || new Date().toISOString().split('T')[0],
           salary: employee.salary || null,
-          is_active: true,
-          status: 'active',
+          user_id: userId,
+          employment_status: 'active',
         })
-        .eq('id', authData.user.id)
         .select()
         .single();
 
-      if (profileError) throw new Error(`Profile update failed: ${profileError.message}`);
+      if (employeeError) throw new Error(`Employee creation failed: ${employeeError.message}`);
       
-      return profileData;
+      return employeeData;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
-      toast.success('Employee added successfully! Login credentials sent to email.');
+      if (data.has_dashboard) {
+        toast.success('Employee added successfully! Login credentials sent to email.');
+      } else {
+        toast.success('Employee added successfully!');
+      }
     },
     onError: (error: any) => {
       console.error('Failed to add employee:', error);
@@ -121,7 +145,7 @@ export function useUpdateEmployee() {
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<EmployeeInput> }) => {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('employees')
         .update({
           full_name: updates.full_name,
           phone: updates.phone || null,
@@ -154,10 +178,9 @@ export function useDeactivateEmployee() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('employees')
         .update({ 
-          is_active: false,
-          status: 'inactive',
+          employment_status: 'inactive',
         })
         .eq('id', id)
         .select()
@@ -183,10 +206,9 @@ export function useReactivateEmployee() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('employees')
         .update({ 
-          is_active: true,
-          status: 'active',
+          employment_status: 'active',
         })
         .eq('id', id)
         .select()
@@ -222,7 +244,7 @@ export function useDepartments() {
     queryKey: ['departments'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('employees')
         .select('department')
         .not('department', 'is', null);
       
@@ -241,7 +263,7 @@ export function usePositions() {
     queryKey: ['positions'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('employees')
         .select('position')
         .not('position', 'is', null);
       

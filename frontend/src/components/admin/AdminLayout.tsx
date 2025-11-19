@@ -34,7 +34,18 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   });
 
   const toggleSection = (section: keyof typeof openSections) => {
-    setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+    setOpenSections(prev => {
+      // Close all sections first
+      const allClosed = {
+        operations: false,
+        finance: false,
+        ticketing: false,
+        hr: false,
+        maintenance: false,
+      };
+      // Then open only the clicked section (toggle behavior)
+      return { ...allClosed, [section]: !prev[section] };
+    });
   };
 
   // Menu structure with categories and sub-items

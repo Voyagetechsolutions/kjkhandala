@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,18 +27,81 @@ export default function HRDashboard() {
   const Layout = isAdminRoute ? AdminLayout : HRLayout;
 
   // All hooks must be called before any conditional returns
-  const { data: employees = [] } = useQuery({
-    queryKey: ['hr-employees'],
+  // Fetch employees from multiple sources
+  const { data: employeesData = [] } = useQuery({
+    queryKey: ['hr-employees-table'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('employees')
         .select('*')
-        .not('employee_id', 'is', null)
         .order('full_name');
       if (error) throw error;
       return data || [];
     },
   });
+
+  const { data: profilesData = [] } = useQuery({
+    queryKey: ['hr-profiles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .not('role', 'eq', 'PASSENGER')
+        .order('full_name');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: driversData = [] } = useQuery({
+    queryKey: ['hr-drivers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('*')
+        .order('full_name');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Combine all employees (avoid duplicates by user_id)
+  const employees = React.useMemo(() => {
+    const allEmployees = new Map();
+    
+    // Add from employees table
+    employeesData.forEach((emp: any) => {
+      allEmployees.set(emp.id, {
+        ...emp,
+        source: 'employees',
+        status: emp.employment_status || 'active',
+      });
+    });
+    
+    // Add from profiles (non-passengers)
+    profilesData.forEach((profile: any) => {
+      if (!allEmployees.has(profile.id)) {
+        allEmployees.set(profile.id, {
+          ...profile,
+          source: 'profiles',
+          status: profile.is_active ? 'active' : 'inactive',
+        });
+      }
+    });
+    
+    // Add from drivers
+    driversData.forEach((driver: any) => {
+      if (!allEmployees.has(driver.id)) {
+        allEmployees.set(driver.id, {
+          ...driver,
+          source: 'drivers',
+          status: driver.status || 'active',
+        });
+      }
+    });
+    
+    return Array.from(allEmployees.values());
+  }, [employeesData, profilesData, driversData]);
 
   const { data: attendance = [] } = useQuery({
     queryKey: ['hr-attendance-today'],
@@ -54,12 +117,17 @@ export default function HRDashboard() {
   });
 
   const { data: payroll = [] } = useQuery({
-    queryKey: ['hr-payroll'],
+    queryKey: ['hr-payroll-current'],
     queryFn: async () => {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      
       const { data, error } = await supabase
         .from('payroll')
         .select('*')
-        .order('created_at', { ascending: false });
+        .gte('period_start', firstDay)
+        .lte('period_end', lastDay);
       if (error) throw error;
       return data || [];
     },
@@ -93,9 +161,18 @@ export default function HRDashboard() {
 
   const employeeStats = {
     total: employees.length,
-    active: employees.filter((e: any) => e.status === 'active').length,
-    onLeave: employees.filter((e: any) => e.status === 'on_leave').length,
-    terminated: employees.filter((e: any) => e.status === 'terminated').length,
+    active: employees.filter((e: any) => {
+      const status = e.status || e.employment_status;
+      return status === 'active' || status === 'ACTIVE';
+    }).length,
+    onLeave: employees.filter((e: any) => {
+      const status = e.status || e.employment_status;
+      return status === 'on_leave' || status === 'ON_LEAVE';
+    }).length,
+    terminated: employees.filter((e: any) => {
+      const status = e.status || e.employment_status;
+      return status === 'terminated' || status === 'TERMINATED' || status === 'inactive' || status === 'INACTIVE';
+    }).length,
   };
 
   const departmentBreakdown = employees.reduce((acc: any[], emp: any) => {
@@ -112,15 +189,20 @@ export default function HRDashboard() {
   }));
 
   const attendanceToday = {
-    onDuty: attendance.filter((a: any) => a.status === 'present').length,
-    absent: attendance.filter((a: any) => a.status === 'absent').length,
-    late: attendance.filter((a: any) => a.isLate).length,
+    onDuty: attendance.filter((a: any) => a.check_in).length,
+    absent: employeeStats.active - attendance.filter((a: any) => a.check_in).length,
+    late: attendance.filter((a: any) => {
+      if (!a.check_in) return false;
+      const checkInTime = new Date(a.check_in).getHours() * 60 + new Date(a.check_in).getMinutes();
+      const scheduledTime = 8 * 60; // 8:00 AM
+      return checkInTime > scheduledTime + 15; // Late if more than 15 mins after 8 AM
+    }).length,
   };
 
   const payrollSummary = {
-    totalCost: payroll.reduce((sum: number, p: any) => sum + parseFloat(p.totalAmount || 0), 0),
-    processed: payroll.filter((p: any) => p.status === 'processed').length,
-    pending: payroll.filter((p: any) => p.status === 'pending').length,
+    totalCost: payroll.reduce((sum: number, p: any) => sum + parseFloat(p.net_salary || 0), 0),
+    processed: payroll.filter((p: any) => p.status === 'APPROVED' || p.status === 'PROCESSED').length,
+    pending: payroll.filter((p: any) => p.status === 'PENDING').length,
   };
 
   const today = new Date();

@@ -40,6 +40,11 @@ export default function Footer() {
                   Booking Offices
                 </Link>
               </li>
+              <li>
+                <Link to="/careers" className="text-muted-foreground hover:text-primary transition-colors">
+                  Careers
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -48,23 +53,33 @@ export default function Footer() {
             <h3 className="font-semibold mb-4">Travel Information</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link to="/contact" className="text-muted-foreground hover:text-primary transition-colors">
+                <Link to="/faqs" className="text-muted-foreground hover:text-primary transition-colors">
                   FAQs
                 </Link>
               </li>
               <li>
-                <Link to="/contact" className="text-muted-foreground hover:text-primary transition-colors">
+                <Link to="/ticket-rules" className="text-muted-foreground hover:text-primary transition-colors">
                   Ticket Rules
                 </Link>
               </li>
               <li>
-                <Link to="/contact" className="text-muted-foreground hover:text-primary transition-colors">
+                <Link to="/terms" className="text-muted-foreground hover:text-primary transition-colors">
                   Terms & Conditions
                 </Link>
               </li>
               <li>
-                <Link to="/contact" className="text-muted-foreground hover:text-primary transition-colors">
+                <Link to="/service-advisories" className="text-muted-foreground hover:text-primary transition-colors">
                   Service Advisories
+                </Link>
+              </li>
+              <li>
+                <Link to="/privacy" className="text-muted-foreground hover:text-primary transition-colors">
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link to="/risk" className="text-muted-foreground hover:text-primary transition-colors">
+                  Acceptance of Risk
                 </Link>
               </li>
             </ul>
@@ -130,6 +145,7 @@ export default function Footer() {
 
         <div className="border-t pt-8 text-center text-sm text-muted-foreground">
           <p>&copy; {new Date().getFullYear()} KJ Khandala Travel & Tours. All Rights Reserved.</p>
+          <p className="mt-2">Built by <a href="https://voyagetechsolutions.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Voyagetech Solutions</a></p>
         </div>
       </div>
     </footer>

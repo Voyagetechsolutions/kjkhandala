@@ -41,22 +41,18 @@ export default function LiveOperationsMap() {
 
       // Get trip status for each bus
       const { data: tripData, error: tripError } = await supabase
-        .from('trip_tracking')
+        .from('trips')
         .select(`
           *,
-          schedules (
-            id,
-            departure_time,
-            routes (
-              origin,
-              destination
-            )
+          routes (
+            origin,
+            destination
           ),
           drivers (
             full_name
           )
         `)
-        .in('status', ['scheduled', 'in_transit']);
+        .in('status', ['scheduled', 'active', 'boarding', 'departed']);
 
       if (tripError) throw tripError;
 

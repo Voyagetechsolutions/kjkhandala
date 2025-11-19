@@ -33,10 +33,10 @@ export default function OperationsLayout({ children }: OperationsLayoutProps) {
     { path: "/operations/tracking", icon: MapPin, label: "Live Tracking" },
     { path: "/operations/cities", icon: MapPinned, label: "City Management" },
     { path: "/operations/routes", icon: MapPin, label: "Route Management" },
-    { path: "/admin/incidents", icon: AlertTriangle, label: "Incident Management" },
-    { path: "/admin/delays", icon: Clock, label: "Delay Management" },
+    { path: "/operations/incidents", icon: AlertTriangle, label: "Incident Management" },
+    { path: "/operations/delays", icon: Clock, label: "Delay Management" },
     { path: "/operations/reports", icon: BarChart3, label: "Reports and Analytics" },
-    { path: "/admin/terminal", icon: Building2, label: "Terminal Operations" },
+    { path: "/operations/terminal", icon: Building2, label: "Terminal Operations" },
     { path: "/operations/settings", icon: Settings, label: "Settings" },
   ];
 

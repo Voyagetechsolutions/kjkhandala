@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/components/admin/AdminLayout';
 import TicketingLayout from '@/components/ticketing/TicketingLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,11 @@ import {
   Search, MapPin, Calendar, Users, Clock, Bus, ArrowRight, DollarSign, ArrowLeft 
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+
+interface City {
+  id: string;
+  name: string;
+}
 
 interface Route {
   id: string;
@@ -49,6 +54,7 @@ export default function SearchTrips() {
   const Layout = isAdminRoute ? AdminLayout : TicketingLayout;
 
   // State
+  const [cities, setCities] = useState<City[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [searching, setSearching] = useState(false);
@@ -63,17 +69,30 @@ export default function SearchTrips() {
 
   useEffect(() => {
     if (!loading && user) {
+      fetchCities();
       fetchRoutes();
     }
   }, [user, loading]);
 
+  const fetchCities = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('cities')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      setCities(data || []);
+    } catch (error: any) {
+      console.error('Error fetching cities:', error);
+    }
+  };
+
   const fetchRoutes = async () => {
     try {
-      const query = supabase
+      const { data, error } = await supabase
         .from('routes')
-        .select('id, origin, destination');
-      
-      const { data, error } = await query
+        .select('id, origin, destination')
         .eq('is_active', true)
         .order('origin');
 
@@ -97,83 +116,75 @@ export default function SearchTrips() {
     try {
       setSearching(true);
 
-      // Search for trips
-      const query = supabase
+      // Search for trips with route filtering
+      const { data, error } = await supabase
         .from('trips')
         .select(`
           id,
           trip_number,
-          departure_time,
-          arrival_time,
-          base_fare,
+          scheduled_departure,
+          scheduled_arrival,
+          fare,
           status,
-          routes (origin, destination),
+          total_seats,
+          available_seats,
+          routes!inner (origin, destination),
           buses (name, bus_type)
-        `);
-      
-      const { data, error } = await query
-        .gte('departure_time', `${searchParams.travel_date}T00:00:00`)
-        .lte('departure_time', `${searchParams.travel_date}T23:59:59`)
+        `)
+
+        .eq('routes.origin', searchParams.origin)
+        .eq('routes.destination', searchParams.destination)
+        .gte('scheduled_departure', `${searchParams.travel_date}T00:00:00`)
+        .lte('scheduled_departure', `${searchParams.travel_date}T23:59:59`)
+
         .in('status', ['SCHEDULED', 'BOARDING'])
-        .order('departure_time');
+        .gte('available_seats', parseInt(searchParams.passengers))
+        .order('scheduled_departure');
 
       if (error) throw error;
 
-      // Get seat counts for each trip
-      const tripsWithSeats = await Promise.all(
-        (data || []).map(async (trip: any) => {
-          const seatQuery = supabase
-            .from('booking_seats')
-            .select('*', { count: 'exact', head: true });
-          
-          const { count: bookedCount } = await seatQuery
-            .eq('trip_id', trip.id)
-            .in('status', ['reserved', 'sold']);
+      // Transform trips data
+      const transformedTrips = (data || []).map((trip: any) => {
+        // Calculate duration
+        const departure = new Date(trip.scheduled_departure);
+        const arrival = trip.scheduled_arrival ? new Date(trip.scheduled_arrival) : null;
+        const duration = arrival 
+          ? `${Math.floor((arrival.getTime() - departure.getTime()) / (1000 * 60 * 60))}h ${Math.floor(((arrival.getTime() - departure.getTime()) % (1000 * 60 * 60)) / (1000 * 60))}m`
+          : 'N/A';
 
-          const booked = bookedCount || 0;
-          const total = 60; // Fixed 60 seats
-          const available = total - booked;
+        // Handle routes - Supabase returns array when using !inner
+        const routes = Array.isArray(trip.routes) ? trip.routes[0] : trip.routes;
+        const buses = Array.isArray(trip.buses) ? trip.buses[0] : trip.buses;
 
-          // Calculate duration
-          const departure = new Date(trip.departure_time);
-          const arrival = trip.arrival_time ? new Date(trip.arrival_time) : null;
-          const duration = arrival 
-            ? `${Math.floor((arrival.getTime() - departure.getTime()) / (1000 * 60 * 60))}h ${Math.floor(((arrival.getTime() - departure.getTime()) % (1000 * 60 * 60)) / (1000 * 60))}m`
-            : 'N/A';
+        return {
+          trip_id: trip.id,
+          trip_number: trip.trip_number,
+          departure_time: trip.scheduled_departure,
+          arrival_time: trip.scheduled_arrival,
+          origin: routes?.origin || 'N/A',
+          destination: routes?.destination || 'N/A',
+          bus_name: buses?.name || 'TBA',
+          bus_type: buses?.bus_type || 'Standard',
+          total_seats: trip.total_seats || 60,
+          booked_seats: (trip.total_seats || 60) - (trip.available_seats || 0),
+          available_seats: trip.available_seats || 0,
+          base_fare: trip.fare,
+          status: trip.status,
+          duration,
+        };
+      });
 
-          return {
-            trip_id: trip.id,
-            trip_number: trip.trip_number,
-            departure_time: trip.departure_time,
-            arrival_time: trip.arrival_time,
-            origin: trip.routes?.origin || 'N/A',
-            destination: trip.routes?.destination || 'N/A',
-            bus_name: trip.buses?.name || 'TBA',
-            bus_type: trip.buses?.bus_type || 'Standard',
-            total_seats: total,
-            booked_seats: booked,
-            available_seats: available,
-            base_fare: trip.base_fare,
-            status: trip.status,
-            duration,
-          };
-        })
-      );
+      setTrips(transformedTrips);
 
-      // Filter by origin and destination
-      const filtered = tripsWithSeats.filter(
-        (trip) =>
-          trip.origin.toLowerCase().includes(searchParams.origin.toLowerCase()) &&
-          trip.destination.toLowerCase().includes(searchParams.destination.toLowerCase()) &&
-          trip.available_seats >= parseInt(searchParams.passengers)
-      );
-
-      setTrips(filtered);
-
-      if (filtered.length === 0) {
+      if (transformedTrips.length === 0) {
         toast({
           title: 'No trips found',
           description: 'No available trips match your search criteria',
+        });
+      } else {
+        toast({
+          title: 'Search complete',
+          description: `Found ${transformedTrips.length} available trip${transformedTrips.length > 1 ? 's' : ''}`,
         });
       }
     } catch (error: any) {
@@ -193,8 +204,9 @@ export default function SearchTrips() {
     sessionStorage.setItem('selectedTrip', JSON.stringify(trip));
     sessionStorage.setItem('passengers', searchParams.passengers);
     
-    // Navigate to seat selection
-    navigate('/ticketing/seat-selection');
+    // Navigate to passenger details first
+    const basePath = isAdminRoute ? '/admin/ticketing' : '/ticketing';
+    navigate(`${basePath}/passenger-details`);
   };
 
   if (loading) {
@@ -233,12 +245,21 @@ export default function SearchTrips() {
                   <MapPin className="inline h-4 w-4 mr-1" />
                   Origin
                 </Label>
-                <Input
-                  id="origin"
-                  placeholder="e.g., Gaborone"
+                <Select
                   value={searchParams.origin}
-                  onChange={(e) => setSearchParams({ ...searchParams, origin: e.target.value })}
-                />
+                  onValueChange={(value) => setSearchParams({ ...searchParams, origin: value })}
+                >
+                  <SelectTrigger id="origin">
+                    <SelectValue placeholder="Select origin city" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cities.map((city) => (
+                      <SelectItem key={city.id} value={city.name}>
+                        {city.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Destination */}
@@ -247,12 +268,21 @@ export default function SearchTrips() {
                   <MapPin className="inline h-4 w-4 mr-1" />
                   Destination
                 </Label>
-                <Input
-                  id="destination"
-                  placeholder="e.g., Francistown"
+                <Select
                   value={searchParams.destination}
-                  onChange={(e) => setSearchParams({ ...searchParams, destination: e.target.value })}
-                />
+                  onValueChange={(value) => setSearchParams({ ...searchParams, destination: value })}
+                >
+                  <SelectTrigger id="destination">
+                    <SelectValue placeholder="Select destination city" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cities.map((city) => (
+                      <SelectItem key={city.id} value={city.name}>
+                        {city.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Travel Date */}

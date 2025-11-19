@@ -288,11 +288,11 @@ export default function HRPayroll() {
                   <TableRow key={record.id}>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{record.employee.full_name}</div>
-                        <div className="text-sm text-muted-foreground">{record.employee.employee_id}</div>
+                        <div className="font-medium">{record.employee?.full_name || 'N/A'}</div>
+                        <div className="text-sm text-muted-foreground">{record.employee?.employee_id || 'N/A'}</div>
                       </div>
                     </TableCell>
-                    <TableCell>{record.employee.department}</TableCell>
+                    <TableCell>{record.employee?.department || 'N/A'}</TableCell>
                     <TableCell className="text-right font-medium">P {record.basic_salary.toLocaleString()}</TableCell>
                     <TableCell className="text-right text-green-600">+P {record.allowances.toLocaleString()}</TableCell>
                     <TableCell className="text-right text-green-600">

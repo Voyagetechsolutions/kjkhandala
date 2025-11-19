@@ -45,19 +45,18 @@ export default function PayrollManagement() {
 
   const queryClient = useQueryClient();
 
-  // Fetch active employees with salary info
+  // Fetch all employees for payroll (both dashboard and non-dashboard)
   const { data: employeesData, isLoading: employeesLoading } = useQuery({
-    queryKey: ['employees-active'],
+    queryKey: ['employees-payroll'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('employees')
         .select('*')
-        .eq('status', 'ACTIVE')
+        .eq('employment_status', 'active')
         .order('full_name');
-      if (error) {
-        console.error('Error fetching employees:', error);
-        throw error;
-      }
+      
+      if (error) throw error;
+      
       return data || [];
     },
   });
@@ -270,12 +269,12 @@ export default function PayrollManagement() {
 
   // Calculate summary from actual data
   const summary = {
-    totalEmployees: employees.length || (employeesData?.length || 0),
-    totalGrossPay: employees.reduce((sum, emp) => sum + (emp.grossPay || emp.basicSalary + emp.allowances + emp.overtime + emp.bonuses), 0),
-    totalBonuses: employees.reduce((sum, emp) => sum + emp.bonuses, 0),
-    totalAllowances: employees.reduce((sum, emp) => sum + emp.allowances, 0),
-    totalDeductions: employees.reduce((sum, emp) => sum + emp.deductions, 0),
-    totalNetPay: employees.reduce((sum, emp) => sum + emp.netSalary, 0),
+    totalEmployees: employeesData?.length || 0,
+    totalGrossPay: employees.reduce((sum, emp) => sum + (emp.grossPay || 0), 0),
+    totalBonuses: employees.reduce((sum, emp) => sum + (emp.bonuses || 0), 0),
+    totalAllowances: employees.reduce((sum, emp) => sum + (emp.allowances || 0), 0),
+    totalDeductions: employees.reduce((sum, emp) => sum + (emp.deductions || 0), 0),
+    totalNetPay: employees.reduce((sum, emp) => sum + (emp.netSalary || 0), 0),
     processed: employees.filter(emp => emp.status === 'processed' || emp.status === 'approved').length,
     pending: employees.filter(emp => emp.status === 'pending').length,
   };

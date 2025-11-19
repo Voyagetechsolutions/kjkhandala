@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/components/admin/AdminLayout';
 import TicketingLayout from '@/components/ticketing/TicketingLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -56,40 +56,37 @@ export default function BookingSummary() {
     try {
       setConfirming(true);
 
-      // 1. Get or create agent record
-      const { data: agentData } = await supabase
-        .from('ticketing_agents')
-        .select('id')
-        .eq('profile_id', user?.id)
-        .single();
-
-      const agentId = agentData?.id;
-
-      // 2. Create/update passenger records
+      // 1. Create/update passenger records
       const passengerIds = await Promise.all(
         passengers.map(async (p) => {
+          // Prepare passenger payload with proper null handling
+          const passengerPayload = {
+            full_name: p.full_name,
+            phone: p.phone,
+            email: p.email || null,
+            id_number: p.id_number || null,
+            passport_number: p.passport_number || null,
+            gender: p.gender || null,
+            nationality: p.nationality || null,
+            date_of_birth: p.date_of_birth ? new Date(p.date_of_birth).toISOString().split('T')[0] : null,
+            next_of_kin_name: p.next_of_kin_name || null,
+            next_of_kin_phone: p.next_of_kin_phone || null,
+            special_notes: p.special_notes || null,
+          };
+
           // Check if passenger exists
           const { data: existing } = await supabase
             .from('passengers')
             .select('id')
             .eq('phone', p.phone)
-            .single();
+            .maybeSingle();
 
           if (existing) {
             // Update existing passenger
             await supabase
               .from('passengers')
               .update({
-                full_name: p.full_name,
-                email: p.email,
-                id_number: p.id_number,
-                passport_number: p.passport_number,
-                gender: p.gender,
-                nationality: p.nationality,
-                date_of_birth: p.date_of_birth,
-                next_of_kin_name: p.next_of_kin_name,
-                next_of_kin_phone: p.next_of_kin_phone,
-                special_notes: p.special_notes,
+                ...passengerPayload,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', existing.id);
@@ -99,19 +96,7 @@ export default function BookingSummary() {
             // Create new passenger
             const { data: newPassenger, error } = await supabase
               .from('passengers')
-              .insert({
-                full_name: p.full_name,
-                phone: p.phone,
-                email: p.email,
-                id_number: p.id_number,
-                passport_number: p.passport_number,
-                gender: p.gender,
-                nationality: p.nationality,
-                date_of_birth: p.date_of_birth,
-                next_of_kin_name: p.next_of_kin_name,
-                next_of_kin_phone: p.next_of_kin_phone,
-                special_notes: p.special_notes,
-              })
+              .insert(passengerPayload)
               .select('id')
               .single();
 
@@ -121,77 +106,81 @@ export default function BookingSummary() {
         })
       );
 
-      // 3. Create booking
-      const { data: booking, error: bookingError } = await supabase
+      // 2. Generate booking reference
+      const bookingRef = `VB${Date.now().toString().slice(-8)}`;
+
+      // 3. Check seat availability
+      for (let i = 0; i < selectedSeats.length; i++) {
+        const seatNumber = selectedSeats[i].toString();
+        const { data: existingSeat } = await supabase
+          .from('bookings')
+          .select('id')
+          .eq('trip_id', trip.trip_id)
+          .eq('seat_number', seatNumber)
+          .maybeSingle();
+
+        if (existingSeat) {
+          throw new Error(`Seat ${seatNumber} is already booked. Please select a different seat.`);
+        }
+      }
+
+      // 4. Create bookings (one per passenger/seat)
+      const bookingInserts = passengers.map((p, index) => ({
+        booking_reference: `${bookingRef}-${index + 1}`,
+        trip_id: trip.trip_id,
+        user_id: user?.id || null,
+        passenger_name: p.full_name,
+        passenger_phone: p.phone,
+        passenger_email: p.email || null,
+        seat_number: selectedSeats[index]?.toString() || null,
+        total_amount: paymentData.totalAmount / passengers.length,
+        payment_status: paymentData.details.amount >= paymentData.finalAmount 
+          ? 'paid' 
+          : paymentData.details.amount > 0 
+          ? 'partial' 
+          : 'pending',
+        booking_status: 'confirmed',
+        booked_by: user?.id || null,
+      }));
+
+      const { data: bookings, error: bookingError } = await supabase
         .from('bookings')
-        .insert({
-          trip_id: trip.trip_id,
-          passenger_id: passengerIds[0], // Primary passenger
-          booked_by: agentId,
-          number_of_passengers: passengers.length,
-          total_amount: paymentData.totalAmount,
-          amount_paid: paymentData.details.amount,
-          balance: paymentData.finalAmount - paymentData.details.amount,
-          base_fare: trip.base_fare,
-          discount: paymentData.discount.amount,
-          discount_reason: paymentData.discount.reason,
-          travel_date: new Date(trip.departure_time).toISOString().split('T')[0],
-          status: 'confirmed',
-          payment_status: paymentData.details.amount >= paymentData.finalAmount ? 'paid' : paymentData.details.amount > 0 ? 'partial' : 'unpaid',
-        })
-        .select('id, booking_reference')
-        .single();
+        .insert(bookingInserts)
+        .select('id, booking_reference');
 
       if (bookingError) throw bookingError;
 
-      setBookingReference(booking.booking_reference);
+      // Store base reference (without -1, -2 suffix) for fetching all bookings later
+      setBookingReference(bookingRef);
 
-      // 4. Create booking seats
-      const seatInserts = passengers.map((p, index) => ({
-        booking_id: booking.id,
-        trip_id: trip.trip_id,
-        seat_number: p.seat_number,
-        passenger_name: p.full_name,
-        passenger_phone: p.phone,
-        passenger_id_number: p.id_number,
-        seat_price: trip.base_fare,
-        seat_type: 'standard',
-        status: 'sold',
-      }));
+      // 5. Create payment record (if any)
+      if (paymentData.details.amount > 0) {
+        const validStatus = paymentData.details.amount >= paymentData.finalAmount
+          ? 'paid'
+          : 'partial';
 
-      const { error: seatsError } = await supabase
-        .from('booking_seats')
-        .insert(seatInserts);
+        const { error: paymentError } = await supabase
+          .from('payments')
+          .insert({
+            booking_id: bookings[0].id,
+            amount: paymentData.details.amount,
+            payment_method: paymentData.method,
+            payment_status: validStatus, // must match your enum in Supabase
+            transaction_reference: paymentData.details.transaction_id || null,
+            processed_by: user?.id || null,
+            paid_at: new Date().toISOString(),
+          });
 
-      if (seatsError) throw seatsError;
-
-      // 5. Create payment record
-      const { error: paymentError } = await supabase
-        .from('booking_payments')
-        .insert({
-          booking_id: booking.id,
-          amount: paymentData.details.amount,
-          payment_method: paymentData.method,
-          transaction_id: paymentData.details.transaction_id,
-          card_last_four: paymentData.details.card_last_four,
-          mobile_number: paymentData.details.mobile_number,
-          voucher_code: paymentData.details.voucher_code,
-          company_name: paymentData.details.company_name,
-          invoice_number: paymentData.details.invoice_number,
-          notes: paymentData.details.notes,
-          processed_by: agentId,
-          status: 'completed',
-        });
-
-      if (paymentError) throw paymentError;
+        if (paymentError) console.error('Payment record error:', paymentError);
+      }
 
       toast({
         title: 'Booking confirmed!',
-        description: `Booking reference: ${booking.booking_reference}`,
+        description: `Booking reference: ${bookingRef} (${bookings.length} passenger${bookings.length > 1 ? 's' : ''})`,
       });
 
-      // Store booking reference and navigate to ticket
-      sessionStorage.setItem('bookingReference', booking.booking_reference);
+      // Store base booking reference and navigate to ticket
+      sessionStorage.setItem('bookingReference', bookingRef);
       navigate('/ticketing/issue-ticket');
 
     } catch (error: any) {

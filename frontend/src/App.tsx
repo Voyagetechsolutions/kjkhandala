@@ -21,7 +21,14 @@ import Careers from "./pages/Careers";
 import About from "./pages/About";
 import Charters from "./pages/Charters";
 import NotFound from "./pages/NotFound";
+import FAQs from "./pages/FAQs";
+import TicketRules from "./pages/TicketRules";
+import Terms from "./pages/Terms";
+import ServiceAdvisories from "./pages/ServiceAdvisories";
+import Privacy from "./pages/Privacy";
+import AcceptanceOfRisk from "./pages/AcceptanceOfRisk";
 import AdminDashboard from "./pages/admin/SuperAdminDashboard";
+import CommandCenter from "./pages/admin/operations/CommandCenter";
 import AdminRoutes from "./pages/admin/Routes";
 import CitiesManagement from "./pages/admin/CitiesManagement";
 import AdminSchedules from "./pages/admin/Schedules";
@@ -73,6 +80,7 @@ import CancelRefund from "./pages/ticketing/CancelRefund";
 import CustomerLookup from "./pages/ticketing/CustomerLookup";
 import TicketingTripManagement from "./pages/ticketing/TripManagement";
 import OfficeAdmin from "./pages/ticketing/OfficeAdmin";
+import ReservedTickets from "./pages/ticketing/ReservedTickets";
 import DriverHome from "./pages/driver/DriverHome";
 import TripDetails from "./pages/driver/TripDetails";
 import Manifest from "./pages/driver/Manifest";
@@ -125,6 +133,11 @@ import PassengerDetails from "./pages/PassengerDetails";
 import Payment from "./pages/Payment";
 import PaymentNew from "./pages/PaymentNew";
 import ETicket from "./pages/ETicket";
+// New Booking Flow Pages
+import PassengerDetailsPage from "./pages/booking/PassengerDetailsPage";
+import SeatSelectionPage from "./pages/booking/SeatSelectionPage";
+import PaymentPage from "./pages/booking/PaymentPage";
+import ConfirmationPage from "./pages/booking/ConfirmationPage";
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -138,6 +151,14 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/routes" element={<RoutesPage />} />
+            
+            {/* New Booking Flow - Widget Based */}
+            <Route path="/book/passenger-details" element={<PassengerDetailsPage />} />
+            <Route path="/book/seat-selection" element={<SeatSelectionPage />} />
+            <Route path="/book/payment-method" element={<PaymentPage />} />
+            <Route path="/book/confirmation" element={<ConfirmationPage />} />
+            
+            {/* Old Booking Routes (Legacy) */}
             <Route path="/book" element={<TripSearch />} />
             <Route path="/book/passengers" element={<PassengerDetails />} />
             <Route path="/book/seats" element={<SeatSelection />} />
@@ -148,11 +169,18 @@ const App = () => (
             <Route path="/careers" element={<Careers />} />
             <Route path="/about" element={<About/>} />
             <Route path="/charters" element={<Charters />} />
+            <Route path="/faqs" element={<FAQs />} />
+            <Route path="/ticket-rules" element={<TicketRules />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/service-advisories" element={<ServiceAdvisories />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/risk" element={<AcceptanceOfRisk />} />
             <Route path="/seat-selection/:scheduleId" element={<SeatSelection />} />
             <Route path="/booking-confirmation/:bookingId?" element={<BookingConfirmationNew />} />
             <Route path="/my-bookings" element={<MyBookings />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin" element={<CommandCenter />} />
+            <Route path="/admin/dashboard" element={<CommandCenter />} />
+            <Route path="/admin/old-dashboard" element={<AdminDashboard />} />
             <Route path="/admin/fleet" element={<FleetManagement />} />
             <Route path="/admin/drivers" element={<DriverManagement />} />
             <Route path="/admin/route-management" element={<RouteManagement />} />
@@ -183,7 +211,7 @@ const App = () => (
             <Route path="/operations/trips" element={<TripScheduling />} />
             <Route path="/operations/fleet" element={<FleetManagement />} />
             <Route path="/operations/drivers" element={<DriverManagement />} />
-            <Route path="/operations/tracking" element={<LiveTracking />} />
+            <Route path="/operations/tracking" element={<OperationsLiveTracking />} />
             <Route path="/operations/cities" element={<CitiesManagement />} />
             <Route path="/operations/routes" element={<RouteManagement />} />
             <Route path="/operations/incidents" element={<IncidentManagement />} />
@@ -206,6 +234,7 @@ const App = () => (
             <Route path="/ticketing/customer-lookup" element={<CustomerLookup />} />
             <Route path="/ticketing/trip-management" element={<TicketingTripManagement />} />
             <Route path="/ticketing/office-admin" element={<OfficeAdmin />} />
+            <Route path="/ticketing/reserved" element={<ReservedTickets />} />
             {/* Legacy Ticketing Routes */}
             <Route path="/ticketing/sell" element={<SellTicket />} />
             <Route path="/ticketing/check-in" element={<CheckIn />} />
@@ -227,6 +256,7 @@ const App = () => (
             <Route path="/admin/ticketing/customer-lookup" element={<CustomerLookup />} />
             <Route path="/admin/ticketing/trip-management" element={<TicketingTripManagement />} />
             <Route path="/admin/ticketing/office-admin" element={<OfficeAdmin />} />
+            <Route path="/admin/ticketing/reserved" element={<ReservedTickets />} />
             <Route path="/admin/ticketing/sell" element={<SellTicket />} />
             <Route path="/admin/ticketing/check-in" element={<CheckIn />} />
             <Route path="/admin/ticketing/find" element={<FindTicket />} />

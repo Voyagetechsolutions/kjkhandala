@@ -1,554 +1,579 @@
-# 🚀 DEPLOYMENT GUIDE - VOYAGE ONBOARD
+# Complete Deployment Guide - New Features
 
-## Complete Production Deployment Instructions
+## Overview
 
----
-
-## 📋 PRE-DEPLOYMENT CHECKLIST
-
-### **1. Environment Setup**
-- [ ] PostgreSQL database created
-- [ ] DPO payment account configured
-- [ ] SMTP email account setup
-- [ ] Twilio SMS account setup
-- [ ] Domain name registered (optional)
-- [ ] SSL certificate obtained
-
-### **2. Code Preparation**
-- [ ] All tests passing
-- [ ] No console errors
-- [ ] Environment variables documented
-- [ ] Database migrations tested
-- [ ] Build process verified
+This guide covers deploying 4 major feature enhancements:
+1. ✅ Employee-Payroll Synchronization
+2. ✅ Fuel Management System (Driver + Admin)
+3. ⏳ Seamless Ticketing Flow
+4. ⏳ Enhanced Delay Management
 
 ---
 
-## 🗄️ DATABASE SETUP
+## Prerequisites
 
-### **Step 1: Create PostgreSQL Database**
-
-```bash
-# On your server or cloud provider
-createdb kjkhandala
-
-# Or using SQL
-CREATE DATABASE kjkhandala;
-CREATE USER kjkhandala_user WITH PASSWORD 'your_secure_password';
-GRANT ALL PRIVILEGES ON DATABASE kjkhandala TO kjkhandala_user;
-```
-
-### **Step 2: Configure Connection**
-
-```env
-DATABASE_URL="postgresql://kjkhandala_user:your_secure_password@localhost:5432/kjkhandala"
-```
-
-### **Step 3: Run Migrations**
-
-```bash
-cd backend
-npx prisma migrate deploy
-npx prisma generate
-```
+- Supabase project with admin access
+- Node.js and npm installed
+- Git repository access
+- Admin access to production environment
 
 ---
 
-## 🔧 BACKEND DEPLOYMENT
+## Step 1: Database Deployment
 
-### **Option A: Traditional Server (VPS/Dedicated)**
+### 1.1 Run SQL Scripts
 
-#### **1. Install Dependencies**
-
-```bash
-# Install Node.js 18+
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-# Install PM2 (Process Manager)
-sudo npm install -g pm2
-```
-
-#### **2. Clone & Setup**
-
-```bash
-# Clone repository
-git clone https://github.com/Voyagetechsolutions/voyage-onboard-now.git
-cd voyage-onboard-now/backend
-
-# Install packages
-npm install
-
-# Create .env file
-nano .env
-```
-
-#### **3. Environment Variables**
-
-```env
-# Server
-NODE_ENV=production
-PORT=3001
-CORS_ORIGIN=https://yourdomain.com
-
-# Database
-DATABASE_URL=postgresql://user:pass@localhost:5432/kjkhandala
-
-# JWT
-JWT_SECRET=your_super_secret_jwt_key_change_this
-
-# DPO Payment
-DPO_URL=https://secure.3gdirectpay.com
-DPO_COMPANY_TOKEN=your_dpo_company_token
-DPO_SERVICE_TYPE=3854
-
-# Email (Gmail example)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your_email@gmail.com
-SMTP_PASS=your_gmail_app_password
-SMTP_FROM="Voyage Onboard" <noreply@voyage.com>
-
-# SMS (Twilio)
-TWILIO_ACCOUNT_SID=your_twilio_account_sid
-TWILIO_AUTH_TOKEN=your_twilio_auth_token
-TWILIO_PHONE_NUMBER=+267XXXXXXXX
-
-# Frontend URL
-FRONTEND_URL=https://yourdomain.com
-```
-
-#### **4. Start with PM2**
-
-```bash
-# Start application
-pm2 start src/server.js --name voyage-backend
-
-# Save PM2 configuration
-pm2 save
-
-# Setup auto-restart on reboot
-pm2 startup
-```
-
-#### **5. Setup Nginx Reverse Proxy**
-
-```bash
-# Install Nginx
-sudo apt-get install nginx
-
-# Create configuration
-sudo nano /etc/nginx/sites-available/voyage-api
-```
-
-```nginx
-server {
-    listen 80;
-    server_name api.yourdomain.com;
-
-    location / {
-        proxy_pass http://localhost:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-}
-```
-
-```bash
-# Enable site
-sudo ln -s /etc/nginx/sites-available/voyage-api /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl restart nginx
-```
-
-#### **6. Setup SSL (Let's Encrypt)**
-
-```bash
-# Install Certbot
-sudo apt-get install certbot python3-certbot-nginx
-
-# Get certificate
-sudo certbot --nginx -d api.yourdomain.com
-
-# Auto-renewal
-sudo certbot renew --dry-run
-```
-
----
-
-### **Option B: Cloud Platform (Heroku/Railway/Render)**
-
-#### **Heroku Deployment:**
-
-```bash
-# Install Heroku CLI
-curl https://cli-assets.heroku.com/install.sh | sh
-
-# Login
-heroku login
-
-# Create app
-heroku create voyage-onboard-api
-
-# Add PostgreSQL
-heroku addons:create heroku-postgresql:hobby-dev
-
-# Set environment variables
-heroku config:set NODE_ENV=production
-heroku config:set JWT_SECRET=your_secret
-heroku config:set DPO_COMPANY_TOKEN=your_token
-# ... (set all env vars)
-
-# Deploy
-git push heroku main
-
-# Run migrations
-heroku run npx prisma migrate deploy
-```
-
----
-
-## 🎨 FRONTEND DEPLOYMENT
-
-### **Option A: Netlify (Recommended)**
-
-#### **1. Build Application**
-
-```bash
-cd frontend
-npm run build
-```
-
-#### **2. Deploy to Netlify**
-
-**Via Netlify CLI:**
-```bash
-# Install Netlify CLI
-npm install -g netlify-cli
-
-# Login
-netlify login
-
-# Deploy
-netlify deploy --prod --dir=dist
-```
-
-**Via Netlify Dashboard:**
-1. Go to https://app.netlify.com
-2. Click "Add new site" → "Deploy manually"
-3. Drag & drop the `dist` folder
-4. Configure environment variables
-5. Set custom domain (optional)
-
-#### **3. Environment Variables**
-
-In Netlify Dashboard → Site settings → Environment variables:
-```
-VITE_API_URL=https://api.yourdomain.com
-```
-
-#### **4. Configure Redirects**
-
-Create `frontend/public/_redirects`:
-```
-/*    /index.html   200
-```
-
----
-
-### **Option B: Vercel**
-
-```bash
-# Install Vercel CLI
-npm install -g vercel
-
-# Login
-vercel login
-
-# Deploy
-cd frontend
-vercel --prod
-```
-
----
-
-### **Option C: Traditional Server**
-
-```bash
-# Build
-cd frontend
-npm run build
-
-# Copy to server
-scp -r dist/* user@server:/var/www/voyage
-
-# Nginx configuration
-sudo nano /etc/nginx/sites-available/voyage-frontend
-```
-
-```nginx
-server {
-    listen 80;
-    server_name yourdomain.com;
-    root /var/www/voyage;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api {
-        proxy_pass http://localhost:3001;
-    }
-}
-```
-
----
-
-## 🔐 SECURITY HARDENING
-
-### **1. Firewall Setup**
-
-```bash
-# UFW (Ubuntu)
-sudo ufw allow 22/tcp
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw enable
-```
-
-### **2. Database Security**
+Open Supabase SQL Editor and execute in this order:
 
 ```sql
--- Create read-only user for reports
-CREATE USER readonly WITH PASSWORD 'secure_password';
-GRANT CONNECT ON DATABASE kjkhandala TO readonly;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO readonly;
+-- 1. Ensure enum types exist (if not already run)
+\i supabase/00_PRODUCTION_ENUMS.sql
+
+-- 2. Apply feature enhancements
+\i supabase/FEATURE_ENHANCEMENTS.sql
 ```
 
-### **3. Rate Limiting (Already Implemented)**
+### 1.2 Verify Tables Created
 
-Backend already has rate limiting:
-- API: 100 req/15min
-- Auth: 5 req/15min
-- Payment: 10 req/hour
+Run this verification query:
 
-### **4. HTTPS Only**
+```sql
+-- Check new tables
+SELECT table_name 
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+AND table_name IN (
+  'fuel_stations',
+  'trip_delays',
+  'booking_flow_history'
+)
+ORDER BY table_name;
 
-```javascript
-// In server.js (production only)
-if (process.env.NODE_ENV === 'production') {
-  app.use((req, res, next) => {
-    if (req.header('x-forwarded-proto') !== 'https') {
-      res.redirect(`https://${req.header('host')}${req.url}`);
-    } else {
-      next();
-    }
-  });
-}
+-- Check new views
+SELECT table_name 
+FROM information_schema.views 
+WHERE table_schema = 'public' 
+AND table_name IN (
+  'employee_payroll_sync',
+  'driver_fuel_logs',
+  'delay_management_overview'
+)
+ORDER BY table_name;
+
+-- Check triggers
+SELECT trigger_name, event_object_table
+FROM information_schema.triggers
+WHERE trigger_schema = 'public'
+AND trigger_name IN (
+  'trigger_sync_employee_to_payroll',
+  'trigger_calculate_affected_passengers',
+  'trigger_track_booking_flow'
+)
+ORDER BY trigger_name;
 ```
+
+**Expected Results:**
+- ✅ 3 new tables
+- ✅ 3 new views
+- ✅ 3 new triggers
 
 ---
 
-## 📊 MONITORING & LOGGING
+## Step 2: Storage Setup
 
-### **1. PM2 Monitoring**
+### 2.1 Create Storage Bucket
 
-```bash
-# View logs
-pm2 logs voyage-backend
+1. Go to Supabase Dashboard → Storage
+2. Click "New bucket"
+3. Settings:
+   - **Name:** `fuel-receipts`
+   - **Public:** No (keep private)
+   - **File size limit:** 5 MB
+   - **Allowed MIME types:** 
+     - `image/jpeg`
+     - `image/png`
+     - `image/jpg`
+     - `application/pdf`
 
-# Monitor resources
-pm2 monit
+### 2.2 Apply Storage Policies
 
-# Web dashboard
-pm2 plus
+In Supabase SQL Editor:
+
+```sql
+-- Allow drivers to upload their own receipts
+CREATE POLICY "Drivers can upload their own receipts"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'fuel-receipts' AND
+  (storage.foldername(name))[1] = auth.uid()::text
+);
+
+-- Allow drivers to view their own receipts
+CREATE POLICY "Drivers can view their own receipts"
+ON storage.objects FOR SELECT
+TO authenticated
+USING (
+  bucket_id = 'fuel-receipts' AND
+  (storage.foldername(name))[1] = auth.uid()::text
+);
+
+-- Allow admins to view all receipts
+CREATE POLICY "Admins can view all receipts"
+ON storage.objects FOR SELECT
+TO authenticated
+USING (
+  bucket_id = 'fuel-receipts' AND
+  EXISTS (
+    SELECT 1 FROM user_roles
+    WHERE user_id = auth.uid()
+      AND role IN ('SUPER_ADMIN', 'ADMIN', 'FINANCE_MANAGER')
+  )
+);
 ```
 
-### **2. Database Monitoring**
+### 2.3 Verify Storage
 
-```bash
-# Check connections
-SELECT count(*) FROM pg_stat_activity;
-
-# Slow queries
-SELECT query, calls, total_time, mean_time
-FROM pg_stat_statements
-ORDER BY mean_time DESC
-LIMIT 10;
-```
-
-### **3. Error Tracking (Optional)**
-
-Install Sentry:
-```bash
-npm install @sentry/node
-```
-
-```javascript
-// In server.js
-const Sentry = require('@sentry/node');
-
-Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  environment: process.env.NODE_ENV
-});
-
-app.use(Sentry.Handlers.errorHandler());
-```
+Upload a test file to verify policies work correctly.
 
 ---
 
-## 🧪 POST-DEPLOYMENT TESTING
+## Step 3: Frontend Deployment
 
-### **1. Health Checks**
+### 3.1 Add New Routes
 
-```bash
-# Backend health
-curl https://api.yourdomain.com/health
+Update `frontend/src/App.tsx`:
 
-# Database connection
-curl https://api.yourdomain.com/api/health
+```typescript
+// Add imports
+import FuelLogs from "./pages/driver/FuelLogs";
+import FuelStations from "./pages/admin/FuelStations";
+import BookingFlow from "./pages/booking/BookingFlow";
 
-# WebSocket
-wscat -c wss://api.yourdomain.com
+// Add routes
+// Driver routes
+<Route path="/driver/fuel-logs" element={<FuelLogs />} />
+
+// Admin routes
+<Route path="/admin/fuel-stations" element={<FuelStations />} />
+
+// Public booking flow
+<Route path="/book-flow" element={<BookingFlow />} />
 ```
 
-### **2. Functional Testing**
+### 3.2 Update Navigation
 
-- [ ] Login works
-- [ ] Booking flow completes
-- [ ] Payments process
-- [ ] Notifications send
-- [ ] Live tracking updates
-- [ ] Reports generate
-- [ ] Queue processes messages
+**Driver Layout** (`frontend/src/components/driver/DriverLayout.tsx`):
 
-### **3. Performance Testing**
+```typescript
+import { Fuel } from 'lucide-react';
 
-```bash
-# Load testing with Apache Bench
-ab -n 1000 -c 10 https://api.yourdomain.com/api/trips
-
-# Or use k6
-k6 run load-test.js
+// Add to navItems
+{ path: "/driver/fuel-logs", icon: Fuel, label: "Fuel Logs" }
 ```
 
----
+**Admin Layout** (`frontend/src/components/admin/AdminLayout.tsx`):
 
-## 🔄 BACKUP STRATEGY
+```typescript
+import { Fuel } from 'lucide-react';
 
-### **1. Database Backups**
-
-```bash
-# Daily backup script
-#!/bin/bash
-DATE=$(date +%Y%m%d_%H%M%S)
-pg_dump kjkhandala > /backups/db_$DATE.sql
-gzip /backups/db_$DATE.sql
-
-# Keep only last 7 days
-find /backups -name "db_*.sql.gz" -mtime +7 -delete
+// Add to Finance section
+{ path: "/admin/fuel-stations", icon: Fuel, label: "Fuel Stations" }
 ```
 
-```bash
-# Add to crontab
-crontab -e
-0 2 * * * /path/to/backup-script.sh
-```
-
-### **2. Code Backups**
+### 3.3 Install Dependencies (if needed)
 
 ```bash
-# Git push to remote
-git push origin main
-
-# Or create archive
-tar -czf voyage-backup-$(date +%Y%m%d).tar.gz /path/to/voyage-onboard-now
-```
-
----
-
-## 🚨 TROUBLESHOOTING
-
-### **Backend Issues:**
-
-**Server won't start:**
-```bash
-# Check logs
-pm2 logs voyage-backend
-
-# Check port
-sudo netstat -tulpn | grep 3001
-
-# Restart
-pm2 restart voyage-backend
-```
-
-**Database connection fails:**
-```bash
-# Test connection
-psql -U kjkhandala_user -d kjkhandala -h localhost
-
-# Check DATABASE_URL
-echo $DATABASE_URL
-```
-
-### **Frontend Issues:**
-
-**Build fails:**
-```bash
-# Clear cache
-rm -rf node_modules dist
+cd frontend
 npm install
+```
+
+### 3.4 Build and Deploy
+
+```bash
+# Development
+npm run dev
+
+# Production
 npm run build
 ```
 
-**API calls fail:**
-```bash
-# Check CORS
-# Verify VITE_API_URL
-# Check browser console
+---
+
+## Step 4: Testing
+
+### 4.1 Employee-Payroll Sync
+
+**Test Steps:**
+1. Login as HR Manager
+2. Navigate to HR → Employees
+3. Update an employee's salary
+4. Navigate to HR → Payroll
+5. Verify draft payroll records show updated salary
+
+**Expected Result:**
+- ✅ Salary updates automatically in draft payroll
+
+### 4.2 Fuel Management - Admin
+
+**Test Steps:**
+1. Login as Admin
+2. Navigate to Admin → Fuel Stations
+3. Add a new fuel station:
+   - Name: "Test Station"
+   - Location: "Test Location"
+   - Mark as Active
+4. Verify station appears in list
+5. Toggle status to Inactive
+6. Verify status changes
+
+**Expected Result:**
+- ✅ Can create fuel stations
+- ✅ Can toggle active/inactive
+- ✅ Statistics update correctly
+
+### 4.3 Fuel Management - Driver
+
+**Test Steps:**
+1. Login as Driver
+2. Navigate to Driver → Fuel Logs
+3. Click "Add Fuel Log"
+4. Fill in details:
+   - Select fuel station (should only show active stations)
+   - Enter liters: 50
+   - Enter cost per liter: 15.50
+   - Verify total cost auto-calculates: 775.00
+   - Enter odometer reading
+   - Upload receipt image
+5. Submit
+6. Verify log appears with "Pending" status
+
+**Expected Result:**
+- ✅ Can add fuel log
+- ✅ Receipt uploads successfully
+- ✅ Log shows in history
+- ✅ Status is "Pending"
+
+### 4.4 Fuel Approval - Admin
+
+**Test Steps:**
+1. Login as Admin/Finance Manager
+2. Navigate to Finance → Fuel Logs (or create this page)
+3. View pending fuel logs
+4. Approve or reject logs
+
+**Note:** Fuel approval UI needs to be created (see Future Enhancements)
+
+### 4.5 Delay Management
+
+**Test Steps:**
+1. Login as Operations Manager
+2. Navigate to Operations → Delay Management
+3. Create a new delay:
+   - Select trip
+   - Enter delay reason
+   - Set new departure time
+4. Verify affected passengers count is auto-calculated
+5. Mark delay as resolved
+6. Verify resolution timestamp
+
+**Expected Result:**
+- ✅ Can create delays
+- ✅ Passenger count auto-calculates
+- ✅ Can mark as resolved
+
+---
+
+## Step 5: Data Migration (if applicable)
+
+### 5.1 Migrate Existing Fuel Logs
+
+If you have existing fuel logs without station references:
+
+```sql
+-- Create a default "Unknown" station
+INSERT INTO fuel_stations (name, location, is_active)
+VALUES ('Unknown Station', 'Unknown', false)
+RETURNING id;
+
+-- Update existing logs (replace {station_id} with actual ID)
+UPDATE fuel_logs
+SET fuel_station_id = '{station_id}'
+WHERE fuel_station_id IS NULL;
+```
+
+### 5.2 Migrate Existing Delays
+
+If you have delay data in other tables:
+
+```sql
+-- Example migration (adjust based on your schema)
+INSERT INTO trip_delays (
+  trip_id,
+  delay_reason,
+  delay_minutes,
+  original_departure,
+  new_departure,
+  created_at
+)
+SELECT 
+  trip_id,
+  reason,
+  EXTRACT(EPOCH FROM (new_time - original_time))/60,
+  original_time,
+  new_time,
+  created_at
+FROM old_delays_table;
 ```
 
 ---
 
-## 📞 SUPPORT CONTACTS
+## Step 6: Monitoring and Validation
 
-**Technical Issues:**
-- Database: DBA team
-- Server: DevOps team
-- Application: Development team
+### 6.1 Check Database Health
 
-**Service Providers:**
-- DPO Support: support@dpo.com
-- Twilio Support: support@twilio.com
-- Hosting: Your provider support
+```sql
+-- Check table sizes
+SELECT 
+  schemaname,
+  tablename,
+  pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size
+FROM pg_tables
+WHERE schemaname = 'public'
+AND tablename IN ('fuel_stations', 'fuel_logs', 'trip_delays', 'booking_flow_history')
+ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+
+-- Check recent activity
+SELECT 
+  'fuel_logs' as table_name,
+  COUNT(*) as total_records,
+  COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') as last_24h
+FROM fuel_logs
+UNION ALL
+SELECT 
+  'trip_delays',
+  COUNT(*),
+  COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours')
+FROM trip_delays;
+```
+
+### 6.2 Monitor Storage Usage
+
+```sql
+-- Check storage bucket usage
+SELECT 
+  bucket_id,
+  COUNT(*) as file_count,
+  pg_size_pretty(SUM(metadata->>'size')::bigint) as total_size
+FROM storage.objects
+WHERE bucket_id = 'fuel-receipts'
+GROUP BY bucket_id;
+```
+
+### 6.3 Check Error Logs
+
+Monitor Supabase logs for:
+- Failed fuel log uploads
+- Trigger execution errors
+- RLS policy violations
 
 ---
 
-## ✅ DEPLOYMENT CHECKLIST
+## Step 7: User Training
 
-- [ ] Database created & migrated
-- [ ] Backend deployed & running
-- [ ] Frontend deployed & accessible
-- [ ] SSL certificates installed
-- [ ] Environment variables set
-- [ ] Backups configured
-- [ ] Monitoring setup
-- [ ] Health checks passing
-- [ ] All tests passing
+### 7.1 Driver Training
+
+**Topics to cover:**
+- How to access Fuel Logs
+- How to add a fuel log
+- How to upload receipts
+- Understanding approval status
+- What to do if rejected
+
+**Training Materials:**
+- Create video tutorial
+- Create PDF guide
+- Conduct live training session
+
+### 7.2 Admin Training
+
+**Topics to cover:**
+- Managing fuel stations
+- Approving fuel logs
+- Viewing fuel reports
+- Managing delays
+- Understanding payroll sync
+
+---
+
+## Rollback Plan
+
+If issues occur, follow this rollback procedure:
+
+### Database Rollback
+
+```sql
+-- Drop new tables (in reverse order)
+DROP TABLE IF EXISTS booking_flow_history CASCADE;
+DROP TABLE IF EXISTS trip_delays CASCADE;
+DROP TABLE IF EXISTS fuel_stations CASCADE;
+
+-- Drop views
+DROP VIEW IF EXISTS delay_management_overview;
+DROP VIEW IF EXISTS driver_fuel_logs;
+DROP VIEW IF EXISTS employee_payroll_sync;
+
+-- Drop triggers
+DROP TRIGGER IF EXISTS trigger_track_booking_flow ON bookings;
+DROP TRIGGER IF EXISTS trigger_calculate_affected_passengers ON trip_delays;
+DROP TRIGGER IF EXISTS trigger_sync_employee_to_payroll ON employees;
+
+-- Drop functions
+DROP FUNCTION IF EXISTS track_booking_flow();
+DROP FUNCTION IF EXISTS calculate_affected_passengers();
+DROP FUNCTION IF EXISTS sync_employee_to_payroll();
+
+-- Revert column additions
+ALTER TABLE fuel_logs DROP COLUMN IF EXISTS fuel_station_id;
+ALTER TABLE fuel_logs DROP COLUMN IF EXISTS receipt_image_url;
+ALTER TABLE fuel_logs DROP COLUMN IF EXISTS status;
+ALTER TABLE fuel_logs DROP COLUMN IF EXISTS rejection_reason;
+
+ALTER TABLE bookings DROP COLUMN IF EXISTS flow_step;
+ALTER TABLE bookings DROP COLUMN IF EXISTS flow_started_at;
+ALTER TABLE bookings DROP COLUMN IF EXISTS flow_completed_at;
+
+ALTER TABLE payroll DROP COLUMN IF EXISTS bonuses;
+ALTER TABLE payroll DROP COLUMN IF EXISTS overtime_pay;
+ALTER TABLE payroll DROP COLUMN IF EXISTS created_by;
+```
+
+### Frontend Rollback
+
+```bash
+# Revert to previous commit
+git revert HEAD
+
+# Or checkout specific files
+git checkout HEAD~1 -- frontend/src/pages/driver/FuelLogs.tsx
+git checkout HEAD~1 -- frontend/src/pages/admin/FuelStations.tsx
+git checkout HEAD~1 -- frontend/src/App.tsx
+```
+
+---
+
+## Post-Deployment Checklist
+
+- [ ] All SQL scripts executed successfully
+- [ ] Storage bucket created and configured
+- [ ] Storage policies applied
+- [ ] Frontend routes added
+- [ ] Navigation updated
+- [ ] Application builds without errors
+- [ ] Employee-payroll sync tested
+- [ ] Fuel station management tested
+- [ ] Driver fuel logging tested
+- [ ] Receipt upload tested
+- [ ] Delay management tested
+- [ ] User training completed
 - [ ] Documentation updated
-- [ ] Team trained
-- [ ] Support contacts documented
+- [ ] Monitoring configured
+- [ ] Backup created
 
 ---
 
-**Deployment Status:** ✅ READY FOR PRODUCTION
+## Support and Troubleshooting
 
-**Last Updated:** 2025-01-07
-**Version:** 1.0.0
+### Common Issues
+
+**Issue: Receipt upload fails**
+- Check storage bucket exists
+- Verify file size < 5MB
+- Check file type is allowed
+- Verify storage policies
+
+**Issue: Fuel stations not showing for drivers**
+- Check station is marked as active
+- Verify RLS policies
+- Check driver authentication
+
+**Issue: Payroll not syncing**
+- Verify trigger is enabled
+- Check employee has salary set
+- Ensure payroll status is 'draft'
+
+**Issue: Delay passenger count is 0**
+- Check booking statuses
+- Verify trip_id is correct
+- Check trigger is firing
+
+### Getting Help
+
+- Check logs in Supabase Dashboard
+- Review `FEATURE_IMPLEMENTATION_GUIDE.md`
+- Contact development team
+- Check GitHub issues
+
+---
+
+## Next Steps
+
+After successful deployment:
+
+1. **Monitor Usage:**
+   - Track fuel log submissions
+   - Monitor storage usage
+   - Review delay reports
+
+2. **Gather Feedback:**
+   - Survey drivers on fuel logging
+   - Get admin feedback on management tools
+   - Identify improvement areas
+
+3. **Implement Enhancements:**
+   - Fuel approval workflow UI
+   - Fuel analytics dashboard
+   - Automated delay notifications
+   - Complete ticketing flow wizard
+
+4. **Optimize Performance:**
+   - Add database indexes if needed
+   - Optimize queries
+   - Cache frequently accessed data
+
+---
+
+## Success Metrics
+
+Track these metrics post-deployment:
+
+- **Fuel Management:**
+  - Number of fuel logs submitted per day
+  - Average approval time
+  - Receipt upload success rate
+  - Fuel cost trends
+
+- **Payroll Sync:**
+  - Number of automatic updates
+  - Sync accuracy rate
+  - Time saved vs manual entry
+
+- **Delay Management:**
+  - Number of delays recorded
+  - Average delay duration
+  - Resolution time
+  - Passenger impact
+
+---
+
+## Conclusion
+
+This deployment adds significant functionality to the system:
+- ✅ Automated employee-payroll synchronization
+- ✅ Complete fuel management system
+- ✅ Enhanced delay tracking
+- ⏳ Foundation for seamless ticketing flow
+
+Follow this guide carefully and test thoroughly before production deployment.
+
+For questions or issues, refer to `FEATURE_IMPLEMENTATION_GUIDE.md` or contact the development team.

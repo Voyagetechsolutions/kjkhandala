@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/components/admin/AdminLayout';
 import TicketingLayout from '@/components/ticketing/TicketingLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,26 +47,26 @@ export default function PassengerDetails() {
   useEffect(() => {
     // Get data from sessionStorage
     const tripData = sessionStorage.getItem('selectedTrip');
-    const seatsData = sessionStorage.getItem('selectedSeats');
+    const passengersCount = sessionStorage.getItem('passengers');
 
-    if (!tripData || !seatsData) {
+    if (!tripData || !passengersCount) {
       toast({
         variant: 'destructive',
         title: 'Missing data',
-        description: 'Please complete seat selection first',
+        description: 'Please search for a trip first',
       });
-      navigate('/ticketing/search-trips');
+      const basePath = isAdminRoute ? '/admin/ticketing' : '/ticketing';
+      navigate(`${basePath}/search-trips`);
       return;
     }
 
     const trip = JSON.parse(tripData);
-    const seats = JSON.parse(seatsData);
+    const count = parseInt(passengersCount);
 
     setTrip(trip);
-    setSelectedSeats(seats);
 
-    // Initialize passenger forms
-    const forms: PassengerForm[] = seats.map((seatNum: number) => ({
+    // Initialize passenger forms (without seat numbers yet)
+    const forms: PassengerForm[] = Array.from({ length: count }, () => ({
       full_name: '',
       phone: '',
       email: '',
@@ -78,7 +78,7 @@ export default function PassengerDetails() {
       next_of_kin_name: '',
       next_of_kin_phone: '',
       special_notes: '',
-      seat_number: seatNum,
+      seat_number: 0, // Will be assigned during seat selection
     }));
 
     setPassengers(forms);
@@ -206,8 +206,9 @@ export default function PassengerDetails() {
     // Store passenger data
     sessionStorage.setItem('passengerDetails', JSON.stringify(passengers));
 
-    // Navigate to payment
-    navigate('/ticketing/payment');
+    // Navigate to seat selection
+    const basePath = isAdminRoute ? '/admin/ticketing' : '/ticketing';
+    navigate(`${basePath}/seat-selection`);
   };
 
   if (loading) {
@@ -225,9 +226,12 @@ export default function PassengerDetails() {
               Enter details for {passengers.length} passenger(s)
             </p>
           </div>
-          <Button variant="outline" onClick={() => navigate('/ticketing/seat-selection')}>
+          <Button variant="outline" onClick={() => {
+            const basePath = isAdminRoute ? '/admin/ticketing' : '/ticketing';
+            navigate(`${basePath}/search-trips`);
+          }}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Seats
+            Back to Search
           </Button>
         </div>
 
@@ -260,7 +264,7 @@ export default function PassengerDetails() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>
-                    Passenger {index + 1} - Seat {passenger.seat_number}
+                    Passenger {index + 1}
                   </CardTitle>
                   <CardDescription>Enter passenger information</CardDescription>
                 </div>
@@ -419,7 +423,7 @@ export default function PassengerDetails() {
           <CardContent className="pt-6">
             <Button onClick={validateAndProceed} className="w-full" size="lg">
               <CheckCircle2 className="h-5 w-5 mr-2" />
-              Continue to Payment
+              Continue to Seat Selection
             </Button>
           </CardContent>
         </Card>

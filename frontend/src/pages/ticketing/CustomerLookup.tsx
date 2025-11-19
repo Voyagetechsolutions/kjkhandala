@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/components/admin/AdminLayout';
 import TicketingLayout from '@/components/ticketing/TicketingLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -98,26 +98,48 @@ export default function CustomerLookup() {
 
       setCustomer(passengerData);
 
-      // Fetch customer bookings
+      // Fetch customer bookings by phone
       const { data: bookingsData } = await supabase
         .from('bookings')
-        .select(`
-          *,
-          trips (
-            trip_number,
-            departure_time,
-            routes (origin, destination)
-          )
-        `)
-        .eq('passenger_id', passengerData.id)
-        .order('booking_date', { ascending: false })
-        .limit(10);
+        .select('*')
+        .eq('passenger_phone', passengerData.phone)
+        .order('created_at', { ascending: false })
+        .limit(20);
 
-      setBookings(bookingsData || []);
+      // Fetch trip details for each booking
+      const bookingsWithTrips = await Promise.all(
+        (bookingsData || []).map(async (booking) => {
+          const { data: trip } = await supabase
+            .from('trips')
+            .select('trip_number, scheduled_departure, route_id')
+            .eq('id', booking.trip_id)
+            .single();
+
+          if (trip) {
+            const { data: route } = await supabase
+              .from('routes')
+              .select('origin, destination')
+              .eq('id', trip.route_id)
+              .single();
+
+            return {
+              ...booking,
+              trips: {
+                trip_number: trip.trip_number,
+                departure_time: trip.scheduled_departure,
+                routes: route,
+              },
+            };
+          }
+          return booking;
+        })
+      );
+
+      setBookings(bookingsWithTrips);
 
       toast({
         title: 'Customer found',
-        description: `${passengerData.full_name} - ${passengerData.total_trips || 0} trips`,
+        description: `${passengerData.full_name} - ${bookingsData?.length || 0} bookings`,
       });
 
     } catch (error: any) {

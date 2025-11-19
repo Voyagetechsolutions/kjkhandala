@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -125,36 +127,41 @@ export default function Careers() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      {/* Header */}
-      <div className="bg-blue-600 text-white py-16">
-        <div className="container mx-auto px-4">
-          <h1 className="text-5xl font-bold mb-4">Join Our Team</h1>
-          <p className="text-xl text-blue-100">Build your career with us. Explore exciting opportunities.</p>
-        </div>
-      </div>
-
-      {/* Job Listings */}
-      <div className="container mx-auto px-4 py-12">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2">Open Positions</h2>
-          <p className="text-muted-foreground">We're looking for talented individuals to join our growing team</p>
-        </div>
-
-        {isLoading ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">Loading positions...</p>
+    <div className="min-h-screen flex flex-col">
+      <Navbar />
+      
+      <main className="flex-1">
+        {/* Header */}
+        <div className="bg-gradient-to-br from-primary/10 to-secondary/10 py-16">
+          <div className="container mx-auto px-4 text-center">
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">Join Our Team</h1>
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+              Build your career with us. Explore exciting opportunities.
+            </p>
           </div>
-        ) : jobs.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Briefcase className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No Open Positions</h3>
-              <p className="text-muted-foreground">We don't have any open positions at the moment. Check back soon!</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        </div>
+
+        {/* Job Listings */}
+        <div className="container mx-auto px-4 py-12">
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold mb-2">Open Positions</h2>
+            <p className="text-muted-foreground">We're looking for talented individuals to join our growing team</p>
+          </div>
+
+          {isLoading ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Loading positions...</p>
+            </div>
+          ) : jobs.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Briefcase className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-xl font-semibold mb-2">No Open Positions</h3>
+                <p className="text-muted-foreground">We don't have any open positions at the moment. Check back soon!</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {jobs.map((job: any) => (
               <Card key={job.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
@@ -200,9 +207,10 @@ export default function Careers() {
                 </CardContent>
               </Card>
             ))}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      </main>
 
       {/* Application Dialog */}
       <Dialog open={showApplicationDialog} onOpenChange={setShowApplicationDialog}>
@@ -307,6 +315,8 @@ export default function Careers() {
           </div>
         </DialogContent>
       </Dialog>
+      
+      <Footer />
     </div>
   );
 }

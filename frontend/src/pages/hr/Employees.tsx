@@ -54,18 +54,18 @@ export default function Employees() {
 
   const filteredEmployees = employees.filter((emp: any) => {
     const matchesDept = filters.department === 'all' || emp.department === filters.department;
-    const matchesStatus = filters.status === 'all' || emp.status === filters.status;
+    const matchesStatus = filters.status === 'all' || emp.employment_status === filters.status;
     const matchesSearch = !filters.search || 
       emp.full_name?.toLowerCase().includes(filters.search.toLowerCase()) ||
       emp.email?.toLowerCase().includes(filters.search.toLowerCase()) ||
-      emp.employee_id?.toLowerCase().includes(filters.search.toLowerCase());
+      emp.employee_number?.toLowerCase().includes(filters.search.toLowerCase());
     return matchesDept && matchesStatus && matchesSearch;
   });
 
   const summary = {
     total: employees.length,
-    active: employees.filter((e: any) => e.is_active).length,
-    inactive: employees.filter((e: any) => !e.is_active).length,
+    active: employees.filter((e: any) => e.employment_status === 'active').length,
+    inactive: employees.filter((e: any) => e.employment_status === 'inactive').length,
   };
 
   const departments = [...new Set(employees.map((e: any) => e.department))].filter(Boolean);

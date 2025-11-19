@@ -55,14 +55,15 @@ export default function TerminalOperations() {
 
       const { data: bookings, error: bookingsError } = await supabase
         .from('bookings')
-        .select('trip_id, seats_booked')
-        .in('trip_id', trips?.map(t => t.id) || []);
+        .select('trip_id, seat_number')
+        .in('trip_id', trips?.map(t => t.id) || [])
+        .neq('booking_status', 'cancelled');
 
       if (bookingsError) throw bookingsError;
 
       const tripsWithBookings = trips?.map(trip => {
         const tripBookings = bookings?.filter(b => b.trip_id === trip.id) || [];
-        const bookedSeats = tripBookings.reduce((sum, b) => sum + (b.seats_booked || 1), 0);
+        const bookedSeats = tripBookings.length; // Each booking is one seat
         const bus = Array.isArray(trip.bus) ? trip.bus[0] : trip.bus;
         const capacity = bus?.seating_capacity || trip.total_seats || 0;
         const loadFactor = capacity > 0 ? ((bookedSeats / capacity) * 100).toFixed(1) : '0';

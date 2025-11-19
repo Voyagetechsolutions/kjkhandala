@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/components/admin/AdminLayout';
 import TicketingLayout from '@/components/ticketing/TicketingLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,80 +41,98 @@ export default function ModifyBooking() {
     try {
       setSearching(true);
 
-      let query = supabase
-        .from('bookings')
-        .select(`
-          *,
-          trips (
-            trip_number,
-            departure_time,
-            routes (origin, destination),
-            buses (name)
-          ),
-          passengers (full_name, phone, id_number)
-        `);
+      // Extract base reference if searching by reference (remove -1, -2 suffix)
+      const baseRef = searchType === 'reference' ? searchTerm.split('-')[0] : null;
+
+      // Search bookings
+      let bookingsQuery = supabase.from('bookings').select('*');
 
       if (searchType === 'reference') {
-        query = query.eq('booking_reference', searchTerm);
+        bookingsQuery = bookingsQuery.or(`booking_reference.eq.${searchTerm},booking_reference.like.${baseRef}-%`);
       } else if (searchType === 'phone') {
-        const { data: passenger } = await supabase
-          .from('passengers')
-          .select('id')
-          .eq('phone', searchTerm)
-          .single();
-
-        if (!passenger) {
-          toast({
-            title: 'Not found',
-            description: 'No booking found with this phone number',
-          });
-          return;
-        }
-
-        query = query.eq('passenger_id', passenger.id);
+        bookingsQuery = bookingsQuery.eq('passenger_phone', searchTerm);
       } else if (searchType === 'id') {
+        // Search in passengers table first
         const { data: passenger } = await supabase
           .from('passengers')
-          .select('id')
+          .select('phone')
           .eq('id_number', searchTerm)
-          .single();
+          .maybeSingle();
 
         if (!passenger) {
           toast({
             title: 'Not found',
-            description: 'No booking found with this ID number',
+            description: 'No passenger found with this ID number',
           });
+          setSearching(false);
           return;
         }
 
-        query = query.eq('passenger_id', passenger.id);
+        bookingsQuery = bookingsQuery.eq('passenger_phone', passenger.phone);
       }
 
-      const { data, error } = await query.single();
+      const { data: allBookings, error: bookingsError } = await bookingsQuery.order('created_at', { ascending: false });
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          toast({
-            title: 'Not found',
-            description: 'No booking found matching your search',
-          });
-        } else {
-          throw error;
-        }
+      if (bookingsError) throw bookingsError;
+
+      if (!allBookings || allBookings.length === 0) {
+        toast({
+          title: 'Not found',
+          description: 'No booking found matching your search',
+        });
+        setSearching(false);
         return;
       }
 
-      // Fetch booking seats
-      const { data: seats } = await supabase
-        .from('booking_seats')
-        .select('*')
-        .eq('booking_id', data.id);
+      // Use first booking for trip details
+      const firstBooking = allBookings[0];
 
-      setBooking({ ...data, seats });
+      // Fetch trip details
+      const { data: trip } = await supabase
+        .from('trips')
+        .select('id, trip_number, scheduled_departure, scheduled_arrival, route_id, bus_id')
+        .eq('id', firstBooking.trip_id)
+        .single();
+
+      let tripData = null;
+      if (trip) {
+        const { data: route } = await supabase
+          .from('routes')
+          .select('origin, destination')
+          .eq('id', trip.route_id)
+          .single();
+
+        const { data: bus } = await supabase
+          .from('buses')
+          .select('name, number_plate')
+          .eq('id', trip.bus_id)
+          .single();
+
+        tripData = {
+          trip_number: trip.trip_number,
+          departure_time: trip.scheduled_departure,
+          arrival_time: trip.scheduled_arrival,
+          routes: route,
+          buses: bus,
+        };
+      }
+
+      // Calculate totals
+      const totalAmount = allBookings.reduce((sum, b) => sum + (parseFloat(b.total_amount) || 0), 0);
+
+      setBooking({
+        ...firstBooking,
+        trips: tripData,
+        passengers: allBookings,
+        total_amount: totalAmount,
+        passenger_count: allBookings.length,
+        payment_status: firstBooking.payment_status,
+        booking_status: firstBooking.booking_status,
+      });
 
       toast({
         title: 'Booking found',
-        description: `Booking ${data.booking_reference} loaded`,
+        description: `Found ${allBookings.length} passenger(s)`,
       });
 
     } catch (error: any) {
@@ -260,16 +278,22 @@ export default function ModifyBooking() {
                 <div>
                   <h3 className="font-semibold mb-3 flex items-center gap-2">
                     <Users className="h-4 w-4" />
-                    Passengers ({booking.seats?.length})
+                    Passengers ({booking.passenger_count || 1})
                   </h3>
                   <div className="space-y-2">
-                    {booking.seats?.map((seat: any, index: number) => (
+                    {booking.passengers?.map((passenger: any, index: number) => (
                       <div key={index} className="flex items-center justify-between p-3 border rounded">
                         <div>
-                          <p className="font-medium">{seat.passenger_name}</p>
-                          <p className="text-sm text-muted-foreground">{seat.passenger_phone}</p>
+                          <p className="font-medium">{passenger.passenger_name}</p>
+                          <p className="text-sm text-muted-foreground">{passenger.passenger_phone}</p>
+                          {passenger.passenger_email && (
+                            <p className="text-xs text-muted-foreground">{passenger.passenger_email}</p>
+                          )}
                         </div>
-                        <Badge variant="secondary">Seat {seat.seat_number}</Badge>
+                        <div className="text-right">
+                          <Badge variant="secondary">Seat {passenger.seat_number}</Badge>
+                          <p className="text-xs text-muted-foreground mt-1">P {parseFloat(passenger.total_amount)?.toFixed(2)}</p>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -282,22 +306,26 @@ export default function ModifyBooking() {
                   <h3 className="font-semibold mb-3">Payment Information</h3>
                   <div className="grid md:grid-cols-2 gap-4 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total:</span>
+                      <span className="text-muted-foreground">Total Amount:</span>
                       <span className="font-medium">P {booking.total_amount?.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Paid:</span>
-                      <span className="font-medium text-green-600">P {booking.amount_paid?.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Balance:</span>
-                      <span className={`font-medium ${booking.balance > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                        P {booking.balance?.toFixed(2)}
+                      <span className="text-muted-foreground">Payment Status:</span>
+                      <span className={`font-medium capitalize ${
+                        booking.payment_status === 'paid' ? 'text-green-600' : 
+                        booking.payment_status === 'partial' ? 'text-orange-600' : 
+                        'text-gray-600'
+                      }`}>
+                        {booking.payment_status}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Status:</span>
-                      <span className="font-medium capitalize">{booking.payment_status}</span>
+                      <span className="text-muted-foreground">Booking Status:</span>
+                      <span className="font-medium capitalize">{booking.booking_status}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Booked On:</span>
+                      <span className="text-sm">{new Date(booking.created_at).toLocaleDateString()}</span>
                     </div>
                   </div>
                 </div>

@@ -235,17 +235,28 @@ export default function TicketingDashboard() {
             ) : (
               <div className="space-y-3">
                 {trips?.slice(0, 5).map((trip: any) => (
-                  <div key={trip.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex-1">
-                      <p className="font-medium">{trip.route_name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        <Clock className="inline h-3 w-3 mr-1" />
-                        {new Date(trip.scheduled_departure).toLocaleTimeString()}
-                      </p>
+                  <div key={trip.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="flex-1 space-y-1">
+                      <p className="font-semibold">{trip.route?.origin} → {trip.route?.destination}</p>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <span>
+                          <Clock className="inline h-3 w-3 mr-1" />
+                          {new Date(trip.scheduled_departure).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span>
+                          <Bus className="inline h-3 w-3 mr-1" />
+                          {trip.bus?.name || 'TBA'}
+                        </span>
+                        <span>
+                          <User className="inline h-3 w-3 mr-1" />
+                          {trip.driver?.full_name || 'TBA'}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium">{trip.available_seats}/{trip.total_seats} seats</p>
-                      <Badge variant={trip.status === 'BOARDING' ? 'default' : 'secondary'}>
+                    <div className="text-right space-y-1">
+                      <p className="text-sm font-medium">{trip.booked_seats}/{trip.total_seats} seats</p>
+                      <p className="text-xs text-muted-foreground">{trip.available_seats} left</p>
+                      <Badge variant={trip.status === 'BOARDING' ? 'default' : 'secondary'} className="text-xs">
                         {trip.status}
                       </Badge>
                     </div>
@@ -256,37 +267,50 @@ export default function TicketingDashboard() {
           </CardContent>
         </Card>
 
-        {/* Low Seat Alerts */}
+        {/* Passenger Load Zones */}
         <Card>
           <CardHeader>
-            <CardTitle>Low Seat Alerts</CardTitle>
-            <CardDescription>Routes about to sell out</CardDescription>
+            <CardTitle>Passenger Load Status</CardTitle>
+            <CardDescription>Trip departure readiness zones</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <div className="text-center py-12">Loading...</div>
-            ) : alerts && alerts.length > 0 ? (
-              <div className="space-y-3">
-                {alerts.map((alert: any) => (
-                  <div key={alert.id} className="flex items-center justify-between p-3 border border-orange-200 bg-orange-50 rounded-lg">
-                    <div className="flex-1">
-                      <p className="font-medium">{alert.message}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {alert.severity === 'HIGH' ? '🔴' : '🟡'} {alert.alert_type}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <Badge variant={alert.severity === 'HIGH' ? 'destructive' : 'secondary'}>
-                        {alert.severity}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
+            ) : !trips || trips.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No trips to monitor</p>
               </div>
             ) : (
-              <div className="text-center py-12 text-muted-foreground">
-                <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No alerts</p>
+              <div className="space-y-3">
+                {trips?.map((trip: any) => {
+                  const bgColor = trip.zone === 'red' ? 'bg-red-50 border-red-200' : 
+                                  trip.zone === 'yellow' ? 'bg-yellow-50 border-yellow-200' : 
+                                  'bg-green-50 border-green-200';
+                  
+                  return (
+                    <div key={trip.id} className={`p-4 border rounded-lg ${bgColor}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex-1">
+                          <p className="font-semibold">{trip.route?.origin} → {trip.route?.destination}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(trip.scheduled_departure).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} • {trip.bus?.name || 'TBA'}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold">{trip.booked_seats} passengers</p>
+                          <p className="text-xs text-muted-foreground">{trip.occupancy_rate.toFixed(0)}% capacity</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t">
+                        <span className="text-sm font-medium">{trip.zone_label}</span>
+                        <Badge variant={trip.zone === 'red' ? 'destructive' : trip.zone === 'yellow' ? 'secondary' : 'default'}>
+                          {trip.can_depart ? 'CAN DEPART' : 'CANNOT DEPART'}
+                        </Badge>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </CardContent>

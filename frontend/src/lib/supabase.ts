@@ -97,3 +97,5 @@ export function onAuthStateChange(callback: (user: any) => void) {
     callback(session?.user || null);
   });
 }
+
+export default supabase;
