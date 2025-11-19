@@ -33,16 +33,10 @@ export default function AboutStorySection() {
           <div className="space-y-6">
             <h2 className="text-3xl md:text-4xl font-bold">Our Story</h2>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              Since 1984, KJ Khandala has delivered safe, reliable and comfortable travel across Southern Africa.
-            </p>
-            <p className="text-lg text-muted-foreground leading-relaxed">
-              Our fleet is built to premium specifications, and every trip is defined by professionalism, punctuality and good old-fashioned courtesy.
-            </p>
-            <p className="text-lg text-muted-foreground leading-relaxed">
-              Whether you're booking a vacation, business trip, charter or staff transport, we remain committed to excellence, affordability and safety.
+              Founded on 02 October 2013, KJ KHANDALA began with a simple but powerful vision: to create a transport brand that would stand among the greats of Botswana — a name built on trust, excellence, and unforgettable travel experiences.
             </p>
             <Button size="lg" onClick={() => navigate("/about")}>
-              Read More About Us
+              Read More
             </Button>
           </div>
         </div>

@@ -36,7 +36,22 @@ export default function Manifest() {
         .eq('booking_status', 'CONFIRMED')
         .order('seat_number');
       if (error) throw error;
-      return { passengers: data || [] };
+      
+      const passengers = data || [];
+      const trip = passengers[0]?.trip || null;
+      
+      // Calculate stats
+      const stats = {
+        total: passengers.length,
+        checkedIn: passengers.filter((p: any) => p.boarding_status === 'BOARDED').length,
+        notBoarded: passengers.filter((p: any) => p.boarding_status !== 'BOARDED').length,
+      };
+      
+      return { 
+        passengers,
+        trip,
+        stats
+      };
     },
   });
 
