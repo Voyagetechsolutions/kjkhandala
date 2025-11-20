@@ -1,579 +1,490 @@
-# Complete Deployment Guide - New Features
+# 🚀 DEPLOYMENT GUIDE
 
-## Overview
-
-This guide covers deploying 4 major feature enhancements:
-1. ✅ Employee-Payroll Synchronization
-2. ✅ Fuel Management System (Driver + Admin)
-3. ⏳ Seamless Ticketing Flow
-4. ⏳ Enhanced Delay Management
+Complete guide to deploy all migrations and functions to Supabase.
 
 ---
 
-## Prerequisites
+## 📋 **PRE-DEPLOYMENT CHECKLIST**
 
-- Supabase project with admin access
-- Node.js and npm installed
-- Git repository access
-- Admin access to production environment
+- [ ] Supabase project created
+- [ ] Supabase CLI installed
+- [ ] Database backup created (if existing data)
+- [ ] Environment variables configured
 
 ---
 
-## Step 1: Database Deployment
+## 🔧 **OPTION 1: Supabase CLI (Recommended)**
 
-### 1.1 Run SQL Scripts
+### **Step 1: Install Supabase CLI**
 
-Open Supabase SQL Editor and execute in this order:
+```bash
+# Windows (PowerShell)
+scoop install supabase
 
-```sql
--- 1. Ensure enum types exist (if not already run)
-\i supabase/00_PRODUCTION_ENUMS.sql
-
--- 2. Apply feature enhancements
-\i supabase/FEATURE_ENHANCEMENTS.sql
+# Or using npm
+npm install -g supabase
 ```
 
-### 1.2 Verify Tables Created
+### **Step 2: Login to Supabase**
 
-Run this verification query:
+```bash
+supabase login
+```
+
+### **Step 3: Link Your Project**
+
+```bash
+cd c:\Users\Mthokozisi\Downloads\BMS\voyage-onboard-now
+supabase link --project-ref your-project-ref
+```
+
+**Find your project ref:**
+- Go to https://supabase.com/dashboard
+- Select your project
+- Settings → General → Reference ID
+
+### **Step 4: Deploy Migrations**
+
+```bash
+# Deploy all migrations in order
+supabase db push
+```
+
+This will automatically run all `.sql` files in `supabase/migrations/` in alphabetical order.
+
+### **Step 5: Verify Deployment**
+
+```bash
+# Check migration status
+supabase migration list
+
+# Check database
+supabase db diff
+```
+
+---
+
+## 🌐 **OPTION 2: Supabase Dashboard (Manual)**
+
+### **Step 1: Open SQL Editor**
+
+1. Go to https://supabase.com/dashboard
+2. Select your project
+3. Click "SQL Editor" in sidebar
+4. Click "New query"
+
+### **Step 2: Deploy Migrations in Order**
+
+**Migration 1: Route Frequencies**
+```bash
+File: 20251120_create_route_frequencies.sql
+```
+- Copy entire file content
+- Paste into SQL Editor
+- Click "Run"
+- ✅ Check for success message
+
+**Migration 2: Route Stops**
+```bash
+File: 20251121_add_route_stops.sql
+```
+- Copy entire file content
+- Paste into SQL Editor
+- Click "Run"
+- ✅ Check for success message
+
+**Migration 3: Automated Shifts**
+```bash
+File: 20251122_automated_shifts_and_statuses.sql
+```
+- Copy entire file content
+- Paste into SQL Editor
+- Click "Run"
+- ✅ Check for success message
+
+**Migration 4: Complete Automation System**
+```bash
+File: 20251120_complete_automation_system.sql
+```
+- Copy entire file content
+- Paste into SQL Editor
+- Click "Run"
+- ✅ Check for success message
+
+**Migration 5: Auto Driver Assignment (Fixed)**
+```bash
+File: 20251120_auto_driver_assignment_fixed.sql
+```
+- Copy entire file content
+- Paste into SQL Editor
+- Click "Run"
+- ✅ Check for success message
+
+### **Step 3: Verify Tables Created**
+
+Run this query to check:
 
 ```sql
--- Check new tables
 SELECT table_name 
 FROM information_schema.tables 
-WHERE table_schema = 'public' 
-AND table_name IN (
-  'fuel_stations',
-  'trip_delays',
-  'booking_flow_history'
-)
+WHERE table_schema = 'public'
 ORDER BY table_name;
+```
 
--- Check new views
-SELECT table_name 
-FROM information_schema.views 
-WHERE table_schema = 'public' 
-AND table_name IN (
-  'employee_payroll_sync',
-  'driver_fuel_logs',
-  'delay_management_overview'
-)
-ORDER BY table_name;
+**Expected tables:**
+- ✅ `route_frequencies`
+- ✅ `route_stops`
+- ✅ `trip_stops`
+- ✅ `driver_shifts`
+- ✅ `bus_shifts`
+- ✅ `conductor_shifts`
+- ✅ `driver_rotations`
+- ✅ `alerts`
+- ✅ `shift_reports`
+- ✅ `outbound_notifications`
 
--- Check triggers
-SELECT trigger_name, event_object_table
+### **Step 4: Verify Triggers Created**
+
+```sql
+SELECT trigger_name, event_object_table, action_timing, event_manipulation
 FROM information_schema.triggers
 WHERE trigger_schema = 'public'
-AND trigger_name IN (
-  'trigger_sync_employee_to_payroll',
-  'trigger_calculate_affected_passengers',
-  'trigger_track_booking_flow'
-)
 ORDER BY trigger_name;
 ```
 
-**Expected Results:**
-- ✅ 3 new tables
-- ✅ 3 new views
-- ✅ 3 new triggers
+**Expected triggers:**
+- ✅ `trg_auto_assign_driver`
+- ✅ `trg_auto_assign_bus`
+- ✅ `trg_auto_assign_conductor`
+- ✅ `trg_create_shifts_on_trip_insert`
+- ✅ `trg_update_driver_shift_on_trip_change`
+- ✅ `trg_delete_driver_shift_on_trip_delete`
+- ✅ `trg_finalize_shift_on_trip_update`
 
----
-
-## Step 2: Storage Setup
-
-### 2.1 Create Storage Bucket
-
-1. Go to Supabase Dashboard → Storage
-2. Click "New bucket"
-3. Settings:
-   - **Name:** `fuel-receipts`
-   - **Public:** No (keep private)
-   - **File size limit:** 5 MB
-   - **Allowed MIME types:** 
-     - `image/jpeg`
-     - `image/png`
-     - `image/jpg`
-     - `application/pdf`
-
-### 2.2 Apply Storage Policies
-
-In Supabase SQL Editor:
+### **Step 5: Verify Functions Created**
 
 ```sql
--- Allow drivers to upload their own receipts
-CREATE POLICY "Drivers can upload their own receipts"
-ON storage.objects FOR INSERT
-TO authenticated
-WITH CHECK (
-  bucket_id = 'fuel-receipts' AND
-  (storage.foldername(name))[1] = auth.uid()::text
-);
-
--- Allow drivers to view their own receipts
-CREATE POLICY "Drivers can view their own receipts"
-ON storage.objects FOR SELECT
-TO authenticated
-USING (
-  bucket_id = 'fuel-receipts' AND
-  (storage.foldername(name))[1] = auth.uid()::text
-);
-
--- Allow admins to view all receipts
-CREATE POLICY "Admins can view all receipts"
-ON storage.objects FOR SELECT
-TO authenticated
-USING (
-  bucket_id = 'fuel-receipts' AND
-  EXISTS (
-    SELECT 1 FROM user_roles
-    WHERE user_id = auth.uid()
-      AND role IN ('SUPER_ADMIN', 'ADMIN', 'FINANCE_MANAGER')
-  )
-);
+SELECT routine_name, routine_type
+FROM information_schema.routines
+WHERE routine_schema = 'public'
+AND routine_type = 'FUNCTION'
+ORDER BY routine_name;
 ```
 
-### 2.3 Verify Storage
-
-Upload a test file to verify policies work correctly.
+**Expected functions:**
+- ✅ `auto_assign_driver()`
+- ✅ `auto_assign_bus()`
+- ✅ `auto_assign_conductor()`
+- ✅ `assign_driver_by_rotation()`
+- ✅ `get_available_drivers()`
+- ✅ `generate_shift_reports_for_yesterday()`
+- ✅ `detect_and_mark_delays()`
+- ✅ `finalize_shift_on_trip_update()`
 
 ---
 
-## Step 3: Frontend Deployment
+## 🔄 **DEPLOY EDGE FUNCTIONS**
 
-### 3.1 Add New Routes
-
-Update `frontend/src/App.tsx`:
-
-```typescript
-// Add imports
-import FuelLogs from "./pages/driver/FuelLogs";
-import FuelStations from "./pages/admin/FuelStations";
-import BookingFlow from "./pages/booking/BookingFlow";
-
-// Add routes
-// Driver routes
-<Route path="/driver/fuel-logs" element={<FuelLogs />} />
-
-// Admin routes
-<Route path="/admin/fuel-stations" element={<FuelStations />} />
-
-// Public booking flow
-<Route path="/book-flow" element={<BookingFlow />} />
-```
-
-### 3.2 Update Navigation
-
-**Driver Layout** (`frontend/src/components/driver/DriverLayout.tsx`):
-
-```typescript
-import { Fuel } from 'lucide-react';
-
-// Add to navItems
-{ path: "/driver/fuel-logs", icon: Fuel, label: "Fuel Logs" }
-```
-
-**Admin Layout** (`frontend/src/components/admin/AdminLayout.tsx`):
-
-```typescript
-import { Fuel } from 'lucide-react';
-
-// Add to Finance section
-{ path: "/admin/fuel-stations", icon: Fuel, label: "Fuel Stations" }
-```
-
-### 3.3 Install Dependencies (if needed)
+### **Step 1: Deploy Trip Automation Function**
 
 ```bash
-cd frontend
-npm install
+cd c:\Users\Mthokozisi\Downloads\BMS\voyage-onboard-now
+
+# Deploy
+supabase functions deploy trip-automation
 ```
 
-### 3.4 Build and Deploy
+### **Step 2: Set Environment Variables**
 
 ```bash
-# Development
-npm run dev
+# Set secrets
+supabase secrets set SUPABASE_URL=https://your-project.supabase.co
+supabase secrets set SUPABASE_ANON_KEY=your-anon-key
+```
 
-# Production
-npm run build
+### **Step 3: Test Edge Function**
+
+```bash
+# Test locally first
+supabase functions serve trip-automation
+
+# Then test with curl
+curl -X POST http://localhost:54321/functions/v1/trip-automation \
+  -H "Content-Type: application/json" \
+  -d '{"action":"getActiveTrips"}'
 ```
 
 ---
 
-## Step 4: Testing
+## ⏰ **SETUP SCHEDULED FUNCTIONS**
 
-### 4.1 Employee-Payroll Sync
+### **Option A: Using pg_cron (if enabled)**
 
-**Test Steps:**
-1. Login as HR Manager
-2. Navigate to HR → Employees
-3. Update an employee's salary
-4. Navigate to HR → Payroll
-5. Verify draft payroll records show updated salary
+```sql
+-- Detect delays every 5 minutes
+SELECT cron.schedule(
+  'detect_delays_5m',
+  '*/5 * * * *',
+  $$SELECT detect_and_mark_delays();$$
+);
 
-**Expected Result:**
-- ✅ Salary updates automatically in draft payroll
+-- Generate shift reports daily at 00:10
+SELECT cron.schedule(
+  'daily_shift_reports',
+  '10 0 * * *',
+  $$SELECT generate_shift_reports_for_yesterday();$$
+);
 
-### 4.2 Fuel Management - Admin
+-- Generate trips daily at 00:00
+SELECT cron.schedule(
+  'generate_trips_daily',
+  '0 0 * * *',
+  $$SELECT generate_scheduled_trips();$$
+);
 
-**Test Steps:**
-1. Login as Admin
-2. Navigate to Admin → Fuel Stations
-3. Add a new fuel station:
-   - Name: "Test Station"
-   - Location: "Test Location"
-   - Mark as Active
-4. Verify station appears in list
-5. Toggle status to Inactive
-6. Verify status changes
+-- Update trip statuses every minute
+SELECT cron.schedule(
+  'update_trip_statuses',
+  '* * * * *',
+  $$SELECT update_trip_statuses();$$
+);
 
-**Expected Result:**
-- ✅ Can create fuel stations
-- ✅ Can toggle active/inactive
-- ✅ Statistics update correctly
+-- Update driver shift statuses every minute
+SELECT cron.schedule(
+  'update_shift_statuses',
+  '* * * * *',
+  $$SELECT update_driver_shift_statuses();$$
+);
+```
 
-### 4.3 Fuel Management - Driver
+### **Option B: Using Supabase Scheduled Functions**
 
-**Test Steps:**
-1. Login as Driver
-2. Navigate to Driver → Fuel Logs
-3. Click "Add Fuel Log"
-4. Fill in details:
-   - Select fuel station (should only show active stations)
-   - Enter liters: 50
-   - Enter cost per liter: 15.50
-   - Verify total cost auto-calculates: 775.00
-   - Enter odometer reading
-   - Upload receipt image
-5. Submit
-6. Verify log appears with "Pending" status
+Create a new Edge Function:
 
-**Expected Result:**
-- ✅ Can add fuel log
-- ✅ Receipt uploads successfully
-- ✅ Log shows in history
-- ✅ Status is "Pending"
+```bash
+supabase functions new scheduled-tasks
+```
 
-### 4.4 Fuel Approval - Admin
-
-**Test Steps:**
-1. Login as Admin/Finance Manager
-2. Navigate to Finance → Fuel Logs (or create this page)
-3. View pending fuel logs
-4. Approve or reject logs
-
-**Note:** Fuel approval UI needs to be created (see Future Enhancements)
-
-### 4.5 Delay Management
-
-**Test Steps:**
-1. Login as Operations Manager
-2. Navigate to Operations → Delay Management
-3. Create a new delay:
-   - Select trip
-   - Enter delay reason
-   - Set new departure time
-4. Verify affected passengers count is auto-calculated
-5. Mark delay as resolved
-6. Verify resolution timestamp
-
-**Expected Result:**
-- ✅ Can create delays
-- ✅ Passenger count auto-calculates
-- ✅ Can mark as resolved
+Then deploy and configure in Supabase Dashboard:
+1. Go to Edge Functions
+2. Click on `scheduled-tasks`
+3. Add cron schedule: `*/5 * * * *` (every 5 minutes)
 
 ---
 
-## Step 5: Data Migration (if applicable)
+## ✅ **POST-DEPLOYMENT VERIFICATION**
 
-### 5.1 Migrate Existing Fuel Logs
-
-If you have existing fuel logs without station references:
+### **Test 1: Create a Route Frequency**
 
 ```sql
--- Create a default "Unknown" station
-INSERT INTO fuel_stations (name, location, is_active)
-VALUES ('Unknown Station', 'Unknown', false)
-RETURNING id;
-
--- Update existing logs (replace {station_id} with actual ID)
-UPDATE fuel_logs
-SET fuel_station_id = '{station_id}'
-WHERE fuel_station_id IS NULL;
-```
-
-### 5.2 Migrate Existing Delays
-
-If you have delay data in other tables:
-
-```sql
--- Example migration (adjust based on your schema)
-INSERT INTO trip_delays (
-  trip_id,
-  delay_reason,
-  delay_minutes,
-  original_departure,
-  new_departure,
-  created_at
+-- Insert test schedule
+INSERT INTO route_frequencies (
+  route_id,
+  bus_id,
+  driver_id,
+  departure_time,
+  frequency_type,
+  days_of_week,
+  fare_per_seat,
+  active
 )
-SELECT 
-  trip_id,
-  reason,
-  EXTRACT(EPOCH FROM (new_time - original_time))/60,
-  original_time,
-  new_time,
-  created_at
-FROM old_delays_table;
+VALUES (
+  'your-route-id',
+  'your-bus-id',
+  'your-driver-id',
+  '08:00:00',
+  'DAILY',
+  ARRAY[1,2,3,4,5], -- Mon-Fri
+  350,
+  true
+);
 ```
 
----
-
-## Step 6: Monitoring and Validation
-
-### 6.1 Check Database Health
+### **Test 2: Manually Generate a Trip**
 
 ```sql
--- Check table sizes
-SELECT 
-  schemaname,
-  tablename,
-  pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size
-FROM pg_tables
-WHERE schemaname = 'public'
-AND tablename IN ('fuel_stations', 'fuel_logs', 'trip_delays', 'booking_flow_history')
-ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+-- Call the function
+SELECT generate_scheduled_trips();
 
--- Check recent activity
-SELECT 
-  'fuel_logs' as table_name,
-  COUNT(*) as total_records,
-  COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') as last_24h
-FROM fuel_logs
-UNION ALL
-SELECT 
-  'trip_delays',
-  COUNT(*),
-  COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours')
-FROM trip_delays;
+-- Check if trip was created
+SELECT * FROM trips 
+WHERE is_generated_from_schedule = true 
+ORDER BY created_at DESC 
+LIMIT 1;
 ```
 
-### 6.2 Monitor Storage Usage
+### **Test 3: Verify Auto-Assignment**
 
 ```sql
--- Check storage bucket usage
+-- Check if driver was assigned
 SELECT 
-  bucket_id,
-  COUNT(*) as file_count,
-  pg_size_pretty(SUM(metadata->>'size')::bigint) as total_size
-FROM storage.objects
-WHERE bucket_id = 'fuel-receipts'
-GROUP BY bucket_id;
+  t.id,
+  t.trip_number,
+  t.driver_id,
+  t.bus_id,
+  t.conductor_id,
+  t.scheduled_departure
+FROM trips t
+WHERE t.is_generated_from_schedule = true
+ORDER BY t.created_at DESC
+LIMIT 1;
+
+-- Check if shifts were created
+SELECT * FROM driver_shifts 
+ORDER BY created_at DESC 
+LIMIT 1;
 ```
 
-### 6.3 Check Error Logs
-
-Monitor Supabase logs for:
-- Failed fuel log uploads
-- Trigger execution errors
-- RLS policy violations
-
----
-
-## Step 7: User Training
-
-### 7.1 Driver Training
-
-**Topics to cover:**
-- How to access Fuel Logs
-- How to add a fuel log
-- How to upload receipts
-- Understanding approval status
-- What to do if rejected
-
-**Training Materials:**
-- Create video tutorial
-- Create PDF guide
-- Conduct live training session
-
-### 7.2 Admin Training
-
-**Topics to cover:**
-- Managing fuel stations
-- Approving fuel logs
-- Viewing fuel reports
-- Managing delays
-- Understanding payroll sync
-
----
-
-## Rollback Plan
-
-If issues occur, follow this rollback procedure:
-
-### Database Rollback
-
-```sql
--- Drop new tables (in reverse order)
-DROP TABLE IF EXISTS booking_flow_history CASCADE;
-DROP TABLE IF EXISTS trip_delays CASCADE;
-DROP TABLE IF EXISTS fuel_stations CASCADE;
-
--- Drop views
-DROP VIEW IF EXISTS delay_management_overview;
-DROP VIEW IF EXISTS driver_fuel_logs;
-DROP VIEW IF EXISTS employee_payroll_sync;
-
--- Drop triggers
-DROP TRIGGER IF EXISTS trigger_track_booking_flow ON bookings;
-DROP TRIGGER IF EXISTS trigger_calculate_affected_passengers ON trip_delays;
-DROP TRIGGER IF EXISTS trigger_sync_employee_to_payroll ON employees;
-
--- Drop functions
-DROP FUNCTION IF EXISTS track_booking_flow();
-DROP FUNCTION IF EXISTS calculate_affected_passengers();
-DROP FUNCTION IF EXISTS sync_employee_to_payroll();
-
--- Revert column additions
-ALTER TABLE fuel_logs DROP COLUMN IF EXISTS fuel_station_id;
-ALTER TABLE fuel_logs DROP COLUMN IF EXISTS receipt_image_url;
-ALTER TABLE fuel_logs DROP COLUMN IF EXISTS status;
-ALTER TABLE fuel_logs DROP COLUMN IF EXISTS rejection_reason;
-
-ALTER TABLE bookings DROP COLUMN IF EXISTS flow_step;
-ALTER TABLE bookings DROP COLUMN IF EXISTS flow_started_at;
-ALTER TABLE bookings DROP COLUMN IF EXISTS flow_completed_at;
-
-ALTER TABLE payroll DROP COLUMN IF EXISTS bonuses;
-ALTER TABLE payroll DROP COLUMN IF EXISTS overtime_pay;
-ALTER TABLE payroll DROP COLUMN IF EXISTS created_by;
-```
-
-### Frontend Rollback
+### **Test 4: Test Edge Function**
 
 ```bash
-# Revert to previous commit
-git revert HEAD
-
-# Or checkout specific files
-git checkout HEAD~1 -- frontend/src/pages/driver/FuelLogs.tsx
-git checkout HEAD~1 -- frontend/src/pages/admin/FuelStations.tsx
-git checkout HEAD~1 -- frontend/src/App.tsx
+# Test from command line
+curl -X POST https://your-project.supabase.co/functions/v1/trip-automation \
+  -H "Authorization: Bearer YOUR_ANON_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "getActiveTrips"
+  }'
 ```
 
 ---
 
-## Post-Deployment Checklist
+## 🐛 **TROUBLESHOOTING**
 
-- [ ] All SQL scripts executed successfully
-- [ ] Storage bucket created and configured
-- [ ] Storage policies applied
-- [ ] Frontend routes added
-- [ ] Navigation updated
-- [ ] Application builds without errors
-- [ ] Employee-payroll sync tested
-- [ ] Fuel station management tested
-- [ ] Driver fuel logging tested
-- [ ] Receipt upload tested
-- [ ] Delay management tested
-- [ ] User training completed
-- [ ] Documentation updated
-- [ ] Monitoring configured
-- [ ] Backup created
+### **Error: Column does not exist**
 
----
+**Problem:** Migration references column that doesn't exist.
 
-## Support and Troubleshooting
+**Solution:**
+```sql
+-- Check table structure
+\d+ table_name
 
-### Common Issues
+-- Or
+SELECT column_name, data_type 
+FROM information_schema.columns 
+WHERE table_name = 'your_table';
+```
 
-**Issue: Receipt upload fails**
-- Check storage bucket exists
-- Verify file size < 5MB
-- Check file type is allowed
-- Verify storage policies
+### **Error: Trigger already exists**
 
-**Issue: Fuel stations not showing for drivers**
-- Check station is marked as active
-- Verify RLS policies
-- Check driver authentication
+**Problem:** Trigger was created in previous migration.
 
-**Issue: Payroll not syncing**
-- Verify trigger is enabled
-- Check employee has salary set
-- Ensure payroll status is 'draft'
+**Solution:**
+```sql
+-- Drop and recreate
+DROP TRIGGER IF EXISTS trigger_name ON table_name;
+```
 
-**Issue: Delay passenger count is 0**
-- Check booking statuses
-- Verify trip_id is correct
-- Check trigger is firing
+### **Error: Function does not exist**
 
-### Getting Help
+**Problem:** Function not created or wrong signature.
 
-- Check logs in Supabase Dashboard
-- Review `FEATURE_IMPLEMENTATION_GUIDE.md`
-- Contact development team
-- Check GitHub issues
+**Solution:**
+```sql
+-- List all functions
+SELECT routine_name 
+FROM information_schema.routines 
+WHERE routine_schema = 'public';
 
----
+-- Drop and recreate
+DROP FUNCTION IF EXISTS function_name CASCADE;
+```
 
-## Next Steps
+### **Error: Permission denied**
 
-After successful deployment:
+**Problem:** RLS policies blocking access.
 
-1. **Monitor Usage:**
-   - Track fuel log submissions
-   - Monitor storage usage
-   - Review delay reports
+**Solution:**
+```sql
+-- Temporarily disable RLS for testing
+ALTER TABLE table_name DISABLE ROW LEVEL SECURITY;
 
-2. **Gather Feedback:**
-   - Survey drivers on fuel logging
-   - Get admin feedback on management tools
-   - Identify improvement areas
-
-3. **Implement Enhancements:**
-   - Fuel approval workflow UI
-   - Fuel analytics dashboard
-   - Automated delay notifications
-   - Complete ticketing flow wizard
-
-4. **Optimize Performance:**
-   - Add database indexes if needed
-   - Optimize queries
-   - Cache frequently accessed data
+-- Or create proper policies
+CREATE POLICY "Allow all for authenticated users"
+ON table_name
+FOR ALL
+TO authenticated
+USING (true);
+```
 
 ---
 
-## Success Metrics
+## 📊 **MONITORING**
 
-Track these metrics post-deployment:
+### **Check Cron Jobs Status**
 
-- **Fuel Management:**
-  - Number of fuel logs submitted per day
-  - Average approval time
-  - Receipt upload success rate
-  - Fuel cost trends
+```sql
+-- View scheduled jobs
+SELECT * FROM cron.job;
 
-- **Payroll Sync:**
-  - Number of automatic updates
-  - Sync accuracy rate
-  - Time saved vs manual entry
+-- View job run history
+SELECT * FROM cron.job_run_details
+ORDER BY start_time DESC
+LIMIT 10;
+```
 
-- **Delay Management:**
-  - Number of delays recorded
-  - Average delay duration
-  - Resolution time
-  - Passenger impact
+### **Check Recent Alerts**
+
+```sql
+SELECT 
+  a.severity,
+  a.message,
+  a.created_at,
+  t.trip_number,
+  r.origin,
+  r.destination
+FROM alerts a
+JOIN trips t ON a.trip_id = t.id
+JOIN routes r ON t.route_id = r.id
+WHERE a.created_at > NOW() - INTERVAL '24 hours'
+ORDER BY a.created_at DESC;
+```
+
+### **Check Driver Workload**
+
+```sql
+SELECT 
+  d.full_name,
+  COUNT(ds.id) as total_shifts,
+  SUM(ds.hours_worked) as total_hours
+FROM drivers d
+LEFT JOIN driver_shifts ds ON d.id = ds.driver_id
+WHERE ds.shift_date >= CURRENT_DATE - 7
+GROUP BY d.id, d.full_name
+ORDER BY total_hours DESC;
+```
 
 ---
 
-## Conclusion
+## 🎉 **SUCCESS CHECKLIST**
 
-This deployment adds significant functionality to the system:
-- ✅ Automated employee-payroll synchronization
-- ✅ Complete fuel management system
-- ✅ Enhanced delay tracking
-- ⏳ Foundation for seamless ticketing flow
+- [ ] All migrations deployed successfully
+- [ ] All tables created
+- [ ] All triggers active
+- [ ] All functions created
+- [ ] Edge functions deployed
+- [ ] Scheduled tasks configured
+- [ ] Test trip generated successfully
+- [ ] Auto-assignment working
+- [ ] Shifts created automatically
+- [ ] Booking widget shows trips
+- [ ] Ticketing dashboard shows trips
 
-Follow this guide carefully and test thoroughly before production deployment.
+---
 
-For questions or issues, refer to `FEATURE_IMPLEMENTATION_GUIDE.md` or contact the development team.
+## 📞 **SUPPORT**
+
+If you encounter issues:
+
+1. Check Supabase logs: Dashboard → Logs
+2. Check database logs: SQL Editor → Run queries
+3. Test functions individually
+4. Verify table structures match migrations
+5. Check RLS policies aren't blocking
+
+---
+
+## ✅ **DEPLOYMENT COMPLETE!**
+
+Your automated trip management system is now live! 🚀
