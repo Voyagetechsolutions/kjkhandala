@@ -8,7 +8,7 @@ import {
   ChevronDown, ChevronRight, Ticket, CreditCard, UserCheck, Receipt, 
   AlertTriangle, Clock, BarChart3, Warehouse, CalendarClock, ClipboardCheck,
   Package, Coins, UserPlus, Calendar, Award, FileCheck, Wallet, TrendingUp,
-  Calculator, Fuel, FileSpreadsheet, RefreshCw, Search, Plus
+  Calculator, Fuel, FileSpreadsheet, RefreshCw, Search, Plus, UserCog, Activity
 } from "lucide-react";
 import {
   Collapsible,
@@ -55,7 +55,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       icon: Navigation,
       items: [
         { path: "/admin", icon: LayoutDashboard, label: "Command Center" },
-        { path: "/admin/trips", icon: Bus, label: "Trip Management" },
+        { path: "/admin/trips", icon: Activity, label: "Trip Scheduling" },
+        { path: "/admin/trip-management", icon: Calendar, label: "Trip Management" },
+        { path: "/admin/driver-shifts", icon: UserCog, label: "Driver Shifts" },
         { path: "/admin/fleet", icon: Truck, label: "Fleet Management" },
         { path: "/admin/drivers", icon: Users, label: "Driver Management" },
         { path: "/admin/tracking", icon: Navigation, label: "Live Tracking" },
@@ -96,7 +98,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         { path: "/admin/ticketing/modify-booking", icon: RefreshCw, label: "Modify Booking" },
         { path: "/admin/ticketing/cancel-refund", icon: AlertTriangle, label: "Cancel & Refund" },
         { path: "/admin/ticketing/customer-lookup", icon: Users, label: "Customer Lookup" },
-        { path: "/admin/ticketing/trip-management", icon: Bus, label: "Trip Management" },
         { path: "/admin/ticketing/office-admin", icon: Settings, label: "Office Admin" },
         { path: "/admin/ticketing/reports", icon: BarChart3, label: "Reports" },
       ]
@@ -116,7 +117,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         { path: "/admin/hr/reports", icon: BarChart3, label: "Reports" },
         { path: "/admin/hr/settings", icon: Settings, label: "Settings" },
         { path: "/admin/hr/documents", icon: FileText, label: "Documents" },
-        { path: "/admin/hr/shifts", icon: Clock, label: "Shifts" },
         { path: "/admin/users", icon: Shield, label: "User Management" },
       ]
     },

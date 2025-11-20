@@ -1,0 +1,735 @@
+{
+  "all_tables": [
+    {
+      "table_schema": "auth",
+      "table_name": "audit_log_entries"
+    },
+    {
+      "table_schema": "auth",
+      "table_name": "flow_state"
+    },
+    {
+      "table_schema": "auth",
+      "table_name": "identities"
+    },
+    {
+      "table_schema": "auth",
+      "table_name": "instances"
+    },
+    {
+      "table_schema": "auth",
+      "table_name": "mfa_amr_claims"
+    },
+    {
+      "table_schema": "auth",
+      "table_name": "mfa_challenges"
+    },
+    {
+      "table_schema": "auth",
+      "table_name": "mfa_factors"
+    },
+    {
+      "table_schema": "auth",
+      "table_name": "oauth_authorizations"
+    },
+    {
+      "table_schema": "auth",
+      "table_name": "oauth_clients"
+    },
+    {
+      "table_schema": "auth",
+      "table_name": "oauth_consents"
+    },
+    {
+      "table_schema": "auth",
+      "table_name": "one_time_tokens"
+    },
+    {
+      "table_schema": "auth",
+      "table_name": "refresh_tokens"
+    },
+    {
+      "table_schema": "auth",
+      "table_name": "saml_providers"
+    },
+    {
+      "table_schema": "auth",
+      "table_name": "saml_relay_states"
+    },
+    {
+      "table_schema": "auth",
+      "table_name": "schema_migrations"
+    },
+    {
+      "table_schema": "auth",
+      "table_name": "sessions"
+    },
+    {
+      "table_schema": "auth",
+      "table_name": "sso_domains"
+    },
+    {
+      "table_schema": "auth",
+      "table_name": "sso_providers"
+    },
+    {
+      "table_schema": "auth",
+      "table_name": "users"
+    },
+    {
+      "table_schema": "extensions",
+      "table_name": "spatial_ref_sys"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "attendance"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "audit_logs"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "bank_accounts"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "bookings"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "buses"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "certifications"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "cities"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "companies"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "contracts"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "delays"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "departments"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "driver_shifts"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "drivers"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "employees"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "expense_records"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "expenses"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "favorite_routes"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "fuel_logs"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "gps_devices"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "gps_tracking"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "incidents"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "income_records"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "inspections"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "inventory"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "invoices"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "job_applications"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "job_postings"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "leave_balances"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "leave_requests"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "maintenance_records"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "maintenance_reminders"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "maintenance_schedules"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "notifications"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "parts_consumption"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "passengers"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "payments"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "payroll"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "performance_evaluations"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "profiles"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "refund_requests"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "repairs"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "route_frequencies"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "route_stops"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "routes"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "saved_passengers"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "saved_payment_methods"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "schedules"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "spare_parts_inventory"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "terminals"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "ticket_alerts"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "ticketing_agents"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "trip_ratings"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "trip_stops"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "trips"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "user_roles"
+    },
+    {
+      "table_schema": "public",
+      "table_name": "work_orders"
+    },
+    {
+      "table_schema": "realtime",
+      "table_name": "messages"
+    },
+    {
+      "table_schema": "realtime",
+      "table_name": "messages_2025_11_14"
+    },
+    {
+      "table_schema": "realtime",
+      "table_name": "messages_2025_11_15"
+    },
+    {
+      "table_schema": "realtime",
+      "table_name": "messages_2025_11_16"
+    },
+    {
+      "table_schema": "realtime",
+      "table_name": "messages_2025_11_17"
+    },
+    {
+      "table_schema": "realtime",
+      "table_name": "messages_2025_11_18"
+    },
+    {
+      "table_schema": "realtime",
+      "table_name": "messages_2025_11_19"
+    },
+    {
+      "table_schema": "realtime",
+      "table_name": "messages_2025_11_20"
+    },
+    {
+      "table_schema": "realtime",
+      "table_name": "schema_migrations"
+    },
+    {
+      "table_schema": "realtime",
+      "table_name": "subscription"
+    },
+    {
+      "table_schema": "storage",
+      "table_name": "buckets"
+    },
+    {
+      "table_schema": "storage",
+      "table_name": "buckets_analytics"
+    },
+    {
+      "table_schema": "storage",
+      "table_name": "buckets_vectors"
+    },
+    {
+      "table_schema": "storage",
+      "table_name": "migrations"
+    },
+    {
+      "table_schema": "storage",
+      "table_name": "objects"
+    },
+    {
+      "table_schema": "storage",
+      "table_name": "prefixes"
+    },
+    {
+      "table_schema": "storage",
+      "table_name": "s3_multipart_uploads"
+    },
+    {
+      "table_schema": "storage",
+      "table_name": "s3_multipart_uploads_parts"
+    },
+    {
+      "table_schema": "storage",
+      "table_name": "vector_indexes"
+    },
+    {
+      "table_schema": "vault",
+      "table_name": "secrets"
+    }
+  ],
+  "table_row_counts": [
+    {
+      "schema_name": "extensions",
+      "table_name": "spatial_ref_sys",
+      "row_count": 8500
+    },
+    {
+      "schema_name": "auth",
+      "table_name": "schema_migrations",
+      "row_count": 69
+    },
+    {
+      "schema_name": "realtime",
+      "table_name": "schema_migrations",
+      "row_count": 65
+    },
+    {
+      "schema_name": "storage",
+      "table_name": "migrations",
+      "row_count": 49
+    },
+    {
+      "schema_name": "public",
+      "table_name": "bookings",
+      "row_count": 20
+    },
+    {
+      "schema_name": "public",
+      "table_name": "departments",
+      "row_count": 16
+    },
+    {
+      "schema_name": "public",
+      "table_name": "passengers",
+      "row_count": 13
+    },
+    {
+      "schema_name": "auth",
+      "table_name": "refresh_tokens",
+      "row_count": 12
+    },
+    {
+      "schema_name": "public",
+      "table_name": "user_roles",
+      "row_count": 11
+    },
+    {
+      "schema_name": "public",
+      "table_name": "cities",
+      "row_count": 10
+    },
+    {
+      "schema_name": "public",
+      "table_name": "payments",
+      "row_count": 10
+    },
+    {
+      "schema_name": "public",
+      "table_name": "trips",
+      "row_count": 7
+    },
+    {
+      "schema_name": "auth",
+      "table_name": "sessions",
+      "row_count": 6
+    },
+    {
+      "schema_name": "auth",
+      "table_name": "users",
+      "row_count": 6
+    },
+    {
+      "schema_name": "auth",
+      "table_name": "identities",
+      "row_count": 6
+    },
+    {
+      "schema_name": "public",
+      "table_name": "routes",
+      "row_count": 6
+    },
+    {
+      "schema_name": "public",
+      "table_name": "profiles",
+      "row_count": 6
+    },
+    {
+      "schema_name": "auth",
+      "table_name": "mfa_amr_claims",
+      "row_count": 6
+    },
+    {
+      "schema_name": "auth",
+      "table_name": "one_time_tokens",
+      "row_count": 4
+    },
+    {
+      "schema_name": "public",
+      "table_name": "payroll",
+      "row_count": 2
+    },
+    {
+      "schema_name": "public",
+      "table_name": "buses",
+      "row_count": 2
+    },
+    {
+      "schema_name": "public",
+      "table_name": "drivers",
+      "row_count": 2
+    },
+    {
+      "schema_name": "public",
+      "table_name": "inspections",
+      "row_count": 2
+    },
+    {
+      "schema_name": "public",
+      "table_name": "income_records",
+      "row_count": 1
+    },
+    {
+      "schema_name": "public",
+      "table_name": "incidents",
+      "row_count": 1
+    },
+    {
+      "schema_name": "public",
+      "table_name": "leave_requests",
+      "row_count": 1
+    },
+    {
+      "schema_name": "public",
+      "table_name": "attendance",
+      "row_count": 1
+    },
+    {
+      "schema_name": "public",
+      "table_name": "maintenance_schedules",
+      "row_count": 1
+    },
+    {
+      "schema_name": "public",
+      "table_name": "inventory",
+      "row_count": 1
+    },
+    {
+      "schema_name": "public",
+      "table_name": "invoices",
+      "row_count": 1
+    },
+    {
+      "schema_name": "public",
+      "table_name": "driver_shifts",
+      "row_count": 1
+    },
+    {
+      "schema_name": "public",
+      "table_name": "route_frequencies",
+      "row_count": 1
+    },
+    {
+      "schema_name": "public",
+      "table_name": "bank_accounts",
+      "row_count": 1
+    },
+    {
+      "schema_name": "public",
+      "table_name": "work_orders",
+      "row_count": 1
+    },
+    {
+      "schema_name": "public",
+      "table_name": "expense_records",
+      "row_count": 1
+    }
+  ],
+  "public_tables_dependency_order": [
+    {
+      "table_name": "profiles"
+    },
+    {
+      "table_name": "companies"
+    },
+    {
+      "table_name": "user_roles"
+    },
+    {
+      "table_name": "cities"
+    },
+    {
+      "table_name": "notifications"
+    },
+    {
+      "table_name": "audit_logs"
+    },
+    {
+      "table_name": "ticket_alerts"
+    },
+    {
+      "table_name": "gps_devices"
+    },
+    {
+      "table_name": "gps_tracking"
+    },
+    {
+      "table_name": "buses"
+    },
+    {
+      "table_name": "routes"
+    },
+    {
+      "table_name": "schedules"
+    },
+    {
+      "table_name": "drivers"
+    },
+    {
+      "table_name": "trips"
+    },
+    {
+      "table_name": "incidents"
+    },
+    {
+      "table_name": "delays"
+    },
+    {
+      "table_name": "refund_requests"
+    },
+    {
+      "table_name": "terminals"
+    },
+    {
+      "table_name": "bookings"
+    },
+    {
+      "table_name": "payments"
+    },
+    {
+      "table_name": "attendance"
+    },
+    {
+      "table_name": "leave_requests"
+    },
+    {
+      "table_name": "leave_balances"
+    },
+    {
+      "table_name": "payroll"
+    },
+    {
+      "table_name": "contracts"
+    },
+    {
+      "table_name": "certifications"
+    },
+    {
+      "table_name": "job_postings"
+    },
+    {
+      "table_name": "income_records"
+    },
+    {
+      "table_name": "job_applications"
+    },
+    {
+      "table_name": "expenses"
+    },
+    {
+      "table_name": "fuel_logs"
+    },
+    {
+      "table_name": "bank_accounts"
+    },
+    {
+      "table_name": "maintenance_records"
+    },
+    {
+      "table_name": "work_orders"
+    },
+    {
+      "table_name": "maintenance_schedules"
+    },
+    {
+      "table_name": "inspections"
+    },
+    {
+      "table_name": "repairs"
+    },
+    {
+      "table_name": "spare_parts_inventory"
+    },
+    {
+      "table_name": "parts_consumption"
+    },
+    {
+      "table_name": "maintenance_reminders"
+    },
+    {
+      "table_name": "employees"
+    },
+    {
+      "table_name": "invoices"
+    },
+    {
+      "table_name": "expense_records"
+    },
+    {
+      "table_name": "driver_shifts"
+    },
+    {
+      "table_name": "departments"
+    },
+    {
+      "table_name": "performance_evaluations"
+    },
+    {
+      "table_name": "inventory"
+    },
+    {
+      "table_name": "ticketing_agents"
+    },
+    {
+      "table_name": "passengers"
+    },
+    {
+      "table_name": "saved_passengers"
+    },
+    {
+      "table_name": "saved_payment_methods"
+    },
+    {
+      "table_name": "favorite_routes"
+    },
+    {
+      "table_name": "trip_ratings"
+    },
+    {
+      "table_name": "trip_stops"
+    },
+    {
+      "table_name": "route_stops"
+    },
+    {
+      "table_name": "route_frequencies"
+    }
+  ]
+}

@@ -9,11 +9,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Calendar, Clock, MapPin, Bus, User, Play, Pause, CheckCircle, UserCog, Navigation, AlertCircle, TrendingUp } from 'lucide-react';
+import { Plus, Calendar, Clock, MapPin, Bus, User, Play, Pause, CheckCircle, UserCog, Navigation, AlertCircle, TrendingUp, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import TripForm from '@/components/trips/TripForm';
 import TripCalendar from '@/components/trips/TripCalendar';
+import RouteFrequencyManager from '@/components/trips/RouteFrequencyManager';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -266,6 +267,11 @@ export default function TripScheduling() {
     setShowForm(true);
   };
 
+  const handleEditTrip = (trip: any) => {
+    setEditingTrip(trip);
+    setShowAssignDialog(true);
+  };
+
   const handleAssign = (trip: any) => {
     setSelectedTrip(trip);
     setAssignmentData({
@@ -316,10 +322,6 @@ export default function TripScheduling() {
             <h1 className="text-3xl font-bold">Trip Scheduling</h1>
             <p className="text-muted-foreground">Manage trip schedules and monitor live operations</p>
           </div>
-          <Button onClick={() => { setEditingTrip(null); setShowForm(true); }}>
-            <Plus className="h-4 w-4 mr-2" />
-            Schedule Trip
-          </Button>
         </div>
 
         {/* Summary Cards */}
@@ -378,12 +380,198 @@ export default function TripScheduling() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="table" className="space-y-4">
+        <Tabs defaultValue="schedules" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="table">Trip Table</TabsTrigger>
+            <TabsTrigger value="schedules">Automated Schedules</TabsTrigger>
+            <TabsTrigger value="today">Trips Today</TabsTrigger>
+            <TabsTrigger value="upcoming">Upcoming Trips</TabsTrigger>
             <TabsTrigger value="calendar">Calendar View</TabsTrigger>
             <TabsTrigger value="live">Live Status</TabsTrigger>
           </TabsList>
+
+          {/* Automated Schedules Tab (Primary) */}
+          <TabsContent value="schedules">
+            <RouteFrequencyManager />
+          </TabsContent>
+
+          {/* Trips Today Tab */}
+          <TabsContent value="today" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Trips Today</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Route</TableHead>
+                      <TableHead>Bus</TableHead>
+                      <TableHead>Driver</TableHead>
+                      <TableHead>Departure</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Seats</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {trips?.filter((trip: any) => {
+                      const tripDate = new Date(trip.scheduled_departure);
+                      const today = new Date();
+                      return tripDate.toDateString() === today.toDateString() && trip.is_generated_from_schedule;
+                    }).map((trip: any) => (
+                      <TableRow key={trip.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">
+                              {trip.routes?.origin} → {trip.routes?.destination}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {trip.buses ? (
+                            <div className="flex items-center gap-2">
+                              <Bus className="h-4 w-4 text-muted-foreground" />
+                              <span>{trip.buses.registration_number}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">Not assigned</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {trip.drivers ? (
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span>{trip.drivers.full_name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">Not assigned</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(trip.scheduled_departure).toLocaleTimeString('en-GB', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            trip.status === 'SCHEDULED' ? 'secondary' :
+                            trip.status === 'BOARDING' ? 'default' :
+                            trip.status === 'DEPARTED' ? 'default' :
+                            trip.status === 'COMPLETED' ? 'outline' :
+                            'destructive'
+                          }>
+                            {trip.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">
+                            {trip.available_seats}/{trip.total_seats}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditTrip(trip)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Upcoming Trips Tab */}
+          <TabsContent value="upcoming" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Upcoming Trips</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Route</TableHead>
+                      <TableHead>Bus</TableHead>
+                      <TableHead>Driver</TableHead>
+                      <TableHead>Departure</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Seats</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {trips?.filter((trip: any) => {
+                      const tripDate = new Date(trip.scheduled_departure);
+                      const today = new Date();
+                      return tripDate > today && trip.is_generated_from_schedule;
+                    }).map((trip: any) => (
+                      <TableRow key={trip.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">
+                              {trip.routes?.origin} → {trip.routes?.destination}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {trip.buses ? (
+                            <div className="flex items-center gap-2">
+                              <Bus className="h-4 w-4 text-muted-foreground" />
+                              <span>{trip.buses.registration_number}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">Not assigned</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {trip.drivers ? (
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span>{trip.drivers.full_name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">Not assigned</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(trip.scheduled_departure).toLocaleDateString('en-GB')} {' '}
+                          {new Date(trip.scheduled_departure).toLocaleTimeString('en-GB', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{trip.status}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">
+                            {trip.available_seats}/{trip.total_seats}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditTrip(trip)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Trip Table Tab */}
           <TabsContent value="table" className="space-y-4">

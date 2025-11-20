@@ -10,10 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, MapPin, TrendingUp, Clock, DollarSign, Edit, Trash2, Map } from 'lucide-react';
+import { Plus, MapPin, TrendingUp, Clock, DollarSign, Edit, Trash2, Map, Route } from 'lucide-react';
 import { toast } from 'sonner';
 import RouteForm from '@/components/routes/RouteForm';
 import RouteMapView from '@/components/routes/RouteMapView';
+import RouteStopsManager from '@/components/routes/RouteStopsManager';
 
 export default function RouteManagement() {
   const location = useLocation();
@@ -259,6 +260,15 @@ export default function RouteManagement() {
                           <TableCell>{route.schedules?.[0]?.count || 0}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setEditingRoute(route)}
+                                title="Manage Via Stops"
+                              >
+                                <Route className="h-3 w-3 mr-1" />
+                                Stops
+                              </Button>
                               <Button variant="outline" size="sm" onClick={() => handleEdit(route)}>
                                 <Edit className="h-3 w-3" />
                               </Button>
@@ -274,6 +284,31 @@ export default function RouteManagement() {
                 </Table>
               </CardContent>
             </Card>
+
+            {/* Via Route Stops for selected route */}
+            {editingRoute && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">Managing Via Stops</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Route: {editingRoute.origin} → {editingRoute.destination}
+                    </p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setEditingRoute(null)}
+                  >
+                    Close
+                  </Button>
+                </div>
+                <RouteStopsManager 
+                  routeId={editingRoute.id} 
+                  routeName={`${editingRoute.origin} → ${editingRoute.destination}`}
+                />
+              </div>
+            )}
           </TabsContent>
 
           {/* Analytics Tab */}

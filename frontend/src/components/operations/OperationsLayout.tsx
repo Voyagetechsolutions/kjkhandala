@@ -14,7 +14,9 @@ import {
   Settings,
   LogOut,
   MapPinned,
-  MapPin
+  MapPin,
+  Calendar,
+  UserCog
 } from "lucide-react";
 
 interface OperationsLayoutProps {
@@ -27,7 +29,9 @@ export default function OperationsLayout({ children }: OperationsLayoutProps) {
 
   const navItems = [
     { path: "/operations", icon: LayoutDashboard, label: "Command Center" },
-    { path: "/operations/trips", icon: Activity, label: "Trip Management" },
+    { path: "/operations/trips", icon: Activity, label: "Trip Scheduling" },
+    { path: "/operations/trip-management", icon: Calendar, label: "Trip Management" },
+    { path: "/operations/driver-shifts", icon: UserCog, label: "Driver Shifts" },
     { path: "/operations/fleet", icon: Bus, label: "Fleet Management" },
     { path: "/operations/drivers", icon: Users, label: "Driver Management" },
     { path: "/operations/tracking", icon: MapPin, label: "Live Tracking" },

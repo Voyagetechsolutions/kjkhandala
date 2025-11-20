@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, RefreshCw, Bus, User, MapPin, Clock, DollarSign } from 'lucide-react';
+import { Plus, RefreshCw, Bus, User, MapPin, Clock, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function TripManagement() {
@@ -50,6 +50,23 @@ export default function TripManagement() {
   });
 
   const queryClient = useQueryClient();
+
+  // Date navigation functions
+  const goToPreviousDay = () => {
+    const currentDate = new Date(selectedDate);
+    currentDate.setDate(currentDate.getDate() - 1);
+    setSelectedDate(currentDate.toISOString().split('T')[0]);
+  };
+
+  const goToNextDay = () => {
+    const currentDate = new Date(selectedDate);
+    currentDate.setDate(currentDate.getDate() + 1);
+    setSelectedDate(currentDate.toISOString().split('T')[0]);
+  };
+
+  const goToToday = () => {
+    setSelectedDate(new Date().toISOString().split('T')[0]);
+  };
 
   // Fetch trips
   const { data: tripsData, isLoading } = useQuery({
@@ -251,11 +268,37 @@ export default function TripManagement() {
             <div className="grid md:grid-cols-3 gap-4">
               <div>
                 <Label>Date</Label>
-                <Input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                />
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={goToPreviousDay}
+                    title="Previous day"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={goToNextDay}
+                    title="Next day"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={goToToday}
+                    title="Go to today"
+                  >
+                    Today
+                  </Button>
+                </div>
               </div>
               <div>
                 <Label>Status</Label>

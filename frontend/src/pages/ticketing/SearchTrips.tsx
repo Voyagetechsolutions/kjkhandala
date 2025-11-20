@@ -103,6 +103,55 @@ export default function SearchTrips() {
     }
   };
 
+  const generateProjectedTrips = (schedules: any[], targetDate: string, origin: string, destination: string) => {
+    const projected: any[] = [];
+    const date = new Date(targetDate);
+    const dayOfWeek = date.getDay();
+
+    schedules.forEach((schedule: any) => {
+      let shouldGenerate = false;
+
+      if (schedule.frequency_type === 'DAILY') {
+        shouldGenerate = true;
+      } else if (schedule.frequency_type === 'SPECIFIC_DAYS') {
+        shouldGenerate = schedule.days_of_week?.includes(dayOfWeek);
+      } else if (schedule.frequency_type === 'WEEKLY') {
+        shouldGenerate = schedule.days_of_week?.includes(dayOfWeek);
+      }
+
+      if (shouldGenerate && schedule.routes?.origin === origin && schedule.routes?.destination === destination) {
+        const [hours, minutes] = schedule.departure_time.split(':');
+        const departureDate = new Date(date);
+        departureDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+        
+        const arrivalDate = new Date(departureDate);
+        arrivalDate.setHours(arrivalDate.getHours() + (schedule.duration_hours || schedule.routes?.duration_hours || 0));
+
+        projected.push({
+          id: `projected-${schedule.id}-${targetDate}`,
+          trip_number: `AUTO-${schedule.id.slice(0, 8)}`,
+          scheduled_departure: departureDate.toISOString(),
+          scheduled_arrival: arrivalDate.toISOString(),
+          fare: schedule.fare_per_seat,
+          status: 'SCHEDULED',
+          total_seats: schedule.buses?.seating_capacity || 60,
+          available_seats: schedule.buses?.seating_capacity || 60,
+          routes: {
+            origin: schedule.routes?.origin,
+            destination: schedule.routes?.destination,
+          },
+          buses: {
+            name: schedule.buses?.registration_number || schedule.buses?.name || 'TBA',
+            bus_type: schedule.buses?.bus_type || 'Standard',
+          },
+          is_projected: true,
+        });
+      }
+    });
+
+    return projected;
+  };
+
   const searchTrips = async () => {
     if (!searchParams.origin || !searchParams.destination || !searchParams.travel_date) {
       toast({
@@ -116,7 +165,7 @@ export default function SearchTrips() {
     try {
       setSearching(true);
 
-      // Search for trips with route filtering
+      // Search for existing trips
       const { data, error } = await supabase
         .from('trips')
         .select(`
@@ -128,23 +177,46 @@ export default function SearchTrips() {
           status,
           total_seats,
           available_seats,
+          is_generated_from_schedule,
           routes!inner (origin, destination),
-          buses (name, bus_type)
+          buses (name, bus_type, registration_number)
         `)
-
         .eq('routes.origin', searchParams.origin)
         .eq('routes.destination', searchParams.destination)
         .gte('scheduled_departure', `${searchParams.travel_date}T00:00:00`)
         .lte('scheduled_departure', `${searchParams.travel_date}T23:59:59`)
-
         .in('status', ['SCHEDULED', 'BOARDING'])
+        .eq('is_generated_from_schedule', true)
         .gte('available_seats', parseInt(searchParams.passengers))
         .order('scheduled_departure');
 
       if (error) throw error;
 
+      // Fetch active schedules for projection
+      const { data: schedules, error: schedError } = await supabase
+        .from('route_frequencies')
+        .select(`
+          *,
+          routes:route_id (id, origin, destination, duration_hours),
+          buses:bus_id (id, registration_number, name, bus_type, seating_capacity)
+        `)
+        .eq('active', true);
+
+      if (schedError) throw schedError;
+
+      // Generate projected trips from schedules
+      const projectedTrips = generateProjectedTrips(
+        schedules || [], 
+        searchParams.travel_date, 
+        searchParams.origin, 
+        searchParams.destination
+      );
+
+      // Combine existing and projected trips
+      const allTripsData = [...(data || []), ...projectedTrips];
+
       // Transform trips data
-      const transformedTrips = (data || []).map((trip: any) => {
+      const transformedTrips = allTripsData.map((trip: any) => {
         // Calculate duration
         const departure = new Date(trip.scheduled_departure);
         const arrival = trip.scheduled_arrival ? new Date(trip.scheduled_arrival) : null;
@@ -163,7 +235,7 @@ export default function SearchTrips() {
           arrival_time: trip.scheduled_arrival,
           origin: routes?.origin || 'N/A',
           destination: routes?.destination || 'N/A',
-          bus_name: buses?.name || 'TBA',
+          bus_name: buses?.registration_number || buses?.name || 'TBA',
           bus_type: buses?.bus_type || 'Standard',
           total_seats: trip.total_seats || 60,
           booked_seats: (trip.total_seats || 60) - (trip.available_seats || 0),
@@ -171,8 +243,9 @@ export default function SearchTrips() {
           base_fare: trip.fare,
           status: trip.status,
           duration,
+          is_projected: trip.is_projected || false,
         };
-      });
+      }).sort((a, b) => new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime());
 
       setTrips(transformedTrips);
 

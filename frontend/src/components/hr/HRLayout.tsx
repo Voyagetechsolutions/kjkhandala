@@ -29,7 +29,7 @@ export default function HRLayout({ children }: HRLayoutProps) {
     { path: "/hr", icon: LayoutDashboard, label: "HR Home" },
     { path: "/hr/employees", icon: Users, label: "Employee Management" },
     { path: "/hr/recruitment", icon: UserPlus, label: "Recruitment & Onboarding" },
-    { path: "/hr/attendance", icon: Clock, label: "Attendance & Shifts" },
+    { path: "/hr/attendance", icon: Clock, label: "Attendance" },
     { path: "/hr/payroll", icon: DollarSign, label: "Payroll Management" },
     { path: "/hr/performance", icon: Award, label: "Performance Evaluation" },
     { path: "/hr/compliance", icon: FileCheck, label: "Compliance & Certifications" },

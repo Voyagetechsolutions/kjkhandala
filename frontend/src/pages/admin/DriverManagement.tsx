@@ -39,15 +39,24 @@ export default function DriverManagement() {
     },
   });
 
-  // Fetch driver assignments
-  const { data: assignments } = useQuery({
+  // Fetch driver assignments from trips table
+  const { data: assignments = [] } = useQuery({
     queryKey: ['driver-assignments'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('assignments')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
+        .from('trips')
+        .select(`
+          *,
+          routes:route_id (origin, destination),
+          drivers:driver_id (id, full_name)
+        `)
+        .not('driver_id', 'is', null)
+        .gte('scheduled_departure', new Date().toISOString())
+        .order('scheduled_departure', { ascending: true });
+      if (error) {
+        console.error('Error fetching driver assignments:', error);
+        return [];
+      }
       return data || [];
     },
   });

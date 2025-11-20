@@ -27,7 +27,6 @@ export default function TicketingLayout({ children }: TicketingLayoutProps) {
     { path: "/ticketing/modify-booking", icon: RefreshCw, label: "Modify Booking" },
     { path: "/ticketing/cancel-refund", icon: AlertTriangle, label: "Cancel & Refund" },
     { path: "/ticketing/customer-lookup", icon: Users, label: "Customer Lookup" },
-    { path: "/ticketing/trip-management", icon: Bus, label: "Trip Management" },
     { path: "/ticketing/reports", icon: BarChart3, label: "Reports" },
   ];
 
