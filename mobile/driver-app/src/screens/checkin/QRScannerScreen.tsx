@@ -34,9 +34,9 @@ export default function QRScannerScreen() {
     setProcessing(true);
 
     try {
-      // QR format: VOYAGE-{booking_id}-{ticket_number}
+      // QR format: KJKHANDALA-{booking_id}-{ticket_number}
       const parts = data.split('-');
-      if (parts.length !== 3 || parts[0] !== 'VOYAGE') {
+      if (parts.length !== 3 || parts[0] !== 'KJKHANDALA') {
         throw new Error('Invalid QR code format');
       }
 

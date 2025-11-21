@@ -3,24 +3,18 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { driverService } from '../../services/driverService';
 import Card from '../../components/Card';
 import Badge from '../../components/Badge';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../lib/constants';
+import { WalletTransaction } from '../../types';
 
-interface Transaction {
-  id: string;
-  amount: number;
-  type: string;
-  description: string;
-  created_at: string;
-  status: string;
-}
 
 export default function WalletScreen() {
   const { driver } = useAuth();
   const [balance, setBalance] = useState(0);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [earnings, setEarnings] = useState({ today: 0, week: 0, month: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -33,11 +27,16 @@ export default function WalletScreen() {
 
     try {
       setLoading(true);
-      // Mock data - replace with actual API calls
-      setBalance(2500.00);
-      setTransactions([]);
+      const [walletBalance, walletTransactions, earningsSummary] = await Promise.all([
+        driverService.getWalletBalance(driver.id),
+        driverService.getWalletTransactions(driver.id, 20),
+        driverService.getEarningsSummary(driver.id),
+      ]);
+      setBalance(walletBalance);
+      setTransactions(walletTransactions);
+      setEarnings(earningsSummary);
     } catch (error) {
-      console.error(error);
+      console.error('Error loading wallet data:', error);
     } finally {
       setLoading(false);
     }
@@ -80,12 +79,12 @@ export default function WalletScreen() {
         <Text style={styles.sectionTitle}>This Month</Text>
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
-            <Text style={styles.statValue}>P0.00</Text>
+            <Text style={styles.statValue}>P{earnings.month.toFixed(2)}</Text>
             <Text style={styles.statLabel}>Earned</Text>
           </View>
           <View style={styles.statBox}>
-            <Text style={styles.statValue}>P0.00</Text>
-            <Text style={styles.statLabel}>Withdrawn</Text>
+            <Text style={styles.statValue}>P{earnings.week.toFixed(2)}</Text>
+            <Text style={styles.statLabel}>This Week</Text>
           </View>
         </View>
       </Card>
@@ -98,40 +97,43 @@ export default function WalletScreen() {
             <Text style={styles.emptyText}>No transactions yet</Text>
           </View>
         ) : (
-          transactions.map((transaction) => (
-            <View key={transaction.id} style={styles.transaction}>
-              <View style={styles.transactionLeft}>
-                <View style={[
-                  styles.transactionIcon,
-                  transaction.type === 'credit' ? styles.creditIcon : styles.debitIcon
-                ]}>
-                  <Ionicons
-                    name={transaction.type === 'credit' ? 'arrow-down' : 'arrow-up'}
-                    size={20}
-                    color={COLORS.white}
+          transactions.map((transaction) => {
+            const isDeduction = transaction.transaction_type === 'deduction';
+            return (
+              <View key={transaction.id} style={styles.transaction}>
+                <View style={styles.transactionLeft}>
+                  <View style={[
+                    styles.transactionIcon,
+                    isDeduction ? styles.debitIcon : styles.creditIcon
+                  ]}>
+                    <Ionicons
+                      name={isDeduction ? 'arrow-up' : 'arrow-down'}
+                      size={20}
+                      color={COLORS.white}
+                    />
+                  </View>
+                  <View>
+                    <Text style={styles.transactionDesc}>{transaction.description}</Text>
+                    <Text style={styles.transactionDate}>
+                      {format(new Date(transaction.created_at), 'MMM d, yyyy')}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.transactionRight}>
+                  <Text style={[
+                    styles.transactionAmount,
+                    isDeduction ? styles.debitAmount : styles.creditAmount
+                  ]}>
+                    {isDeduction ? '-' : '+'}P{parseFloat(transaction.amount.toString()).toFixed(2)}
+                  </Text>
+                  <Badge
+                    label={transaction.status}
+                    variant={transaction.status === 'approved' || transaction.status === 'paid' ? 'success' : 'warning'}
                   />
                 </View>
-                <View>
-                  <Text style={styles.transactionDesc}>{transaction.description}</Text>
-                  <Text style={styles.transactionDate}>
-                    {format(new Date(transaction.created_at), 'MMM d, yyyy')}
-                  </Text>
-                </View>
               </View>
-              <View style={styles.transactionRight}>
-                <Text style={[
-                  styles.transactionAmount,
-                  transaction.type === 'credit' ? styles.creditAmount : styles.debitAmount
-                ]}>
-                  {transaction.type === 'credit' ? '+' : '-'}P{transaction.amount.toFixed(2)}
-                </Text>
-                <Badge
-                  label={transaction.status}
-                  variant={transaction.status === 'completed' ? 'success' : 'warning'}
-                />
-              </View>
-            </View>
-          ))
+            );
+          })
         )}
       </Card>
     </ScrollView>

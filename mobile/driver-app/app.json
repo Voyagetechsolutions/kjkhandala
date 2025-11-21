@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "driver-app",
-    "slug": "driver-app",
+    "name": "KJ Khandala Drivers",
+    "slug": "kj-khandala-drivers",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -22,7 +22,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.voyagetechsolutions.driverapp"
+      "package": "com.kjkhandala.drivers"
     },
     "web": {
       "favicon": "./assets/favicon.png"

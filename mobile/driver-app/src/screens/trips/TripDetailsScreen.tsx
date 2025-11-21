@@ -11,6 +11,9 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { tripService } from '../../services/tripService';
+import { automationService } from '../../services/automationService';
+import { useTripAutomations } from '../../hooks/useTripAutomations';
+import { useAuth } from '../../contexts/AuthContext';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
 import Badge from '../../components/Badge';
@@ -20,9 +23,24 @@ import { COLORS, SPACING, TYPOGRAPHY, SHADOWS } from '../../lib/constants';
 export default function TripDetailsScreen() {
   const route = useRoute();
   const navigation = useNavigation();
+  const { driver } = useAuth();
   const { tripId } = route.params as { tripId: string };
   const [trip, setTrip] = useState<Trip | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Initialize automations
+  const { startAutomations, stopAutomations, isActive, lastLocation } = useTripAutomations(
+    trip && driver
+      ? {
+          tripId: trip.id,
+          driverId: driver.id,
+          departureTime: trip.departure_time,
+          route: trip.route,
+          stops: trip.route?.stops || [],
+          destination: trip.route?.destination,
+        }
+      : null
+  );
 
   useEffect(() => {
     loadTripDetails();
@@ -87,12 +105,71 @@ export default function TripDetailsScreen() {
   };
 
   const handleStartTrip = async () => {
-    // Check if pre-trip inspection is completed
-    navigation.navigate('PreTripInspection' as never, { tripId } as never);
+    if (!driver || !trip) return;
+
+    try {
+      // Check pre-trip inspection
+      const inspectionValid = await automationService.validatePreTripInspection(tripId);
+      
+      if (!inspectionValid) {
+        Alert.alert(
+          'Pre-Trip Inspection Required',
+          'Please complete the pre-trip inspection before starting the trip.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Start Inspection',
+              onPress: () => navigation.navigate('PreTripInspection' as never, { tripId } as never),
+            },
+          ]
+        );
+        return;
+      }
+
+      // Check driver rest requirement
+      const restCheck = await automationService.checkDriverRestRequirement(driver.id, tripId);
+      
+      if (restCheck.requiresRest) {
+        Alert.alert(
+          'Rest Required',
+          `You have driven ${restCheck.totalHours?.toFixed(1)} hours. Rest required for ${restCheck.hoursRemaining?.toFixed(1)} more hours.`,
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Auto-assign conductor if needed
+      if (!trip.conductor_id && trip.route_id) {
+        await automationService.autoAssignConductor(
+          tripId,
+          trip.route_id,
+          format(new Date(trip.departure_time), 'yyyy-MM-dd')
+        );
+      }
+
+      // Start trip
+      await tripService.startTrip(tripId);
+      
+      // Start automations
+      await startAutomations();
+      
+      Alert.alert('Success', 'Trip started! Automations are now active.');
+      loadTripDetails();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to start trip');
+    }
   };
 
   const handleCompleteTrip = async () => {
-    navigation.navigate('PostTripInspection' as never, { tripId } as never);
+    try {
+      // Stop automations
+      await stopAutomations();
+      
+      // Navigate to post-trip inspection
+      navigation.navigate('PostTripInspection' as never, { tripId } as never);
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to complete trip');
+    }
   };
 
   if (loading || !trip) {

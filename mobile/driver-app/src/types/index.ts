@@ -225,5 +225,12 @@ export type MainStackParamList = {
   TripTimeline: { tripId: string };
   Wallet: undefined;
   Profile: undefined;
+  ProfileMain: undefined;
+  PersonalInfo: undefined;
+  LicenseDetails: undefined;
+  TripHistory: undefined;
+  PerformanceStats: undefined;
+  Notifications: undefined;
   Settings: undefined;
+  HelpSupport: undefined;
 };

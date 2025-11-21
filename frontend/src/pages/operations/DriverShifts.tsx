@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import OperationsLayout from '@/components/operations/OperationsLayout';
+import GenerateShiftsDialog from '@/components/operations/GenerateShiftsDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -10,7 +11,7 @@ import { format } from 'date-fns';
 
 export default function DriverShifts() {
   // Fetch driver shifts
-  const { data: shifts = [], isLoading } = useQuery({
+  const { data: shifts = [], isLoading, error: shiftsError } = useQuery({
     queryKey: ['driver-shifts'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -18,43 +19,40 @@ export default function DriverShifts() {
         .select(`
           *,
           drivers:driver_id (full_name, phone, license_number),
-          buses:bus_id (registration_number, model),
-          trips:trip_id (
-            trip_number,
-            scheduled_departure,
-            scheduled_arrival,
-            routes:route_id (origin, destination)
-          )
+          buses:bus_id (registration_number),
+          routes:route_id (origin, destination)
         `)
-        .order('shift_start', { ascending: true });
+        .order('start_time', { ascending: true });
       
       if (error) {
         console.error('Error fetching shifts:', error);
+        // Return empty array instead of throwing to prevent crash
         return [];
       }
       return data || [];
     },
     refetchInterval: 30000, // Refresh every 30 seconds
+    retry: false, // Don't retry if table doesn't exist
   });
 
   // Filter shifts
   const today = new Date();
   const todayShifts = shifts.filter((shift: any) => {
-    const shiftDate = new Date(shift.shift_start);
+    const shiftDate = new Date(shift.start_time);
     return shiftDate.toDateString() === today.toDateString();
   });
 
   const activeShifts = shifts.filter((shift: any) => 
-    ['ON_DUTY', 'DRIVING'].includes(shift.status)
+    shift.status === 'on_duty' || shift.status === 'driving' || shift.status === 'ON_DUTY' || shift.status === 'DRIVING'
   );
 
   const upcomingShifts = shifts.filter((shift: any) => {
-    const shiftDate = new Date(shift.shift_start);
-    return shiftDate > today && shift.status === 'SCHEDULED';
+    const shiftDate = new Date(shift.start_time);
+    return shiftDate > today && (shift.status === 'scheduled' || shift.status === 'SCHEDULED');
   });
 
   const completedShifts = shifts.filter((shift: any) => 
-    shift.status === 'COMPLETED'
+    shift.status === 'completed' || shift.status === 'COMPLETED'
   );
 
   const getStatusColor = (status: string) => {
@@ -95,10 +93,10 @@ export default function DriverShifts() {
       <TableCell>
         <div>
           <p className="text-sm font-medium">
-            {format(new Date(shift.shift_start), 'HH:mm')} - {format(new Date(shift.shift_end), 'HH:mm')}
+            {format(new Date(shift.start_time), 'HH:mm')} - {format(new Date(shift.end_time), 'HH:mm')}
           </p>
           <p className="text-xs text-muted-foreground">
-            {format(new Date(shift.shift_start), 'dd MMM yyyy')}
+            {format(new Date(shift.start_time), 'dd MMM yyyy')}
           </p>
         </div>
       </TableCell>
@@ -107,9 +105,11 @@ export default function DriverShifts() {
           <MapPin className="h-4 w-4 text-muted-foreground" />
           <div>
             <p className="text-sm">
-              {shift.trips?.routes?.origin} → {shift.trips?.routes?.destination}
+              {shift.routes?.origin} → {shift.routes?.destination}
             </p>
-            <p className="text-xs text-muted-foreground">Trip: {shift.trips?.trip_number}</p>
+            <p className="text-xs text-muted-foreground">
+              {shift.shift_date && format(new Date(shift.shift_date), 'dd MMM')}
+            </p>
           </div>
         </div>
       </TableCell>
@@ -125,9 +125,9 @@ export default function DriverShifts() {
       </TableCell>
       <TableCell>
         <div className="text-sm">
-          <p>Depart: {format(new Date(shift.trips?.scheduled_departure), 'HH:mm')}</p>
+          <p>Start: {format(new Date(shift.start_time), 'HH:mm')}</p>
           <p className="text-xs text-muted-foreground">
-            Arrive: {format(new Date(shift.trips?.scheduled_arrival), 'HH:mm')}
+            End: {format(new Date(shift.end_time), 'HH:mm')}
           </p>
         </div>
       </TableCell>
@@ -138,11 +138,14 @@ export default function DriverShifts() {
     <OperationsLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">Driver Shifts</h1>
-          <p className="text-muted-foreground">
-            Auto-generated driver shifts with real-time status updates
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Driver Shifts</h1>
+            <p className="text-muted-foreground">
+              Auto-generated driver shifts with real-time status updates
+            </p>
+          </div>
+          <GenerateShiftsDialog />
         </div>
 
         {/* Summary Cards */}
@@ -231,9 +234,11 @@ export default function DriverShifts() {
                     </TableBody>
                   </Table>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No shifts scheduled for today</p>
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Calendar className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg font-medium mb-2">No shifts scheduled for today</p>
+                    <p className="text-sm mb-4">Generate shifts automatically to assign drivers and buses</p>
+                    <GenerateShiftsDialog />
                   </div>
                 )}
               </CardContent>

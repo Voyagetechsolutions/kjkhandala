@@ -3,8 +3,10 @@ import { Trip } from '../types';
 
 export const tripService = {
   // Get today's trips for a driver
-  getTodaysTrips: async (driverId: string): Promise<Trip[]> => {
-    const today = new Date().toISOString().split('T')[0];
+  getTodaysTrips: async (driverId: string) => {
+    const today = new Date();
+    const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+    const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
     
     const { data, error } = await supabase
       .from('trips')
@@ -12,12 +14,11 @@ export const tripService = {
         *,
         route:routes(*),
         bus:buses(*),
-        conductor:profiles(*)
+        driver:drivers(*)
       `)
-      .eq('driver_id', driverId)
-      .gte('departure_time', `${today}T00:00:00`)
-      .lte('departure_time', `${today}T23:59:59`)
-      .order('departure_time', { ascending: true });
+      .gte('scheduled_departure', startOfDay)
+      .lte('scheduled_departure', endOfDay)
+      .order('scheduled_departure', { ascending: true });
 
     if (error) throw error;
     return data || [];
@@ -34,10 +35,10 @@ export const tripService = {
         *,
         route:routes(*),
         bus:buses(*),
-        conductor:profiles(*)
+        driver:drivers(*)
       `)
       .eq('driver_id', driverId)
-      .order('departure_time', { ascending: false });
+      .order('scheduled_departure', { ascending: false });
 
     if (status) {
       query = query.eq('status', status);
@@ -56,8 +57,7 @@ export const tripService = {
         *,
         route:routes(*),
         bus:buses(*),
-        driver:drivers(*),
-        conductor:profiles(*)
+        driver:drivers(*)
       `)
       .eq('id', tripId)
       .single();
@@ -84,7 +84,7 @@ export const tripService = {
     const { error } = await supabase
       .from('trips')
       .update({ 
-        status: 'NOT_STARTED',
+        status: 'in_progress',
         updated_at: new Date().toISOString() 
       })
       .eq('id', tripId);
@@ -97,44 +97,66 @@ export const tripService = {
     const { error } = await supabase
       .from('trips')
       .update({ 
-        status: 'CANCELLED',
+        status: 'cancelled',
         updated_at: new Date().toISOString() 
       })
       .eq('id', tripId);
 
     if (error) throw error;
-    
-    // TODO: Log rejection reason in a separate table
+  },
+
+  // Start trip
+  startTrip: async (tripId: string): Promise<void> => {
+    const { error } = await supabase
+      .from('trips')
+      .update({
+        status: 'in_progress',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', tripId);
+
+    if (error) throw error;
+  },
+
+  // Complete trip
+  completeTrip: async (tripId: string): Promise<void> => {
+    const { error } = await supabase
+      .from('trips')
+      .update({
+        status: 'completed',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', tripId);
+
+    if (error) throw error;
   },
 
   // Get trip statistics
   getTripStats: async (driverId: string) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date();
+    const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+    const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
     
-    // Today's trips
-    const { data: todayTrips } = await supabase
+    const { data: trips } = await supabase
       .from('trips')
-      .select('id, status')
+      .select('*')
       .eq('driver_id', driverId)
-      .gte('departure_time', `${today}T00:00:00`)
-      .lte('departure_time', `${today}T23:59:59`);
+      .gte('scheduled_departure', startOfDay)
+      .lte('scheduled_departure', endOfDay);
 
-    // Total completed trips
-    const { data: completedTrips } = await supabase
-      .from('trips')
-      .select('id')
-      .eq('driver_id', driverId)
-      .eq('status', 'COMPLETED');
-
-    // Get passenger count for today
+    const tripsToday = trips?.length || 0;
+    const tripsCompleted = trips?.filter(t => t.status === 'completed').length || 0;
+    
+    // Get passenger count
     const { data: bookings } = await supabase
       .from('bookings')
-      .select('id, trip_id')
-      .in('trip_id', todayTrips?.map(t => t.id) || []);
+      .select('id')
+      .in('trip_id', trips?.map(t => t.id) || [])
+      .eq('booking_status', 'confirmed');
 
     return {
-      tripsToday: todayTrips?.length || 0,
-      tripsCompleted: completedTrips?.length || 0,
+      tripsToday,
+      tripsCompleted,
       passengersToday: bookings?.length || 0,
     };
   },

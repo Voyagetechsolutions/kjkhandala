@@ -1,15 +1,42 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
+import { driverService } from '../../services/driverService';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../lib/constants';
+import PersonalInfoScreen from './PersonalInfoScreen';
+import LicenseDetailsScreen from './LicenseDetailsScreen';
+import TripHistoryScreen from './TripHistoryScreen';
+import PerformanceStatsScreen from './PerformanceStatsScreen';
+import NotificationsScreen from './NotificationsScreen';
+import SettingsScreen from './SettingsScreen';
+import HelpSupportScreen from './HelpSupportScreen';
+import WalletScreen from '../wallet/WalletScreen';
 
-export default function ProfileScreen() {
+const Stack = createStackNavigator();
+
+function ProfileMainScreen() {
   const { driver, signOut } = useAuth();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
+  const [stats, setStats] = useState({ tripsToday: 0, tripsWeek: 0, tripsMonth: 0, rating: 5.0 });
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const loadStats = async () => {
+    if (!driver?.id) return;
+    try {
+      const data = await driverService.getDriverStats(driver.id);
+      setStats(data);
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
+  };
 
   const handleSignOut = () => {
     Alert.alert(
@@ -31,10 +58,10 @@ export default function ProfileScreen() {
     { icon: 'document-text-outline', label: 'License Details', screen: 'LicenseDetails' },
     { icon: 'car-outline', label: 'My Trips History', screen: 'TripHistory' },
     { icon: 'wallet-outline', label: 'Wallet & Earnings', screen: 'Wallet' },
-    { icon: 'stats-chart-outline', label: 'Performance Stats', screen: 'Stats' },
+    { icon: 'stats-chart-outline', label: 'Performance Stats', screen: 'PerformanceStats' },
     { icon: 'notifications-outline', label: 'Notifications', screen: 'Notifications' },
     { icon: 'settings-outline', label: 'Settings', screen: 'Settings' },
-    { icon: 'help-circle-outline', label: 'Help & Support', screen: 'Support' },
+    { icon: 'help-circle-outline', label: 'Help & Support', screen: 'HelpSupport' },
   ];
 
   return (
@@ -56,19 +83,19 @@ export default function ProfileScreen() {
         <Text style={styles.sectionTitle}>Quick Stats</Text>
         <View style={styles.statsGrid}>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>0</Text>
+            <Text style={styles.statValue}>{stats.tripsToday}</Text>
             <Text style={styles.statLabel}>Trips Today</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>0</Text>
+            <Text style={styles.statValue}>{stats.tripsWeek}</Text>
             <Text style={styles.statLabel}>This Week</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>0</Text>
+            <Text style={styles.statValue}>{stats.tripsMonth}</Text>
             <Text style={styles.statLabel}>This Month</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>5.0</Text>
+            <Text style={styles.statValue}>{stats.rating.toFixed(1)}</Text>
             <Text style={styles.statLabel}>Rating</Text>
           </View>
         </View>
@@ -80,7 +107,7 @@ export default function ProfileScreen() {
           <TouchableOpacity
             key={index}
             style={styles.menuItem}
-            onPress={() => {}}
+            onPress={() => navigation.navigate(item.screen)}
           >
             <View style={styles.menuLeft}>
               <Ionicons name={item.icon as any} size={24} color={COLORS.gray[600]} />
@@ -101,7 +128,7 @@ export default function ProfileScreen() {
 
       <View style={styles.footer}>
         <Text style={styles.version}>Version 1.0.0</Text>
-        <Text style={styles.copyright}>© 2024 Voyage Bus</Text>
+        <Text style={styles.copyright}>© 2025 KJ Khandala Bus Company</Text>
       </View>
     </ScrollView>
   );
@@ -212,3 +239,65 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
   },
 });
+
+export default function ProfileScreen() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: COLORS.primary,
+        },
+        headerTintColor: COLORS.white,
+        headerTitleStyle: {
+          fontWeight: '600',
+        },
+      }}
+    >
+      <Stack.Screen 
+        name="ProfileMain" 
+        component={ProfileMainScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="PersonalInfo" 
+        component={PersonalInfoScreen}
+        options={{ title: 'Personal Information' }}
+      />
+      <Stack.Screen 
+        name="LicenseDetails" 
+        component={LicenseDetailsScreen}
+        options={{ title: 'License Details' }}
+      />
+      <Stack.Screen 
+        name="TripHistory" 
+        component={TripHistoryScreen}
+        options={{ title: 'Trip History' }}
+      />
+      <Stack.Screen 
+        name="Wallet" 
+        component={WalletScreen}
+        options={{ title: 'Wallet & Earnings' }}
+      />
+      <Stack.Screen 
+        name="PerformanceStats" 
+        component={PerformanceStatsScreen}
+        options={{ title: 'Performance Stats' }}
+      />
+      <Stack.Screen 
+        name="Notifications" 
+        component={NotificationsScreen}
+        options={{ title: 'Notifications' }}
+      />
+      <Stack.Screen 
+        name="Settings" 
+        component={SettingsScreen}
+        options={{ title: 'Settings' }}
+      />
+      <Stack.Screen 
+        name="HelpSupport" 
+        component={HelpSupportScreen}
+        options={{ title: 'Help & Support' }}
+      />
+    </Stack.Navigator>
+  );
+}

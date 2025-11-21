@@ -77,14 +77,14 @@ export default function LoginScreen() {
         >
           <View style={styles.header}>
             <Text style={styles.emoji}>🚍</Text>
-            <Text style={styles.title}>Voyage Driver</Text>
+            <Text style={styles.title}>KJ Khandala Drivers</Text>
             <Text style={styles.subtitle}>Sign in to continue</Text>
           </View>
 
           <Card style={styles.card}>
             <Input
               label="Email"
-              placeholder="driver@voyagebus.com"
+              placeholder="driver@kjkhandala.com"
               value={email}
               onChangeText={setEmail}
               error={errors.email}
@@ -118,7 +118,7 @@ export default function LoginScreen() {
           </Card>
 
           <Text style={styles.footer}>
-            Voyage Onboard © 2025
+            KJ Khandala Bus Company © 2025
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
