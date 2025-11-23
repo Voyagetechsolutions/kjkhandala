@@ -32,11 +32,11 @@ export default function ReservedTickets() {
             trip_number,
             scheduled_departure,
             scheduled_arrival,
-            routes:route_id (
+            routes!route_id (
               origin,
               destination
             ),
-            buses:bus_id (
+            buses!bus_id (
               name,
               registration_number
             )

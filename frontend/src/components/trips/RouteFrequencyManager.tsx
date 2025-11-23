@@ -43,16 +43,57 @@ export default function RouteFrequencyManager() {
   const { data: frequencies, isLoading } = useQuery({
     queryKey: ['route-frequencies'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      console.log('🔍 Fetching route frequencies...');
+      
+      // Fetch route frequencies without joins first
+      const { data: freqData, error: freqError } = await supabase
         .from('route_frequencies')
-        .select(`
-          *,
-          routes:route_id (id, origin, destination, duration_hours),
-          buses:bus_id (id, registration_number, model),
-          drivers:driver_id (id, full_name)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
-      if (error) throw error;
+      
+      if (freqError) {
+        console.error('❌ Error fetching route frequencies:', freqError);
+        throw freqError;
+      }
+
+      // Manually fetch related data
+      const routeIds = [...new Set(freqData?.map(f => f.route_id).filter(Boolean))];
+      const busIds = [...new Set(freqData?.map(f => f.bus_id).filter(Boolean))];
+      const driverIds = [...new Set(freqData?.map(f => f.driver_id).filter(Boolean))];
+
+      const [routesData, busesData, driversData] = await Promise.all([
+        routeIds.length > 0 
+          ? supabase.from('routes').select('id, origin, destination, duration_hours').in('id', routeIds)
+          : { data: [] },
+        busIds.length > 0
+          ? supabase.from('buses').select('id, registration_number, model').in('id', busIds)
+          : { data: [] },
+        driverIds.length > 0
+          ? supabase.from('drivers').select('id, full_name').in('id', driverIds)
+          : { data: [] }
+      ]);
+
+      // Map related data
+      const routesMap = new Map(routesData.data?.map((r: any) => [r.id, r] as const) || []);
+      const busesMap = new Map(busesData.data?.map((b: any) => [b.id, b] as const) || []);
+      const driversMap = new Map(driversData.data?.map((d: any) => [d.id, d] as const) || []);
+
+      // Combine data
+      const data = freqData?.map(freq => ({
+        ...freq,
+        routes: routesMap.get(freq.route_id) || null,
+        buses: busesMap.get(freq.bus_id) || null,
+        drivers: driversMap.get(freq.driver_id) || null,
+      }));
+
+      const error = null;
+      
+      if (error) {
+        console.error('❌ Error fetching route frequencies:', error);
+        throw error;
+      }
+      
+      console.log('✅ Route frequencies fetched:', data?.length || 0, data);
       return data || [];
     },
   });

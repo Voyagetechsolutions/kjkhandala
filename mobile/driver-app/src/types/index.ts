@@ -21,8 +21,8 @@ export interface Trip {
   bus_id: string;
   driver_id: string;
   conductor_id?: string;
-  departure_time: string;
-  arrival_time: string;
+  scheduled_departure: string;
+  scheduled_arrival: string;
   status: 'NOT_STARTED' | 'EN_ROUTE' | 'ARRIVED' | 'COMPLETED' | 'CANCELLED' | 'DELAYED';
   total_seats: number;
   available_seats: number;
@@ -176,17 +176,6 @@ export interface DriverMessage {
   created_at: string;
 }
 
-export interface WalletTransaction {
-  id: string;
-  driver_id: string;
-  transaction_type: 'daily_allowance' | 'fuel_allowance' | 'trip_earning' | 'bonus' | 'deduction' | 'advance' | 'refund';
-  amount: number;
-  description: string;
-  status: 'pending' | 'approved' | 'paid';
-  trip_id?: string;
-  created_at: string;
-}
-
 export interface PassengerCheckin {
   id: string;
   booking_id: string;
@@ -210,6 +199,7 @@ export type AuthStackParamList = {
 
 export type MainStackParamList = {
   Dashboard: undefined;
+  Shifts: undefined;
   TripsList: undefined;
   TripDetails: { tripId: string };
   PassengerManifest: { tripId: string };
@@ -223,7 +213,6 @@ export type MainStackParamList = {
   MessagesList: undefined;
   MessageDetail: { messageId: string };
   TripTimeline: { tripId: string };
-  Wallet: undefined;
   Profile: undefined;
   ProfileMain: undefined;
   PersonalInfo: undefined;

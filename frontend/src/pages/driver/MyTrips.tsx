@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 import DriverLayout from '@/components/driver/DriverLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,88 +25,101 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import { format } from 'date-fns';
 
 export default function MyTrips() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [filterStatus, setFilterStatus] = useState('all');
 
-  // Mock data - replace with API call
-  const trips = [
-    {
-      id: 1,
-      route: 'Gaborone - Francistown',
-      origin: 'Gaborone Main Terminal',
-      destination: 'Francistown Station',
-      departureTime: '08:00',
-      arrivalTime: '12:00',
-      date: '2024-11-06',
-      busNumber: 'BUS-001',
-      passengers: 35,
-      capacity: 45,
-      status: 'active',
-      distance: '420 km',
+  // Fetch trips for the current driver
+  const { data: trips = [], isLoading } = useQuery({
+    queryKey: ['driver-trips', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('trips')
+        .select(`
+          *,
+          routes!route_id (
+            id,
+            origin,
+            destination,
+            distance_km
+          ),
+          buses!bus_id (
+            id,
+            registration_number,
+            model
+          )
+        `)
+        .eq('driver_id', user.id)
+        .gte('scheduled_departure', new Date().toISOString().split('T')[0])
+        .order('scheduled_departure', { ascending: true });
+      
+      if (error) {
+        console.error('Error fetching driver trips:', error);
+        throw error;
+      }
+      
+      // Transform data to match the expected format
+      return (data || []).map((trip: any) => ({
+        id: trip.id,
+        route: `${trip.routes?.origin} - ${trip.routes?.destination}`,
+        origin: trip.routes?.origin || 'Unknown',
+        destination: trip.routes?.destination || 'Unknown',
+        departureTime: trip.scheduled_departure ? format(new Date(trip.scheduled_departure), 'HH:mm') : 'N/A',
+        arrivalTime: trip.scheduled_arrival ? format(new Date(trip.scheduled_arrival), 'HH:mm') : 'N/A',
+        date: trip.scheduled_departure ? format(new Date(trip.scheduled_departure), 'yyyy-MM-dd') : 'N/A',
+        busNumber: trip.buses?.registration_number || 'Not assigned',
+        passengers: trip.total_seats - trip.available_seats,
+        capacity: trip.total_seats || 45,
+        status: trip.status?.toLowerCase() || 'scheduled',
+        distance: trip.routes?.distance_km ? `${trip.routes.distance_km} km` : 'N/A',
+      }));
     },
-    {
-      id: 2,
-      route: 'Francistown - Maun',
-      origin: 'Francistown Station',
-      destination: 'Maun Terminal',
-      departureTime: '14:00',
-      arrivalTime: '18:30',
-      date: '2024-11-06',
-      busNumber: 'BUS-001',
-      passengers: 28,
-      capacity: 45,
-      status: 'upcoming',
-      distance: '520 km',
-    },
-    {
-      id: 3,
-      route: 'Gaborone - Kasane',
-      origin: 'Gaborone Main Terminal',
-      destination: 'Kasane Border',
-      departureTime: '06:00',
-      arrivalTime: '16:00',
-      date: '2024-11-05',
-      busNumber: 'BUS-001',
-      passengers: 42,
-      capacity: 45,
-      status: 'completed',
-      distance: '850 km',
-    },
-    {
-      id: 4,
-      route: 'Maun - Gaborone',
-      origin: 'Maun Terminal',
-      destination: 'Gaborone Main Terminal',
-      departureTime: '09:00',
-      arrivalTime: '13:30',
-      date: '2024-11-04',
-      busNumber: 'BUS-001',
-      passengers: 38,
-      capacity: 45,
-      status: 'completed',
-      distance: '520 km',
-    },
-  ];
+    enabled: !!user?.id,
+  });
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-green-500';
-      case 'upcoming': return 'bg-blue-500';
-      case 'completed': return 'bg-gray-500';
-      case 'canceled': return 'bg-red-500';
-      default: return 'bg-gray-500';
+    switch (status?.toLowerCase()) {
+      case 'active':
+      case 'departed':
+      case 'in_transit': 
+        return 'bg-green-500';
+      case 'upcoming':
+      case 'scheduled':
+      case 'boarding':
+        return 'bg-blue-500';
+      case 'completed':
+        return 'bg-gray-500';
+      case 'canceled':
+      case 'cancelled':
+        return 'bg-red-500';
+      default: 
+        return 'bg-gray-500';
     }
   };
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'active': return <Play className="h-4 w-4" />;
-      case 'upcoming': return <Clock className="h-4 w-4" />;
-      case 'completed': return <CheckCircle className="h-4 w-4" />;
-      case 'canceled': return <AlertCircle className="h-4 w-4" />;
-      default: return <Clock className="h-4 w-4" />;
+    switch (status?.toLowerCase()) {
+      case 'active':
+      case 'departed':
+      case 'in_transit':
+        return <Play className="h-4 w-4" />;
+      case 'upcoming':
+      case 'scheduled':
+      case 'boarding':
+        return <Clock className="h-4 w-4" />;
+      case 'completed':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'canceled':
+      case 'cancelled':
+        return <AlertCircle className="h-4 w-4" />;
+      default: 
+        return <Clock className="h-4 w-4" />;
     }
   };
 
@@ -208,7 +223,25 @@ export default function MyTrips() {
 
         {/* Trips List */}
         <div className="space-y-4">
-          {filteredTrips.map((trip) => (
+          {isLoading ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading your trips...</p>
+              </CardContent>
+            </Card>
+          ) : filteredTrips.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="text-muted-foreground">No trips found</p>
+                <p className="text-sm text-muted-foreground">
+                  {filterStatus === 'all' ? 'No trips assigned yet' : 'Try changing the filter'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            filteredTrips.map((trip) => (
             <Card key={trip.id}>
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -307,18 +340,9 @@ export default function MyTrips() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+            ))
+          )}
         </div>
-
-        {filteredTrips.length === 0 && (
-          <Card>
-            <CardContent className="text-center py-12">
-              <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-muted-foreground">No trips found</p>
-              <p className="text-sm text-muted-foreground">Try changing the filter</p>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </DriverLayout>
   );

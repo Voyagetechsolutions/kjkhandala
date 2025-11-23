@@ -15,7 +15,6 @@ import PerformanceStatsScreen from './PerformanceStatsScreen';
 import NotificationsScreen from './NotificationsScreen';
 import SettingsScreen from './SettingsScreen';
 import HelpSupportScreen from './HelpSupportScreen';
-import WalletScreen from '../wallet/WalletScreen';
 
 const Stack = createStackNavigator();
 
@@ -57,7 +56,6 @@ function ProfileMainScreen() {
     { icon: 'person-outline', label: 'Personal Information', screen: 'PersonalInfo' },
     { icon: 'document-text-outline', label: 'License Details', screen: 'LicenseDetails' },
     { icon: 'car-outline', label: 'My Trips History', screen: 'TripHistory' },
-    { icon: 'wallet-outline', label: 'Wallet & Earnings', screen: 'Wallet' },
     { icon: 'stats-chart-outline', label: 'Performance Stats', screen: 'PerformanceStats' },
     { icon: 'notifications-outline', label: 'Notifications', screen: 'Notifications' },
     { icon: 'settings-outline', label: 'Settings', screen: 'Settings' },
@@ -272,11 +270,6 @@ export default function ProfileScreen() {
         name="TripHistory" 
         component={TripHistoryScreen}
         options={{ title: 'Trip History' }}
-      />
-      <Stack.Screen 
-        name="Wallet" 
-        component={WalletScreen}
-        options={{ title: 'Wallet & Earnings' }}
       />
       <Stack.Screen 
         name="PerformanceStats" 

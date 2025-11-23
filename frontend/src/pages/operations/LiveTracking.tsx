@@ -129,11 +129,11 @@ export default function LiveTracking() {
       .from('trips')
       .select(`
         *,
-        routes:route_id (
+        routes!route_id (
           origin,
           destination
         ),
-        buses:bus_id (
+        buses!bus_id (
           registration_number,
           name
         )

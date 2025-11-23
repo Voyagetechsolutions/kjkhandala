@@ -192,17 +192,35 @@ export default function SearchTrips() {
 
       if (error) throw error;
 
-      // Fetch active schedules for projection
-      const { data: schedules, error: schedError } = await supabase
+      // Fetch active schedules for projection (manual join to avoid ambiguous FK error)
+      const { data: schedData, error: schedError } = await supabase
         .from('route_frequencies')
-        .select(`
-          *,
-          routes:route_id (id, origin, destination, duration_hours),
-          buses:bus_id (id, registration_number, name, bus_type, seating_capacity)
-        `)
+        .select('*')
         .eq('active', true);
 
       if (schedError) throw schedError;
+
+      // Fetch related data
+      const routeIds = [...new Set(schedData?.map(s => s.route_id).filter(Boolean))];
+      const busIds = [...new Set(schedData?.map(s => s.bus_id).filter(Boolean))];
+
+      const [routesRes, busesRes] = await Promise.all([
+        routeIds.length > 0 
+          ? supabase.from('routes').select('id, origin, destination, duration_hours').in('id', routeIds)
+          : { data: [] },
+        busIds.length > 0
+          ? supabase.from('buses').select('id, registration_number, name, bus_type, seating_capacity').in('id', busIds)
+          : { data: [] }
+      ]);
+
+      const routesMap = new Map(routesRes.data?.map((r: any) => [r.id, r] as const) || []);
+      const busesMap = new Map(busesRes.data?.map((b: any) => [b.id, b] as const) || []);
+
+      const schedules = schedData?.map(sched => ({
+        ...sched,
+        routes: routesMap.get(sched.route_id) || null,
+        buses: busesMap.get(sched.bus_id) || null,
+      }));
 
       // Generate projected trips from schedules
       const projectedTrips = generateProjectedTrips(

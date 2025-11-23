@@ -2,6 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import DashboardScreen from '../screens/dashboard/DashboardScreen';
+import ShiftsScreen from '../screens/shifts/ShiftsScreen';
 import TripsListScreen from '../screens/trips/TripsListScreen';
 import MessagesScreen from '../screens/messages/MessagesScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
@@ -24,6 +25,15 @@ export default function MainNavigator() {
         options={{
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Ionicons name="home" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Shifts"
+        component={ShiftsScreen}
+        options={{
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
+            <Ionicons name="calendar" size={size} color={color} />
           ),
         }}
       />

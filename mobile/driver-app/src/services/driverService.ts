@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { Driver, WalletTransaction } from '../types';
+import { Driver } from '../types';
 
 export const driverService = {
   // Get driver profile
@@ -83,91 +83,6 @@ export const driverService = {
 
     if (error) throw error;
     return data;
-  },
-
-  // Get wallet balance
-  async getWalletBalance(driverId: string): Promise<number> {
-    try {
-      const { data, error } = await supabase
-        .from('driver_earnings')
-        .select('amount, type')
-        .eq('driver_id', driverId);
-
-      if (error) {
-        console.warn('Wallet table not found, returning mock balance');
-        return 2500.00; // Mock balance
-      }
-
-      let balance = 0;
-      data?.forEach((earning: any) => {
-        balance += parseFloat(earning.amount);
-      });
-
-      return balance;
-    } catch (err) {
-      console.error('Error fetching wallet balance:', err);
-      return 2500.00; // Mock balance
-    }
-  },
-
-  // Get wallet transactions
-  async getWalletTransactions(driverId: string, limit: number = 50): Promise<WalletTransaction[]> {
-    try {
-      const { data, error } = await supabase
-        .from('driver_earnings')
-        .select('*')
-        .eq('driver_id', driverId)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (error) {
-        console.warn('Transactions table not found, returning mock data');
-        return [];
-      }
-      return data || [];
-    } catch (err) {
-      console.error('Error fetching transactions:', err);
-      return [];
-    }
-  },
-
-  // Get earnings summary
-  async getEarningsSummary(driverId: string) {
-    const today = new Date().toISOString().split('T')[0];
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-    const calculateEarnings = async (fromDate: string) => {
-      try {
-        const { data, error } = await supabase
-          .from('driver_earnings')
-          .select('amount')
-          .eq('driver_id', driverId)
-          .gte('created_at', fromDate);
-
-        if (error) return 0;
-
-        let total = 0;
-        data?.forEach((earning: any) => {
-          total += parseFloat(earning.amount);
-        });
-        return total;
-      } catch (err) {
-        return 0;
-      }
-    };
-
-    const [todayEarnings, weekEarnings, monthEarnings] = await Promise.all([
-      calculateEarnings(today),
-      calculateEarnings(weekAgo),
-      calculateEarnings(monthAgo),
-    ]);
-
-    return {
-      today: todayEarnings,
-      week: weekEarnings,
-      month: monthEarnings,
-    };
   },
 
   // Get performance metrics

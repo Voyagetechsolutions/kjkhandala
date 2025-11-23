@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
+import { safeFormatDate } from '../../lib/dateUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { messageService } from '../../services/messageService';
 import Card from '../../components/Card';
@@ -104,7 +104,7 @@ export default function MessagesScreen() {
                       {message.title}
                     </Text>
                     <Text style={styles.messageDate}>
-                      {format(new Date(message.created_at), 'MMM d, yyyy • HH:mm')}
+                      {safeFormatDate(message.created_at, 'MMM d, yyyy • HH:mm')}
                     </Text>
                   </View>
                   {!message.is_read && <View style={styles.unreadDot} />}

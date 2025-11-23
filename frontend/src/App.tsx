@@ -50,7 +50,7 @@ import OperationsDashboard from "./pages/operations/OperationsDashboard";
 import OperationsManifest from "./pages/operations/PassengerManifest";
 import TripManagement from "./pages/operations/TripManagement";
 import AutomatedTripManagement from "./pages/operations/AutomatedTripManagement";
-import DriverShifts from "./pages/operations/DriverShifts";
+import ShiftCalendar from "./pages/operations/ShiftCalendar";
 import FleetOperations from "./pages/operations/FleetOperations";
 import OperationsFleetManagement from "./pages/operations/FleetManagement";
 import DriverOperations from "./pages/operations/DriverOperations";
@@ -188,7 +188,7 @@ const App = () => (
             <Route path="/admin/route-management" element={<RouteManagement />} />
             <Route path="/admin/trips" element={<TripScheduling />} />
             <Route path="/admin/trip-management" element={<AutomatedTripManagement />} />
-            <Route path="/admin/driver-shifts" element={<DriverShifts />} />
+            <Route path="/admin/driver-shifts" element={<ShiftCalendar />} />
             <Route path="/admin/manifest" element={<PassengerManifest />} />
             <Route path="/admin/finance" element={<FinanceManagement />} />
             <Route path="/admin/hr" element={<HRManagement />} />
@@ -214,7 +214,7 @@ const App = () => (
             <Route path="/operations/test" element={<RoutingTest />} />
             <Route path="/operations/trips" element={<TripScheduling />} />
             <Route path="/operations/trip-management" element={<AutomatedTripManagement />} />
-            <Route path="/operations/driver-shifts" element={<DriverShifts />} />
+            <Route path="/operations/driver-shifts" element={<ShiftCalendar />} />
             <Route path="/operations/fleet" element={<FleetManagement />} />
             <Route path="/operations/drivers" element={<DriverManagement />} />
             <Route path="/operations/tracking" element={<OperationsLiveTracking />} />

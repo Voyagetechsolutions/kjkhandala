@@ -37,17 +37,58 @@ export default function TripScheduling() {
   });
   const queryClient = useQueryClient();
 
+  // Auto-generate trips from shifts for today
+  const generateTripsFromShiftsMutation = useMutation({
+    mutationFn: async (dateRange: { start_date?: string; end_date?: string } = {}) => {
+      const startDate = dateRange?.start_date || format(new Date(), 'yyyy-MM-dd');
+      const endDate = dateRange?.end_date || format(new Date(), 'yyyy-MM-dd');
+      
+      const { error } = await supabase.rpc('generate_trips_from_frequencies', {
+        start_date: startDate,
+        end_date: endDate,
+      });
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Trips generated from shifts successfully');
+      queryClient.invalidateQueries({ queryKey: ['trips'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to generate trips from shifts');
+    },
+  });
+
   // Fetch all trips/schedules with route, bus, and driver info
   const { data: tripsData, isLoading } = useQuery({
     queryKey: ['trips'],
     queryFn: async () => {
+      // Auto-generate trips for today if none exist
+      const today = format(new Date(), 'yyyy-MM-dd');
+      
+      // Check if trips exist for today
+      const { data: todayTrips } = await supabase
+        .from('trips')
+        .select('id')
+        .gte('scheduled_departure', today)
+        .lt('scheduled_departure', format(new Date(Date.now() + 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
+      
+      // If no trips for today, try to generate them
+      if (!todayTrips || todayTrips.length === 0) {
+        try {
+          await generateTripsFromShiftsMutation.mutateAsync({ start_date: today, end_date: today });
+        } catch (error) {
+          console.warn('Could not auto-generate trips:', error);
+        }
+      }
+
       const { data, error } = await supabase
         .from('trips')
         .select(`
           *,
-          routes:route_id (id, origin, destination),
-          buses:bus_id (id, registration_number, model),
-          drivers:driver_id (id, full_name, phone)
+          routes!route_id (id, origin, destination),
+          buses!bus_id (id, registration_number, model),
+          drivers!driver_id (id, full_name, phone)
         `)
         .order('scheduled_departure', { ascending: false });
       if (error) throw error;
@@ -90,27 +131,46 @@ export default function TripScheduling() {
   const { data: liveTrips, isLoading: liveTripsLoading } = useQuery({
     queryKey: ['live-trips'],
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
       
       // Query with joins for complete trip information
       const { data, error } = await supabase
         .from('trips')
         .select(`
           *,
-          routes:route_id (id, origin, destination, distance_km),
-          buses:bus_id (id, registration_number, model, gps_device_id),
-          drivers:driver_id (id, full_name, phone, license_number)
+          routes!route_id (id, origin, destination, distance_km),
+          buses!bus_id (id, registration_number, model, gps_device_id),
+          drivers!driver_id (id, full_name, phone, license_number)
         `)
-        .gte('scheduled_departure', today)
-        .in('status', ['DEPARTED', 'BOARDING'])
         .order('scheduled_departure', { ascending: true });
       
       if (error) {
         console.error('Error fetching live trips:', error);
-        // Return empty array instead of throwing to prevent UI crash
         return [];
       }
-      return data || [];
+      
+      // Filter trips that are:
+      // 1. BOARDING (within 30 mins before departure)
+      // 2. Between departure and arrival time (DEPARTED/IN_TRANSIT)
+      const liveTripsFiltered = (data || []).filter((trip: any) => {
+        const departure = new Date(trip.scheduled_departure);
+        const arrival = new Date(trip.scheduled_arrival);
+        
+        // BOARDING: 30 minutes before departure to departure time
+        if (trip.status === 'BOARDING') {
+          const boardingStart = new Date(departure.getTime() - 30 * 60 * 1000);
+          return now >= boardingStart && now <= departure;
+        }
+        
+        // DEPARTED/IN_TRANSIT: between departure and arrival
+        if (trip.status === 'DEPARTED' || trip.status === 'IN_TRANSIT') {
+          return now >= departure && now <= arrival;
+        }
+        
+        return false;
+      });
+      
+      return liveTripsFiltered;
     },
     refetchInterval: 15000, // Refresh every 15 seconds for live updates
   });
@@ -252,15 +312,34 @@ export default function TripScheduling() {
 
   // Summary stats
   const trips = tripsData?.trips || [];
-  const todayTrips = trips.filter((t: any) => 
-    t.scheduled_departure?.startsWith(new Date().toISOString().split('T')[0])
+  const today = new Date();
+
+  // Debug: Log trips data
+  console.log('Trips fetched:', trips.length, trips.slice(0, 2));
+  console.log('Status values in DB:', [...new Set(trips.map((t: any) => t.status))]);
+
+  // Trips Today - compare dates properly
+  const todayTrips = trips.filter((t: any) => {
+    if (!t.scheduled_departure) return false;
+    const depDate = new Date(t.scheduled_departure);
+    return depDate.getDate() === today.getDate() &&
+           depDate.getMonth() === today.getMonth() &&
+           depDate.getFullYear() === today.getFullYear();
+  }).length;
+
+  // Active Trips - check actual status values from DB
+  const activeTrips = trips.filter((t: any) => 
+    t.status === 'DEPARTED' || t.status === 'IN_TRANSIT' || t.status === 'BOARDING'
   ).length;
 
-  const activeTrips = trips.filter((t: any) => t.status === 'DEPARTED' || t.status === 'IN_TRANSIT').length;
+  // Completed Trips
   const completedTrips = trips.filter((t: any) => t.status === 'COMPLETED').length;
-  const upcomingTrips = trips.filter((t: any) => 
-    new Date(t.departureDate) > new Date() && t.status === 'SCHEDULED'
-  ).length || 0;
+
+  // Upcoming Trips - fixed field name from departureDate to scheduled_departure
+  const upcomingTrips = trips.filter((t: any) => {
+    if (!t.scheduled_departure) return false;
+    return new Date(t.scheduled_departure) > today && t.status === 'SCHEDULED';
+  }).length;
 
   const handleEdit = (trip: any) => {
     setEditingTrip(trip);
@@ -322,6 +401,12 @@ export default function TripScheduling() {
             <h1 className="text-3xl font-bold">Trip Scheduling</h1>
             <p className="text-muted-foreground">Manage trip schedules and monitor live operations</p>
           </div>
+          <Button 
+            onClick={() => generateTripsFromShiftsMutation.mutate({})}
+            disabled={generateTripsFromShiftsMutation.isPending}
+          >
+            {generateTripsFromShiftsMutation.isPending ? 'Generating...' : 'Generate Trips from Shifts'}
+          </Button>
         </div>
 
         {/* Summary Cards */}
@@ -415,9 +500,12 @@ export default function TripScheduling() {
                   </TableHeader>
                   <TableBody>
                     {trips?.filter((trip: any) => {
+                      if (!trip.scheduled_departure) return false;
                       const tripDate = new Date(trip.scheduled_departure);
                       const today = new Date();
-                      return tripDate.toDateString() === today.toDateString() && trip.is_generated_from_schedule;
+                      // Show trips for selected date (from calendar or today)
+                      const targetDate = selectedDate || today;
+                      return tripDate.toDateString() === targetDate.toDateString();
                     }).map((trip: any) => (
                       <TableRow key={trip.id}>
                         <TableCell>
@@ -508,9 +596,13 @@ export default function TripScheduling() {
                   </TableHeader>
                   <TableBody>
                     {trips?.filter((trip: any) => {
+                      if (!trip.scheduled_departure) return false;
                       const tripDate = new Date(trip.scheduled_departure);
                       const today = new Date();
-                      return tripDate > today && trip.is_generated_from_schedule;
+                      const threeDaysFromNow = new Date(today);
+                      threeDaysFromNow.setDate(today.getDate() + 3);
+                      // Show trips for next 3 days only
+                      return tripDate > today && tripDate <= threeDaysFromNow && trip.status === 'SCHEDULED';
                     }).map((trip: any) => (
                       <TableRow key={trip.id}>
                         <TableCell>

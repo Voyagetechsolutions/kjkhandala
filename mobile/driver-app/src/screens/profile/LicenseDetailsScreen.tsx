@@ -10,7 +10,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import Card from '../../components/Card';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../lib/constants';
-import { format, differenceInDays } from 'date-fns';
+import { differenceInDays } from 'date-fns';
+import { safeFormatDate } from '../../lib/dateUtils';
 
 export default function LicenseDetailsScreen() {
   const { driver } = useAuth();
@@ -60,14 +61,14 @@ export default function LicenseDetailsScreen() {
         <View style={styles.infoRow}>
           <Text style={styles.label}>Issue Date</Text>
           <Text style={styles.value}>
-            {driver?.created_at ? format(new Date(driver.created_at), 'dd MMM yyyy') : 'N/A'}
+            {safeFormatDate(driver?.created_at, 'dd MMM yyyy')}
           </Text>
         </View>
 
         <View style={styles.infoRow}>
           <Text style={styles.label}>Expiry Date</Text>
           <Text style={[styles.value, daysUntilExpiry !== null && daysUntilExpiry < 30 && { color: COLORS.danger }]}>
-            {driver?.license_expiry ? format(new Date(driver.license_expiry), 'dd MMM yyyy') : 'N/A'}
+            {safeFormatDate(driver?.license_expiry, 'dd MMM yyyy')}
           </Text>
         </View>
 
@@ -82,7 +83,7 @@ export default function LicenseDetailsScreen() {
       </Card>
 
       {daysUntilExpiry !== null && daysUntilExpiry < 60 && (
-        <Card style={[styles.card, styles.warningCard]}>
+        <Card style={[styles.card, styles.warningCard] as any}>
           <View style={styles.warningHeader}>
             <Ionicons name="warning" size={24} color={COLORS.warning} />
             <Text style={styles.warningTitle}>Renewal Required</Text>

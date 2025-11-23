@@ -1,11 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
 import Card from './Card';
 import Badge from './Badge';
 import { Trip } from '../types';
 import { COLORS, SPACING, TYPOGRAPHY } from '../lib/constants';
+import { safeFormatDate } from '../lib/dateUtils';
 
 interface TripCardProps {
   trip: Trip;
@@ -29,7 +29,7 @@ export default function TripCard({ trip, onPress }: TripCardProps) {
   };
 
   const formatTime = (dateString: string) => {
-    return format(new Date(dateString), 'HH:mm');
+    return safeFormatDate(dateString, 'HH:mm');
   };
 
   return (
@@ -72,7 +72,7 @@ export default function TripCard({ trip, onPress }: TripCardProps) {
           <View style={styles.detailItem}>
             <Ionicons name="time-outline" size={16} color={COLORS.gray[600]} />
             <Text style={styles.detailText}>
-              {formatTime(trip.departure_time)} - {formatTime(trip.arrival_time)}
+              {formatTime(trip.scheduled_departure)} - {formatTime(trip.scheduled_arrival)}
             </Text>
           </View>
 

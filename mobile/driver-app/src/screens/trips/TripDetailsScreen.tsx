@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
+import { safeFormatDate } from '../../lib/dateUtils';
 import { tripService } from '../../services/tripService';
 import { automationService } from '../../services/automationService';
 import { useTripAutomations } from '../../hooks/useTripAutomations';
@@ -34,9 +34,9 @@ export default function TripDetailsScreen() {
       ? {
           tripId: trip.id,
           driverId: driver.id,
-          departureTime: trip.departure_time,
+          departureTime: trip.scheduled_departure,
           route: trip.route,
-          stops: trip.route?.stops || [],
+          stops: (trip.route as any)?.stops || [],
           destination: trip.route?.destination,
         }
       : null
@@ -90,7 +90,7 @@ export default function TripDetailsScreen() {
         {
           text: 'Reject',
           style: 'destructive',
-          onPress: async (reason) => {
+          onPress: async (reason?: string) => {
             try {
               await tripService.rejectTrip(tripId, reason || 'No reason provided');
               Alert.alert('Success', 'Trip rejected');
@@ -119,7 +119,7 @@ export default function TripDetailsScreen() {
             { text: 'Cancel', style: 'cancel' },
             {
               text: 'Start Inspection',
-              onPress: () => navigation.navigate('PreTripInspection' as never, { tripId } as never),
+              onPress: () => (navigation as any).navigate('PreTripInspection', { tripId }),
             },
           ]
         );
@@ -143,7 +143,7 @@ export default function TripDetailsScreen() {
         await automationService.autoAssignConductor(
           tripId,
           trip.route_id,
-          format(new Date(trip.departure_time), 'yyyy-MM-dd')
+          safeFormatDate(trip.scheduled_departure, 'yyyy-MM-dd')
         );
       }
 
@@ -166,7 +166,7 @@ export default function TripDetailsScreen() {
       await stopAutomations();
       
       // Navigate to post-trip inspection
-      navigation.navigate('PostTripInspection' as never, { tripId } as never);
+      (navigation as any).navigate('PostTripInspection', { tripId });
     } catch (error: any) {
       Alert.alert('Error', 'Failed to complete trip');
     }
@@ -207,7 +207,7 @@ export default function TripDetailsScreen() {
           />
         </View>
         <Text style={styles.date}>
-          {format(new Date(trip.departure_time), 'EEEE, MMMM d, yyyy')}
+          {safeFormatDate(trip.scheduled_departure, 'EEEE, MMMM d, yyyy')}
         </Text>
       </View>
 
@@ -221,7 +221,7 @@ export default function TripDetailsScreen() {
               <Text style={styles.routeLabel}>From</Text>
               <Text style={styles.routeValue}>{trip.route?.origin}</Text>
               <Text style={styles.routeTime}>
-                {format(new Date(trip.departure_time), 'HH:mm')}
+                {safeFormatDate(trip.scheduled_departure, 'HH:mm')}
               </Text>
             </View>
           </View>
@@ -234,7 +234,7 @@ export default function TripDetailsScreen() {
               <Text style={styles.routeLabel}>To</Text>
               <Text style={styles.routeValue}>{trip.route?.destination}</Text>
               <Text style={styles.routeTime}>
-                {format(new Date(trip.arrival_time), 'HH:mm')}
+                {safeFormatDate(trip.scheduled_arrival, 'HH:mm')}
               </Text>
             </View>
           </View>
@@ -242,42 +242,72 @@ export default function TripDetailsScreen() {
       </Card>
 
       {/* Bus Info */}
-      <Card style={styles.card}>
-        <Text style={styles.cardTitle}>Bus Details</Text>
-        <View style={styles.infoRow}>
-          <Ionicons name="bus" size={20} color={COLORS.gray[600]} />
-          <Text style={styles.infoText}>
-            {trip.bus?.registration_number || 'N/A'}
-          </Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Ionicons name="people" size={20} color={COLORS.gray[600]} />
-          <Text style={styles.infoText}>
-            {trip.total_seats} seats ({trip.available_seats} available)
-          </Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Ionicons name="pricetag" size={20} color={COLORS.gray[600]} />
-          <Text style={styles.infoText}>P{trip.price.toFixed(2)} per seat</Text>
-        </View>
-      </Card>
+      <TouchableOpacity
+        onPress={() =>
+          (navigation as any).navigate('PreTripInspection', { 
+            tripId,
+            busId: trip.bus_id,
+            busRegistration: trip.bus?.registration_number 
+          })
+        }
+      >
+        <Card style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Bus Details</Text>
+            <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
+          </View>
+          <View style={styles.infoRow}>
+            <Ionicons name="bus" size={20} color={COLORS.gray[600]} />
+            <Text style={styles.infoText}>
+              {trip.bus?.registration_number || 'N/A'}
+            </Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Ionicons name="people" size={20} color={COLORS.gray[600]} />
+            <Text style={styles.infoText}>
+              {trip.total_seats} seats ({trip.available_seats} available)
+            </Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Ionicons name="pricetag" size={20} color={COLORS.gray[600]} />
+            <Text style={styles.infoText}>
+              P{trip.price ? trip.price.toFixed(2) : '0.00'} per seat
+            </Text>
+          </View>
+          <View style={styles.inspectionHint}>
+            <Ionicons name="clipboard-outline" size={16} color={COLORS.primary} />
+            <Text style={styles.inspectionHintText}>Tap to start pre-trip inspection</Text>
+          </View>
+        </Card>
+      </TouchableOpacity>
 
       {/* Passengers */}
-      <Card style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Passengers</Text>
-          <TouchableOpacity
-            onPress={() =>
-              navigation.navigate('PassengerManifest' as never, { tripId } as never)
-            }
-          >
-            <Text style={styles.viewAll}>View All</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.passengerCount}>
-          {trip.total_seats - trip.available_seats} / {trip.total_seats} booked
-        </Text>
-      </Card>
+      <TouchableOpacity
+        onPress={() =>
+          (navigation as any).navigate('QRScanner', { tripId })
+        }
+      >
+        <Card style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Passengers</Text>
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                (navigation as any).navigate('PassengerManifest', { tripId });
+              }}
+            >
+              <Text style={styles.viewAll}>View Manifest</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.passengerCount}>
+            {trip.total_seats - trip.available_seats} / {trip.total_seats} booked
+          </Text>
+          <View style={styles.inspectionHint}>
+            <Ionicons name="qr-code-outline" size={16} color={COLORS.primary} />
+            <Text style={styles.inspectionHintText}>Tap to check-in passengers</Text>
+          </View>
+        </Card>
+      </TouchableOpacity>
 
       {/* Actions */}
       <View style={styles.actions}>
@@ -310,7 +340,7 @@ export default function TripDetailsScreen() {
             <Button
               title="View Manifest"
               onPress={() =>
-                navigation.navigate('PassengerManifest' as never, { tripId } as never)
+                (navigation as any).navigate('PassengerManifest', { tripId })
               }
               style={styles.actionButton}
             />
@@ -326,7 +356,7 @@ export default function TripDetailsScreen() {
         <Button
           title="Report Incident"
           onPress={() =>
-            navigation.navigate('IncidentReport' as never, { tripId } as never)
+            (navigation as any).navigate('IncidentReport', { tripId })
           }
           variant="outline"
           style={styles.actionButton}
@@ -439,6 +469,20 @@ const styles = StyleSheet.create({
   infoText: {
     ...TYPOGRAPHY.body,
     color: COLORS.text.primary,
+  },
+  inspectionHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.gray[200],
+  },
+  inspectionHintText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.primary,
+    fontWeight: '500',
   },
   passengerCount: {
     ...TYPOGRAPHY.h3,

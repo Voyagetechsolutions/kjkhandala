@@ -13,7 +13,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { driverService } from '../../services/driverService';
 import Card from '../../components/Card';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../lib/constants';
-import { format } from 'date-fns';
+import { safeFormatDate } from '../../lib/dateUtils';
 import { DriverMessage } from '../../types';
 
 export default function NotificationsScreen() {
@@ -93,7 +93,7 @@ export default function NotificationsScreen() {
 
   const renderNotificationItem = ({ item }: { item: DriverMessage }) => (
     <TouchableOpacity onPress={() => handleNotificationPress(item)}>
-      <Card style={[styles.notificationCard, !item.is_read && styles.unreadCard]}>
+      <Card style={[styles.notificationCard, !item.is_read && styles.unreadCard] as any}>
         <View style={styles.notificationHeader}>
           <View style={[styles.iconContainer, { backgroundColor: getNotificationColor(item.message_type) + '20' }]}>
             <Ionicons
@@ -114,7 +114,7 @@ export default function NotificationsScreen() {
               {item.message}
             </Text>
             <Text style={styles.notificationDate}>
-              {format(new Date(item.created_at), 'MMM d, yyyy • HH:mm')}
+              {safeFormatDate(item.created_at, 'MMM d, yyyy • HH:mm')}
             </Text>
           </View>
         </View>

@@ -23,9 +23,9 @@ export default function AutomatedTripManagement() {
         .from('trips')
         .select(`
           *,
-          routes:route_id (origin, destination, duration_hours),
-          buses:bus_id (registration_number, model, capacity),
-          drivers:driver_id (full_name, phone)
+          routes!route_id (origin, destination, duration_hours),
+          buses!bus_id (registration_number, model, seating_capacity),
+          drivers!driver_id (full_name, phone)
         `)
         .eq('is_generated_from_schedule', true)
         .order('scheduled_departure', { ascending: true });
@@ -34,26 +34,55 @@ export default function AutomatedTripManagement() {
         console.error('Error fetching trips:', error);
         return [];
       }
+      
+      console.log('Fetched automated trips:', data?.length || 0);
+      console.log('Sample trip with driver:', data?.[0]);
       return data || [];
     },
     refetchInterval: 30000, // Refresh every 30 seconds for auto-status updates
   });
 
-  // Filter trips by date
+  // Filter trips by date and status
+  const now = new Date();
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  // Today's trips - all trips scheduled for today
   const tripsToday = trips.filter((trip: any) => {
+    if (!trip.scheduled_departure) return false;
     const tripDate = new Date(trip.scheduled_departure);
-    return tripDate.toDateString() === today.toDateString();
+    return tripDate >= today && tripDate < tomorrow;
   });
 
+  // Active trips - BOARDING, or between departure and arrival time
+  const activeTrips = trips.filter((trip: any) => {
+    if (!trip.scheduled_departure || !trip.scheduled_arrival) return false;
+    const departure = new Date(trip.scheduled_departure);
+    const arrival = new Date(trip.scheduled_arrival);
+    
+    // BOARDING status
+    if (trip.status === 'BOARDING') {
+      const boardingStart = new Date(departure.getTime() - 30 * 60 * 1000);
+      return now >= boardingStart && now <= departure;
+    }
+    
+    // DEPARTED - between departure and arrival
+    if (trip.status === 'DEPARTED') {
+      return now >= departure && now <= arrival;
+    }
+    
+    return false;
+  });
+
+  // Upcoming trips - next 6 hours
+  const sixHoursFromNow = new Date(now.getTime() + 6 * 60 * 60 * 1000);
   const upcomingTrips = trips.filter((trip: any) => {
+    if (!trip.scheduled_departure) return false;
     const tripDate = new Date(trip.scheduled_departure);
-    return tripDate > today;
+    return tripDate > now && tripDate <= sixHoursFromNow && trip.status === 'SCHEDULED';
   });
-
-  const activeTrips = trips.filter((trip: any) => 
-    ['BOARDING', 'DEPARTED'].includes(trip.status)
-  );
 
   const completedTrips = trips.filter((trip: any) => 
     trip.status === 'COMPLETED'
@@ -116,11 +145,18 @@ export default function AutomatedTripManagement() {
         )}
       </TableCell>
       <TableCell>
-        {trip.drivers ? (
+        {trip.drivers && trip.drivers.full_name ? (
           <div className="flex items-center gap-2">
             <User className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">{trip.drivers.full_name}</span>
+            <div>
+              <p className="text-sm font-medium">{trip.drivers.full_name}</p>
+              {trip.drivers.phone && (
+                <p className="text-xs text-muted-foreground">{trip.drivers.phone}</p>
+              )}
+            </div>
           </div>
+        ) : trip.driver_id ? (
+          <span className="text-muted-foreground text-sm">Driver ID: {trip.driver_id.slice(0, 8)}...</span>
         ) : (
           <span className="text-muted-foreground text-sm">Not assigned</span>
         )}
@@ -274,7 +310,10 @@ export default function AutomatedTripManagement() {
           <TabsContent value="active">
             <Card>
               <CardHeader>
-                <CardTitle>Active Trips (Boarding / Departed)</CardTitle>
+                <CardTitle>Active Trips (Boarding + In Transit)</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Trips currently boarding or between departure and arrival time
+                </p>
               </CardHeader>
               <CardContent className="p-0">
                 {activeTrips.length > 0 ? (
@@ -309,7 +348,10 @@ export default function AutomatedTripManagement() {
           <TabsContent value="upcoming">
             <Card>
               <CardHeader>
-                <CardTitle>Upcoming Trips</CardTitle>
+                <CardTitle>Upcoming Trips (Next 6 Hours)</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Scheduled trips departing within the next 6 hours
+                </p>
               </CardHeader>
               <CardContent className="p-0">
                 {upcomingTrips.length > 0 ? (

@@ -24,7 +24,7 @@ export default function About() {
           <div className="max-w-4xl mx-auto space-y-12">
             {/* Founding Story */}
             <section>
-              <h2 className="text-3xl font-bold mb-6">Our Beginning</h2>
+              <h2 className="text-3xl font-bold mb-6">THE GENESIS OF KJ KHANDALA</h2>
               <p className="text-lg text-muted-foreground leading-relaxed mb-4">
                 Founded on <strong>02 October 2013</strong>, <strong>KJ KHANDALA</strong> began with a simple but powerful vision: to create a transport brand that would stand among the greats of Botswana — a name built on trust, excellence, and unforgettable travel experiences.
               </p>

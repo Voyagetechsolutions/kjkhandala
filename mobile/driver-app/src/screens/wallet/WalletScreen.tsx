@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
+import { safeFormatDate } from '../../lib/dateUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { driverService } from '../../services/driverService';
 import Card from '../../components/Card';
@@ -115,7 +115,7 @@ export default function WalletScreen() {
                   <View>
                     <Text style={styles.transactionDesc}>{transaction.description}</Text>
                     <Text style={styles.transactionDate}>
-                      {format(new Date(transaction.created_at), 'MMM d, yyyy')}
+                      {safeFormatDate(transaction.created_at, 'MMM d, yyyy')}
                     </Text>
                   </View>
                 </View>

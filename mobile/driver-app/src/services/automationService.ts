@@ -707,7 +707,7 @@ export const automationService = {
       speed_warnings: speedViolations?.length || 0,
       delay_minutes: trip.delay_minutes || 0,
       passenger_count: checkedIn,
-      departure_time: trip.departure_time,
+      departure_time: trip.scheduled_departure,
       arrival_time: trip.actual_arrival_time,
     };
 
@@ -814,13 +814,24 @@ export const automationService = {
 
   // Helper: Send notification
   async sendNotification(recipient: string, title: string, body: string) {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-      },
-      trigger: null,
-    });
+    try {
+      // Check if notifications are available (not in Expo Go with SDK 53+)
+      if (Notifications.scheduleNotificationAsync) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title,
+            body,
+          },
+          trigger: null,
+        });
+      } else {
+        console.log('[Notification]', title, body);
+      }
+    } catch (error) {
+      // Fallback for Expo Go - just log the notification
+      console.log('[Notification]', title, body);
+      console.warn('Notifications not available in Expo Go:', error);
+    }
   },
 
   // Helper: Notify all passengers on a trip

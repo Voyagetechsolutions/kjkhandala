@@ -16,6 +16,7 @@ export const tripService = {
         bus:buses(*),
         driver:drivers(*)
       `)
+      .eq('driver_id', driverId)
       .gte('scheduled_departure', startOfDay)
       .lte('scheduled_departure', endOfDay)
       .order('scheduled_departure', { ascending: true });
@@ -24,7 +25,7 @@ export const tripService = {
     return data || [];
   },
 
-  // Get all trips for a driver
+  // Get all trips for a driver (trips generated from their shifts)
   getDriverTrips: async (
     driverId: string,
     status?: string
@@ -33,14 +34,30 @@ export const tripService = {
       .from('trips')
       .select(`
         *,
-        route:routes(*),
-        bus:buses(*),
-        driver:drivers(*)
+        routes!route_id (
+          id,
+          origin,
+          destination,
+          distance_km
+        ),
+        buses!bus_id (
+          id,
+          registration_number,
+          model
+        ),
+        driver_shifts!shift_id (
+          id,
+          shift_date,
+          shift_start_time,
+          shift_end_time,
+          status
+        )
       `)
       .eq('driver_id', driverId)
-      .order('scheduled_departure', { ascending: false });
+      .gte('scheduled_departure', new Date().toISOString().split('T')[0])
+      .order('scheduled_departure', { ascending: true });
 
-    if (status) {
+    if (status && status !== 'all') {
       query = query.eq('status', status);
     }
 

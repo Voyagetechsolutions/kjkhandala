@@ -1,0 +1,15 @@
+⚠️ THIS FOLDER IS NO LONGER NEEDED ⚠️
+
+The files from this folder have been moved to:
+  frontend/src/pages/operations/
+  frontend/src/components/operations/
+
+You can safely delete this entire "web" folder.
+
+If you can't delete it due to file locks:
+1. Close VS Code
+2. Delete the folder manually in File Explorer
+3. Or restart your computer and try again
+
+The actual web dashboard is in the "frontend" folder.
+Use: cd frontend && npm run dev

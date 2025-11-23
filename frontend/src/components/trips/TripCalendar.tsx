@@ -38,9 +38,9 @@ export default function TripCalendar({ trips, selectedDate, onDateSelect }: Trip
         .from('route_frequencies')
         .select(`
           *,
-          routes:route_id (id, origin, destination, duration_hours),
-          buses:bus_id (id, registration_number, model),
-          drivers:driver_id (id, full_name, phone)
+          routes!route_id (id, origin, destination, duration_hours),
+          buses!bus_id (id, registration_number, model),
+          drivers!driver_id (id, full_name, phone)
         `)
         .eq('active', true);
       
@@ -49,18 +49,18 @@ export default function TripCalendar({ trips, selectedDate, onDateSelect }: Trip
     },
   });
 
-  // Generate projected trips for next 3 months based on schedules
+  // Generate projected trips for next 6 months based on schedules
   useEffect(() => {
     if (!schedules.length) return;
 
     const projected: ProjectedTrip[] = [];
     const today = new Date();
-    const threeMonthsLater = addMonths(today, 3);
+    const sixMonthsLater = addMonths(today, 6);
     
     schedules.forEach((schedule: any) => {
       let currentDate = new Date(today);
       
-      while (currentDate <= threeMonthsLater) {
+      while (currentDate <= sixMonthsLater) {
         const dayOfWeek = currentDate.getDay();
         let shouldGenerate = false;
 

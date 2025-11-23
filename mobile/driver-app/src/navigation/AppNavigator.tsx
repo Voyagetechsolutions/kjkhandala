@@ -5,13 +5,14 @@ import { useAuth } from '../contexts/AuthContext';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
 import TripDetailsScreen from '../screens/trips/TripDetailsScreen';
-import PreTripInspectionScreen from '../screens/inspection/PreTripInspectionScreen';
+import PassengerManifestScreen from '../screens/trips/PassengerManifestScreen';
+import ShiftsScreen from '../screens/shifts/ShiftsScreen';
+import ComprehensivePreTripInspectionScreen from '../screens/inspection/ComprehensivePreTripInspectionScreen';
 import PostTripInspectionScreen from '../screens/inspection/PostTripInspectionScreen';
 import FuelLogScreen from '../screens/fuel/FuelLogScreen';
 import IncidentReportScreen from '../screens/incident/IncidentReportScreen';
 import LiveTrackingScreen from '../screens/tracking/LiveTrackingScreen';
 import QRScannerScreen from '../screens/checkin/QRScannerScreen';
-import WalletScreen from '../screens/wallet/WalletScreen';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { COLORS } from '../lib/constants';
 
@@ -45,8 +46,28 @@ export default function AppNavigator() {
               }}
             />
             <Stack.Screen 
+              name="PassengerManifest" 
+              component={PassengerManifestScreen}
+              options={{ 
+                headerShown: true,
+                title: 'Passenger Manifest',
+                headerStyle: { backgroundColor: COLORS.primary },
+                headerTintColor: COLORS.white,
+              }}
+            />
+            <Stack.Screen 
+              name="Shifts" 
+              component={ShiftsScreen}
+              options={{ 
+                headerShown: true,
+                title: 'My Shifts',
+                headerStyle: { backgroundColor: COLORS.primary },
+                headerTintColor: COLORS.white,
+              }}
+            />
+            <Stack.Screen 
               name="PreTripInspection" 
-              component={PreTripInspectionScreen}
+              component={ComprehensivePreTripInspectionScreen}
               options={{ 
                 headerShown: true,
                 title: 'Pre-Trip Inspection',
@@ -100,16 +121,6 @@ export default function AppNavigator() {
               options={{ 
                 headerShown: true,
                 title: 'Scan Passenger QR',
-                headerStyle: { backgroundColor: COLORS.primary },
-                headerTintColor: COLORS.white,
-              }}
-            />
-            <Stack.Screen 
-              name="Wallet" 
-              component={WalletScreen}
-              options={{ 
-                headerShown: true,
-                title: 'Wallet & Earnings',
                 headerStyle: { backgroundColor: COLORS.primary },
                 headerTintColor: COLORS.white,
               }}

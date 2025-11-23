@@ -58,8 +58,9 @@ export default function TripsListScreen() {
 
   const filters = [
     { label: 'All', value: 'all' },
-    { label: 'Not Started', value: 'NOT_STARTED' },
-    { label: 'En Route', value: 'EN_ROUTE' },
+    { label: 'Scheduled', value: 'SCHEDULED' },
+    { label: 'Boarding', value: 'BOARDING' },
+    { label: 'Departed', value: 'DEPARTED' },
     { label: 'Completed', value: 'COMPLETED' },
   ];
 

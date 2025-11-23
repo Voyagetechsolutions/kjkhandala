@@ -47,8 +47,8 @@ export default function DriverManagement() {
         .from('trips')
         .select(`
           *,
-          routes:route_id (origin, destination),
-          drivers:driver_id (id, full_name)
+          routes!route_id (origin, destination),
+          drivers!driver_id (id, full_name)
         `)
         .not('driver_id', 'is', null)
         .gte('scheduled_departure', new Date().toISOString())

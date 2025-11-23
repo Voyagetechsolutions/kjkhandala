@@ -164,15 +164,23 @@ export default function DashboardScreen() {
         <View style={styles.actionsGrid}>
           <TouchableOpacity
             style={styles.actionCard}
-            onPress={() => navigation.navigate('FuelLog' as never, { tripId: currentTrip?.id } as never)}
+            onPress={() => (navigation as any).navigate('Shifts')}
           >
-            <Ionicons name="water-outline" size={32} color={COLORS.primary} />
+            <Ionicons name="calendar-outline" size={32} color={COLORS.primary} />
+            <Text style={styles.actionText}>My Shifts</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => (navigation as any).navigate('FuelLog', { tripId: currentTrip?.id })}
+          >
+            <Ionicons name="water-outline" size={32} color={COLORS.info} />
             <Text style={styles.actionText}>Fuel Log</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.actionCard}
-            onPress={() => navigation.navigate('IncidentReport' as never, { tripId: currentTrip?.id } as never)}
+            onPress={() => (navigation as any).navigate('IncidentReport', { tripId: currentTrip?.id })}
           >
             <Ionicons name="warning-outline" size={32} color={COLORS.danger} />
             <Text style={styles.actionText}>Report Incident</Text>
@@ -180,17 +188,9 @@ export default function DashboardScreen() {
 
           <TouchableOpacity
             style={styles.actionCard}
-            onPress={() => navigation.navigate('Wallet' as never)}
+            onPress={() => (navigation as any).navigate('Profile')}
           >
-            <Ionicons name="wallet-outline" size={32} color={COLORS.success} />
-            <Text style={styles.actionText}>Wallet</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => navigation.navigate('Profile' as never)}
-          >
-            <Ionicons name="person-outline" size={32} color={COLORS.info} />
+            <Ionicons name="person-outline" size={32} color={COLORS.success} />
             <Text style={styles.actionText}>Profile</Text>
           </TouchableOpacity>
         </View>

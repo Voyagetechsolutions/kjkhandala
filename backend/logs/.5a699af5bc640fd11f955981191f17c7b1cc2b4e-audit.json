@@ -1,0 +1,60 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\.5a699af5bc640fd11f955981191f17c7b1cc2b4e-audit.json",
+    "files": [
+        {
+            "date": 1762725424819,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\rejections-2025-11-09.log",
+            "hash": "d2aa3e1021ac780775ec99f3a465e3408d8f773628b0fb34220df01c0aec376a"
+        },
+        {
+            "date": 1762726107526,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\rejections-2025-11-10.log",
+            "hash": "f3c65259e38de8f5e5bfe013397be2f4f927706474a1f2954168b54bbb2a8b3d"
+        },
+        {
+            "date": 1762814377970,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\rejections-2025-11-11.log",
+            "hash": "9fb35c592cd8f3f6039e4ca9efbe32129845796eaaea3cec6f69b905464a1479"
+        },
+        {
+            "date": 1762900576776,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\rejections-2025-11-12.log",
+            "hash": "b83e552fcf962c0792b521de71226f0d35c713b4bab0b0fbb5449518649d026e"
+        },
+        {
+            "date": 1762990344954,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\rejections-2025-11-13.log",
+            "hash": "9fb8bebcec5b49c4475870c1d4d480b75864a3849b6d13a5ec857f5dabaeea8f"
+        },
+        {
+            "date": 1763072809117,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\rejections-2025-11-14.log",
+            "hash": "493dffe044457e2082deb40956842a6993863fe50f4a3cdb3b790fe523528c25"
+        },
+        {
+            "date": 1763223425177,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\rejections-2025-11-15.log",
+            "hash": "098b8aaa491a44fa1a8ea4ef200f8603436d3fdd433643ca803c23b8092e7467"
+        },
+        {
+            "date": 1763302746716,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\rejections-2025-11-16.log",
+            "hash": "96a6d24c20fe6e71d869cad1cd5d4109bb01d41df689aba073bc9c10c8fd8913"
+        },
+        {
+            "date": 1763338547344,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\rejections-2025-11-17.log",
+            "hash": "7f459a06351c1cd968467bfba56d08acf2ef9b079d3aaf06643574a336b79db2"
+        },
+        {
+            "date": 1763766598017,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\rejections-2025-11-22.log",
+            "hash": "98969b6b8d08407f5aa4c4b59cc8bcc1a91077da6ccea542931f55c779da490c"
+        }
+    ],
+    "hashType": "sha256"
+}

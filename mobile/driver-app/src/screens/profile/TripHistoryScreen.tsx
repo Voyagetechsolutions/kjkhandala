@@ -13,7 +13,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { driverService } from '../../services/driverService';
 import Card from '../../components/Card';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../lib/constants';
-import { format } from 'date-fns';
+import { safeFormatDate } from '../../lib/dateUtils';
 
 export default function TripHistoryScreen() {
   const { driver } = useAuth();
@@ -90,7 +90,7 @@ export default function TripHistoryScreen() {
               {route?.origin || 'N/A'} → {route?.destination || 'N/A'}
             </Text>
             <Text style={styles.dateText}>
-              {schedule?.departure_date ? format(new Date(schedule.departure_date), 'dd MMM yyyy') : 'N/A'}
+              {safeFormatDate(schedule?.departure_date, 'dd MMM yyyy')}
             </Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
@@ -108,14 +108,14 @@ export default function TripHistoryScreen() {
           <View style={styles.detailRow}>
             <Ionicons name="time" size={16} color={COLORS.gray[600]} />
             <Text style={styles.detailText}>
-              {schedule?.departure_time ? format(new Date(`2000-01-01T${schedule.departure_time}`), 'HH:mm') : 'N/A'}
+              {schedule?.departure_time ? safeFormatDate(`2000-01-01T${schedule.departure_time}`, 'HH:mm') : 'N/A'}
             </Text>
           </View>
 
           <View style={styles.detailRow}>
             <Ionicons name="calendar" size={16} color={COLORS.gray[600]} />
             <Text style={styles.detailText}>
-              {item.created_at ? format(new Date(item.created_at), 'dd/MM/yyyy') : 'N/A'}
+              {safeFormatDate(item.created_at, 'dd/MM/yyyy')}
             </Text>
           </View>
         </View>
