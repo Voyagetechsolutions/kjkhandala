@@ -20,7 +20,7 @@ export async function materializeProjectedTrip(projectedTrip: any) {
       .from('trips')
       .select('*')
       .eq('route_id', projectedTrip.route?.id || projectedTrip.route_id)
-      .eq('departure_time', projectedTrip.scheduled_departure)
+      .eq('scheduled_departure', projectedTrip.scheduled_departure)
       .maybeSingle();
 
     if (checkError && checkError.code !== 'PGRST116') {
@@ -36,11 +36,12 @@ export async function materializeProjectedTrip(projectedTrip: any) {
     const newTrip = {
       route_id: projectedTrip.route?.id || projectedTrip.route_id,
       bus_id: projectedTrip.bus?.id || projectedTrip.bus_id,
-      departure_date: departureDate.toISOString().split('T')[0],
-      departure_time: projectedTrip.scheduled_departure,
-      arrival_time: projectedTrip.scheduled_arrival,
-      fare: projectedTrip.fare || 0,
+      scheduled_departure: projectedTrip.scheduled_departure,
+      scheduled_arrival: projectedTrip.scheduled_arrival,
+      fare: projectedTrip.fare || projectedTrip.base_fare || 0,
       status: 'SCHEDULED',
+      total_seats: projectedTrip.total_seats || projectedTrip.bus?.seating_capacity || 0,
+      available_seats: projectedTrip.available_seats || projectedTrip.total_seats || projectedTrip.bus?.seating_capacity || 0,
     };
 
     const { data: createdTrip, error: createError } = await supabase

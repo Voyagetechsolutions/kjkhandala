@@ -56,6 +56,19 @@ export default function PaymentStep({
       // Ensure trip exists in database (handles projected trips)
       const actualTrip = await ensureTripExists(trip);
       
+      // Check if seats are already booked
+      const { data: existingBookings } = await supabase
+        .from('bookings')
+        .select('seat_number')
+        .eq('trip_id', actualTrip.id)
+        .in('seat_number', seats.map(s => s.toString()))
+        .in('booking_status', ['confirmed', 'reserved']);
+
+      if (existingBookings && existingBookings.length > 0) {
+        const bookedSeats = existingBookings.map(b => b.seat_number).join(', ');
+        throw new Error(`Seats ${bookedSeats} are already booked. Please select different seats.`);
+      }
+      
       const isOfficePayment = paymentMethod === 'pay_at_office';
       const reservationExpiry = isOfficePayment ? calculateReservationExpiry() : null;
 
@@ -116,9 +129,9 @@ export default function PaymentStep({
       const { error: updateError } = await supabase
         .from('trips')
         .update({ 
-          available_seats: trip.available_seats - seats.length 
+          available_seats: actualTrip.available_seats - seats.length 
         })
-        .eq('id', trip.id);
+        .eq('id', actualTrip.id);
 
       if (updateError) throw updateError;
 
