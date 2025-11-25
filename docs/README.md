@@ -1,73 +1,163 @@
-# Welcome to your Lovable project
+# KJ Khandala Customer Mobile App
 
-## Project info
+A React Native Expo mobile application for customers to book bus tickets, built with React 19 and the latest dependencies.
 
-**URL**: https://lovable.dev/projects/3b2b8355-983f-4eb5-a9f1-6775f4a63ba9
+## Features
 
-## How can I edit this code?
+- **Authentication**: Sign up, sign in, and profile management
+- **Trip Search**: Search for available trips with the same logic as the frontend website
+- **Seat Selection**: Interactive seat map for selecting seats
+- **Booking Management**: View and manage bookings
+- **E-Tickets**: QR code-based digital tickets
+- **Payment Options**: Office payment, card, and mobile money
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- **React**: 19.1.0
+- **React Native**: 0.81.5
+- **Expo**: ~54.0.0
+- **TypeScript**: ~5.9.2
+- **Supabase**: ^2.84.0
+- **React Navigation**: ^7.0.0
+- **React Query**: ^5.83.0
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/3b2b8355-983f-4eb5-a9f1-6775f4a63ba9) and start prompting.
+## Installation
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
 
-**Use your preferred IDE**
+- Node.js 18+ installed
+- Expo CLI installed globally: `npm install -g expo-cli`
+- Expo Go app on your mobile device (for testing)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Setup Steps
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1. **Install dependencies**:
+   ```powershell
+   cd mobile/customer
+   npm install
+   ```
 
-Follow these steps:
+2. **Configure environment variables**:
+   - Copy `.env.example` to `.env`
+   - Add your Supabase credentials:
+     ```
+     EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
+     EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+     ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+3. **Start the development server**:
+   ```powershell
+   npm start
+   ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+4. **Run on device**:
+   - Scan the QR code with Expo Go app (Android/iOS)
+   - Or press `a` for Android emulator
+   - Or press `i` for iOS simulator
 
-# Step 3: Install the necessary dependencies.
-npm i
+## Project Structure
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```
+src/
+├── components/          # Reusable UI components
+│   ├── Button.tsx
+│   ├── Input.tsx
+│   └── ...
+├── context/            # React Context providers
+│   ├── AuthContext.tsx
+│   └── BookingContext.tsx
+├── lib/                # Configuration and setup
+│   └── supabase.ts
+├── navigation/         # Navigation configuration
+│   └── AppNavigator.tsx
+├── screens/            # App screens
+│   ├── auth/          # Authentication screens
+│   ├── booking/       # Booking flow screens
+│   ├── home/          # Home screen
+│   ├── profile/       # Profile screens
+│   └── tickets/       # Ticket screens
+├── services/          # API and business logic
+│   ├── authService.ts
+│   ├── bookingService.ts
+│   └── tripService.ts
+├── types/             # TypeScript type definitions
+│   └── index.ts
+└── utils/             # Utility functions
+    └── formatters.ts
 ```
 
-**Edit a file directly in GitHub**
+## Key Features Implementation
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Trip Search Logic
+The app uses the same trip search logic as the frontend `BookingWidget.tsx`:
+- Fetches existing trips from the database
+- Generates projected trips from `route_frequencies` table
+- Supports one-way and return trips
+- Filters by date, origin, destination, and passenger count
 
-**Use GitHub Codespaces**
+### Booking Flow
+1. **Search**: Enter travel details
+2. **Results**: View available trips
+3. **Seat Selection**: Choose seats from interactive map
+4. **Passenger Details**: Enter passenger information
+5. **Payment**: Select payment method
+6. **Confirmation**: View e-ticket with QR code
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Authentication
+- Supabase Auth integration
+- Persistent sessions with AsyncStorage
+- Profile management
 
-## What technologies are used for this project?
+## Scripts
 
-This project is built with:
+- `npm start` - Start Expo development server
+- `npm run android` - Run on Android
+- `npm run ios` - Run on iOS
+- `npm run web` - Run on web
+- `npm run clear` - Clear cache and restart
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Database Schema
 
-## How can I deploy this project?
+The app connects to the same Supabase database as the main BMS system:
+- `trips` - Trip schedules
+- `route_frequencies` - Route frequency patterns
+- `bookings` - Customer bookings
+- `cities` - Available cities
+- `routes` - Route definitions
+- `buses` - Bus information
 
-Simply open [Lovable](https://lovable.dev/projects/3b2b8355-983f-4eb5-a9f1-6775f4a63ba9) and click on Share -> Publish.
+## Environment Variables
 
-## Can I connect a custom domain to my Lovable project?
+Required environment variables in `.env`:
+```
+EXPO_PUBLIC_SUPABASE_URL=your_supabase_project_url
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
-Yes, you can!
+## Troubleshooting
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+### Metro bundler issues
+```powershell
+npm run clear
+```
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### Dependency issues
+```powershell
+rm -rf node_modules
+npm install
+```
+
+### TypeScript errors
+Ensure all dependencies are installed and restart your IDE.
+
+## Contributing
+
+Follow the coding standards defined in the project:
+- Use TypeScript for all files
+- Follow the existing folder structure
+- Use functional components with hooks
+- Implement proper error handling
+
+## License
+
+Proprietary - KJ Khandala Travel & Tours

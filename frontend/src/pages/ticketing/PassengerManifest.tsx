@@ -4,474 +4,463 @@ import { useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/components/admin/AdminLayout';
 import TicketingLayout from '@/components/ticketing/TicketingLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
   Users, 
-  Search, 
+  Bus, 
   Download, 
   FileText,
-  RefreshCw,
-  CheckCircle, 
-  XCircle, 
-  Phone, 
-  Mail,
-  Luggage,
-  Calendar
+  Search,
+  ClipboardList
 } from 'lucide-react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import { format } from 'date-fns';
+import { toast } from 'sonner';
+
+interface Booking {
+  id: string;
+  booking_reference: string;
+  passenger_name: string;
+  passenger_phone: string;
+  passenger_email: string | null;
+  passenger_id_number: string | null;
+  seat_number: string;
+  status: string;
+  payment_status: string;
+  total_amount: number;
+  created_at: string;
+}
+
+interface Trip {
+  id: string;
+  trip_number: string;
+  scheduled_departure: string;
+  scheduled_arrival: string;
+  status: string;
+  routes: {
+    origin: string;
+    destination: string;
+  } | null;
+  buses: {
+    registration_number: string;
+    name: string;
+  } | null;
+}
 
 export default function PassengerManifest() {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
   const Layout = isAdminRoute ? AdminLayout : TicketingLayout;
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedTrip, setSelectedTrip] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [selectedTrip, setSelectedTrip] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Fetch today's trips for dropdown
-  const { data: trips = [] } = useQuery({
-    queryKey: ['todays-trips-manifest'],
+  // Fetch all trips with route and bus data
+  const { data: trips, isLoading } = useQuery({
+    queryKey: ['manifest-trips'],
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0];
       const { data, error } = await supabase
         .from('trips')
         .select(`
-          *,
-          route:routes(*),
-          bus:buses(*)
+          id,
+          trip_number,
+          scheduled_departure,
+          scheduled_arrival,
+          status,
+          routes (origin, destination),
+          buses (registration_number, name)
         `)
-        .gte('departure_time', `${today}T00:00:00`)
-        .lte('departure_time', `${today}T23:59:59`)
-        .in('status', ['SCHEDULED', 'BOARDING', 'DEPARTED'])
-        .order('departure_time');
+        .in('status', ['SCHEDULED', 'BOARDING', 'DEPARTED', 'COMPLETED'])
+        .order('scheduled_departure', { ascending: false })
+        .limit(100);
       if (error) throw error;
-      return data || [];
+      // Transform the data to handle Supabase's array response
+      return (data || []).map(trip => ({
+        ...trip,
+        routes: Array.isArray(trip.routes) ? trip.routes[0] : trip.routes,
+        buses: Array.isArray(trip.buses) ? trip.buses[0] : trip.buses,
+      })) as Trip[];
     },
   });
 
-  // Fetch manifest for selected trip
-  const { data: manifestData, isLoading, refetch } = useQuery({
-    queryKey: ['passenger-manifest', selectedTrip],
+  // Fetch bookings for selected trip
+  const { data: bookings, isLoading: isBookingsLoading } = useQuery({
+    queryKey: ['trip-bookings', selectedTrip],
     queryFn: async () => {
-      if (!selectedTrip) return null;
-
-      // Get trip details
-      const { data: trip, error: tripError } = await supabase
-        .from('trips')
-        .select(`
-          *,
-          route:routes(*),
-          bus:buses(*),
-          driver:drivers(*)
-        `)
-        .eq('id', selectedTrip)
-        .single();
-
-      if (tripError) throw tripError;
-
-      // Get passengers with check-in status
-      const { data: bookings, error: bookingsError } = await supabase
+      if (!selectedTrip) return [];
+      const { data, error } = await supabase
         .from('bookings')
-        .select(`
-          *,
-          passenger:profiles(*),
-          checkin:checkin_records(*)
-        `)
+        .select('*')
         .eq('trip_id', selectedTrip)
-        .in('status', ['confirmed', 'checked_in'])
+        .in('payment_status', ['completed', 'paid'])
         .order('seat_number');
-
-      if (bookingsError) throw bookingsError;
-
-      return { passengers: bookings || [], trip };
+      if (error) throw error;
+      return data as Booking[];
     },
     enabled: !!selectedTrip,
   });
 
-  const passengers = manifestData?.passengers || [];
-  const tripDetails = manifestData?.trip || null;
+  // Get selected trip data
+  const selectedTripData = trips?.find(t => t.id === selectedTrip);
 
-  const getStatusBadge = (passenger: any) => {
-    const checkin = passenger.checkin?.[0];
-    if (!checkin) return <Badge variant="outline">Not Checked In</Badge>;
-    
-    switch (checkin.boarding_status) {
-      case 'checked_in':
-        return <Badge className="bg-blue-500">Checked In</Badge>;
-      case 'boarded':
-        return <Badge className="bg-green-500">Boarded</Badge>;
-      case 'no_show':
-        return <Badge variant="destructive">No Show</Badge>;
-      default:
-        return <Badge variant="outline">Unknown</Badge>;
-    }
-  };
-
-  const handleDownloadPDF = () => {
-    if (!tripDetails || passengers.length === 0) {
-      toast.error('No data to export');
+  // Download CSV function
+  const handleDownloadCSV = () => {
+    if (!selectedTrip || !bookings || bookings.length === 0) {
+      toast.error('No passengers to download');
       return;
     }
 
-    const doc = new jsPDF();
-    
-    // Header
-    doc.setFontSize(18);
-    doc.text('Passenger Manifest', 14, 20);
-    
-    // Trip details
-    doc.setFontSize(10);
-    doc.text(`Route: ${tripDetails.route?.route_name}`, 14, 30);
-    doc.text(`From: ${tripDetails.route?.origin_city} To: ${tripDetails.route?.destination_city}`, 14, 36);
-    doc.text(`Departure: ${new Date(tripDetails.departure_time).toLocaleString()}`, 14, 42);
-    doc.text(`Bus: ${tripDetails.bus?.registration_number} (${tripDetails.bus?.seating_capacity} seats)`, 14, 48);
-    doc.text(`Driver: ${tripDetails.driver?.full_name}`, 14, 54);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 60);
+    const selectedTripData = trips?.find(t => t.id === selectedTrip);
+    if (!selectedTripData) return;
 
-    // Table
-    const tableData = passengers.map((p: any) => [
-      p.seat_number,
-      p.ticket_number,
-      p.passenger_name,
-      p.passenger_phone,
-      p.checkin?.[0]?.boarding_status || 'Not Checked In',
-      `P ${parseFloat(p.total_amount).toFixed(2)}`,
+    // Create CSV content
+    const headers = [
+      'Seat Number',
+      'Passenger Name',
+      'ID Number',
+      'Phone',
+      'Email',
+      'Booking Reference',
+      'Status',
+      'Payment Status'
+    ];
+
+    const rows = bookings.map(booking => [
+      booking.seat_number || '',
+      booking.passenger_name || '',
+      booking.passenger_id_number || 'N/A',
+      booking.passenger_phone || '',
+      booking.passenger_email || '',
+      booking.booking_reference || '',
+      booking.status || '',
+      booking.payment_status || ''
     ]);
 
-    autoTable(doc, {
-      startY: 70,
-      head: [['Seat', 'Ticket #', 'Passenger', 'Phone', 'Status', 'Amount']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [59, 130, 246] },
-      styles: { fontSize: 8 },
-    });
+    const csvContent = [
+      // Title
+      [`Passenger Manifest - ${selectedTripData.routes?.origin || 'N/A'} to ${selectedTripData.routes?.destination || 'N/A'}`],
+      [`Trip Number: ${selectedTripData.trip_number}`],
+      [`Departure: ${format(new Date(selectedTripData.scheduled_departure), 'PPpp')}`],
+      [`Bus: ${selectedTripData.buses?.registration_number || selectedTripData.buses?.name || 'N/A'}`],
+      [`Total Passengers: ${bookings.length}`],
+      [],
+      headers,
+      ...rows
+    ]
+      .map(row => row.join(','))
+      .join('\n');
 
-    // Summary
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    doc.text(`Total Passengers: ${passengers.length}`, 14, finalY);
-    doc.text(`Total Revenue: P ${passengers.reduce((sum: number, p: any) => sum + parseFloat(p.total_amount || 0), 0).toFixed(2)}`, 14, finalY + 6);
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute(
+      'download',
+      `manifest_${selectedTripData.trip_number}_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`
+    );
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 
-    doc.save(`manifest-${tripDetails.route?.route_name}-${new Date().toISOString().split('T')[0]}.pdf`);
-    toast.success('PDF downloaded successfully');
+    toast.success('Manifest downloaded successfully');
   };
 
-  const handleDownloadExcel = () => {
-    if (!tripDetails || passengers.length === 0) {
-      toast.error('No data to export');
-      return;
-    }
-
-    const excelData = passengers.map((p: any) => ({
-      'Seat': p.seat_number,
-      'Ticket Number': p.ticket_number,
-      'Passenger Name': p.passenger_name,
-      'Phone': p.passenger_phone,
-      'Email': p.passenger_email || 'N/A',
-      'Status': p.checkin?.[0]?.boarding_status || 'Not Checked In',
-      'Check-In Time': p.checkin?.[0]?.checkin_time ? new Date(p.checkin[0].checkin_time).toLocaleString() : 'N/A',
-      'Amount': parseFloat(p.total_amount).toFixed(2),
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(excelData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Manifest');
-    
-    XLSX.writeFile(wb, `manifest-${tripDetails.route?.route_name}-${new Date().toISOString().split('T')[0]}.xlsx`);
-    toast.success('Excel file downloaded successfully');
-  };
-
-  // Filter passengers based on search and status
-  const filteredPassengers = passengers.filter((passenger: any) => {
-    const matchesSearch = !searchTerm || 
-      passenger.passenger_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      passenger.ticket_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      passenger.passenger_phone?.includes(searchTerm);
-    
-    const checkinStatus = passenger.checkin?.[0]?.boarding_status;
-    const matchesStatus = filterStatus === 'all' || 
-      (filterStatus === 'checked_in' && checkinStatus === 'checked_in') ||
-      (filterStatus === 'boarded' && checkinStatus === 'boarded') ||
-      (filterStatus === 'no_show' && checkinStatus === 'no_show') ||
-      (filterStatus === 'not_checked_in' && !checkinStatus);
-    
-    return matchesSearch && matchesStatus;
+  // Filter trips based on search
+  const filteredTrips = trips?.filter((trip) => {
+    if (!searchQuery) return true;
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      trip.routes?.origin?.toLowerCase().includes(searchLower) ||
+      trip.routes?.destination?.toLowerCase().includes(searchLower) ||
+      trip.buses?.registration_number?.toLowerCase().includes(searchLower) ||
+      trip.trip_number?.toLowerCase().includes(searchLower)
+    );
   });
 
-  const stats = {
-    total: passengers.length,
-    checkedIn: passengers.filter((p: any) => p.checkin?.[0]?.boarding_status === 'checked_in').length,
-    boarded: passengers.filter((p: any) => p.checkin?.[0]?.boarding_status === 'boarded').length,
-    noShow: passengers.filter((p: any) => p.checkin?.[0]?.boarding_status === 'no_show').length,
-    notCheckedIn: passengers.filter((p: any) => !p.checkin || p.checkin.length === 0).length,
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'SCHEDULED': return 'bg-blue-500';
+      case 'BOARDING': return 'bg-yellow-500';
+      case 'DEPARTED': return 'bg-green-500';
+      case 'COMPLETED': return 'bg-gray-500';
+      case 'CANCELLED': return 'bg-red-500';
+      default: return 'bg-gray-400';
+    }
   };
+
+  const getBookingStatusColor = (status: string) => {
+    const statusUpper = status?.toUpperCase();
+    switch (statusUpper) {
+      case 'CONFIRMED': return 'bg-green-500';
+      case 'CHECKED_IN': return 'bg-blue-500';
+      case 'PENDING': return 'bg-yellow-500';
+      case 'CANCELLED': return 'bg-red-500';
+      default: return 'bg-gray-400';
+    }
+  };
+
+  const getPaymentStatusColor = (status: string) => {
+    const statusLower = status?.toLowerCase();
+    switch (statusLower) {
+      case 'completed':
+      case 'paid': return 'bg-green-500';
+      case 'pending': return 'bg-yellow-500';
+      case 'failed': return 'bg-red-500';
+      default: return 'bg-gray-400';
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg">Loading manifests...</div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold mb-2">Passenger Manifest</h1>
-          <p className="text-muted-foreground">View and manage passenger lists for trips</p>
+          <h1 className="text-3xl font-bold mb-2">Passenger Manifests</h1>
+          <p className="text-muted-foreground">View and download trip passenger manifests</p>
         </div>
 
-        {/* Filters and Actions */}
+        {/* Summary Cards */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Trips</CardTitle>
+              <Bus className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{trips?.length || 0}</div>
+              <p className="text-xs text-muted-foreground">Available trips</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Selected Trip Passengers</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{bookings?.length || 0}</div>
+              <p className="text-xs text-muted-foreground">Confirmed bookings</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">With ID Numbers</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {bookings?.filter(b => b.passenger_id_number).length || 0}
+              </div>
+              <p className="text-xs text-muted-foreground">ID verification</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Search */}
+        <div className="flex gap-4">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by route, bus, or trip number..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+
+        {/* Trips List */}
         <Card>
           <CardHeader>
-            <CardTitle>Trip Selection & Filters</CardTitle>
-            <CardDescription>Select a trip and filter passengers</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5" />
+              Select Trip
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                {/* Trip Selection */}
-                <div>
-                  <Label>Select Trip</Label>
-                  <Select value={selectedTrip} onValueChange={setSelectedTrip}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a trip" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {trips.map((trip: any) => (
-                        <SelectItem key={trip.id} value={trip.id}>
-                          {trip.route?.route_name} - {new Date(trip.departure_time).toLocaleTimeString()}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Status Filter */}
-                <div>
-                  <Label>Filter by Status</Label>
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Passengers</SelectItem>
-                      <SelectItem value="checked_in">Checked In</SelectItem>
-                      <SelectItem value="boarded">Boarded</SelectItem>
-                      <SelectItem value="no_show">No Show</SelectItem>
-                      <SelectItem value="not_checked_in">Not Checked In</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                {/* Search */}
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by name, ticket, or phone..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-
-                {/* Action Buttons */}
-                <Button onClick={() => refetch()} variant="outline">
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh
-                </Button>
-                <Button onClick={handleDownloadPDF} disabled={!selectedTrip || passengers.length === 0}>
-                  <FileText className="h-4 w-4 mr-2" />
-                  PDF
-                </Button>
-                <Button onClick={handleDownloadExcel} disabled={!selectedTrip || passengers.length === 0}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Excel
-                </Button>
-              </div>
+            <div className="max-h-96 overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Trip Number</TableHead>
+                    <TableHead>Date & Time</TableHead>
+                    <TableHead>Route</TableHead>
+                    <TableHead>Bus</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTrips?.map((trip) => (
+                    <TableRow 
+                      key={trip.id}
+                      className={selectedTrip === trip.id ? 'bg-muted' : ''}
+                    >
+                      <TableCell className="font-medium">{trip.trip_number}</TableCell>
+                      <TableCell>
+                        <div className="font-medium">
+                          {format(new Date(trip.scheduled_departure), 'MMM dd, yyyy')}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {format(new Date(trip.scheduled_departure), 'HH:mm')}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium">{trip.routes?.origin || 'N/A'}</div>
+                        <div className="text-sm text-muted-foreground">
+                          to {trip.routes?.destination || 'N/A'}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {trip.buses?.registration_number || trip.buses?.name || 'N/A'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={`${getStatusColor(trip.status)} text-white`}>
+                          {trip.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant={selectedTrip === trip.id ? 'default' : 'outline'}
+                          onClick={() => setSelectedTrip(trip.id)}
+                        >
+                          View Manifest
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           </CardContent>
         </Card>
 
-        {/* Trip Details & Stats */}
-        {tripDetails && (
-          <>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
+        {/* Selected Trip Manifest */}
+        {selectedTrip && selectedTripData && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Passenger Manifest
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {selectedTripData.routes?.origin || 'N/A'} → {selectedTripData.routes?.destination || 'N/A'}
+                </p>
+              </div>
+              <Button
+                onClick={handleDownloadCSV}
+                disabled={!bookings || bookings.length === 0}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download CSV
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Trip Details */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted rounded-lg">
                   <div>
-                    <p className="text-sm text-muted-foreground">Selected Trip</p>
-                    <p className="text-xl font-bold">
-                      {tripDetails.route?.origin_city} → {tripDetails.route?.destination_city}
-                    </p>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                      <Calendar className="h-3 w-3" />
-                      {new Date(tripDetails.departure_time).toLocaleString()}
+                    <p className="text-sm text-muted-foreground">Trip Number</p>
+                    <p className="font-medium">{selectedTripData.trip_number}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Departure</p>
+                    <p className="font-medium">
+                      {format(new Date(selectedTripData.scheduled_departure), 'PPp')}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Capacity</p>
-                    <p className="text-2xl font-bold">{passengers.length} / {tripDetails.bus?.seating_capacity}</p>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Bus</p>
+                    <p className="font-medium">
+                      {selectedTripData.buses?.registration_number || selectedTripData.buses?.name || 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Passengers</p>
+                    <p className="font-medium text-lg">{bookings?.length || 0}</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Summary Stats */}
-            <div className="grid md:grid-cols-5 gap-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats.total}</div>
-                  <p className="text-xs text-muted-foreground">Passengers</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Checked In</CardTitle>
-                  <CheckCircle className="h-4 w-4 text-blue-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats.checkedIn}</div>
-                  <p className="text-xs text-muted-foreground">Ready</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Boarded</CardTitle>
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats.boarded}</div>
-                  <p className="text-xs text-muted-foreground">On Bus</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">No Show</CardTitle>
-                  <XCircle className="h-4 w-4 text-red-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats.noShow}</div>
-                  <p className="text-xs text-muted-foreground">Absent</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Pending</CardTitle>
-                  <Users className="h-4 w-4 text-yellow-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats.notCheckedIn}</div>
-                  <p className="text-xs text-muted-foreground">Not Checked</p>
-                </CardContent>
-              </Card>
-            </div>
-          </>
+                {/* Passengers Table */}
+                {isBookingsLoading ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">Loading passengers...</p>
+                  </div>
+                ) : bookings && bookings.length > 0 ? (
+                  <div className="border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Seat</TableHead>
+                          <TableHead>Passenger Name</TableHead>
+                          <TableHead>ID Number</TableHead>
+                          <TableHead>Phone</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Booking Ref</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Payment</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {bookings.map((booking) => (
+                          <TableRow key={booking.id}>
+                            <TableCell className="font-medium">{booking.seat_number}</TableCell>
+                            <TableCell>{booking.passenger_name}</TableCell>
+                            <TableCell>
+                              {booking.passenger_id_number ? (
+                                <span className="font-mono text-sm">{booking.passenger_id_number}</span>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">Not provided</span>
+                              )}
+                            </TableCell>
+                            <TableCell>{booking.passenger_phone}</TableCell>
+                            <TableCell className="text-sm">
+                              {booking.passenger_email || <span className="text-muted-foreground">N/A</span>}
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">{booking.booking_reference}</TableCell>
+                            <TableCell>
+                              <Badge className={`${getBookingStatusColor(booking.status)} text-white`}>
+                                {booking.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={`${getPaymentStatusColor(booking.payment_status)} text-white`}>
+                                {booking.payment_status}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Users className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-muted-foreground">No passengers found for this trip</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         )}
-
-      {/* Passenger List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Passenger List</CardTitle>
-          <CardDescription>Complete manifest for selected trip</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-12">Loading manifest...</div>
-          ) : !selectedTrip ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Select a trip to view passenger manifest</p>
-            </div>
-          ) : filteredPassengers.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No passengers found</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Seat</TableHead>
-                  <TableHead>Passenger Name</TableHead>
-                  <TableHead>Ticket #</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Luggage</TableHead>
-                  <TableHead>Payment</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredPassengers.map((booking: any) => (
-                  <TableRow key={booking.id}>
-                    <TableCell className="font-medium font-mono">{booking.seat_number}</TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{booking.passenger_name}</div>
-                        <div className="text-sm text-muted-foreground">{booking.passenger?.id_number || 'N/A'}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm font-mono">{booking.ticket_number}</TableCell>
-                    <TableCell>
-                      <div className="text-sm space-y-1">
-                        <div className="flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          {booking.passenger_phone}
-                        </div>
-                        {booking.passenger_email && (
-                          <div className="flex items-center gap-1 text-muted-foreground">
-                            <Mail className="h-3 w-3" />
-                            {booking.passenger_email}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-sm">
-                        <Luggage className="h-3 w-3" />
-                        0 bags
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className="bg-green-500">Paid</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(booking)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
       </div>
     </Layout>
   );

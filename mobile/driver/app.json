@@ -1,0 +1,78 @@
+{
+  "expo": {
+    "name": "Voyage Driver",
+    "slug": "voyage-driver-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "voyage-driver",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1976D2"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.voyage.driver",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to scan passenger QR codes and take photos for incident reports.",
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to attach photos to incident reports.",
+        "NSLocationWhenInUseUsageDescription": "This app uses your location to track trip routes and provide accurate ETAs.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app uses your location in the background to track trip routes even when the app is not in use.",
+        "UIBackgroundModes": ["location", "fetch"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1976D2"
+      },
+      "package": "com.voyage.driver",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Voyage Driver to access your camera to scan QR codes and take incident photos."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Voyage Driver to use your location to track trips.",
+          "locationWhenInUsePermission": "Allow Voyage Driver to use your location to track trips."
+        }
+      ],
+      "expo-secure-store",
+      "expo-sqlite"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "your-project-id"
+      }
+    }
+  }
+}

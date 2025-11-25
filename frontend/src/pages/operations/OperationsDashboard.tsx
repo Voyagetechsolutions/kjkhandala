@@ -385,6 +385,45 @@ export default function OperationsDashboard() {
                 <div className="text-sm text-muted-foreground">Handle incidents</div>
               </button>
             </div>
+            
+            {/* Additional Quick Actions */}
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+              <button 
+                onClick={() => {
+                  // Navigate to trips page first, then they can select a trip to assign
+                  navigate('/operations/trips');
+                }}
+                className="p-4 border rounded-lg hover:bg-accent transition-colors text-left border-green-200 bg-green-50/50"
+              >
+                <Bus className="h-6 w-6 mb-2 text-green-600" />
+                <div className="font-medium">Assign Bus</div>
+                <div className="text-sm text-muted-foreground">Smart bus assignment</div>
+              </button>
+              <button 
+                onClick={() => navigate('/operations/passenger-manifest')}
+                className="p-4 border rounded-lg hover:bg-accent transition-colors text-left"
+              >
+                <Users className="h-6 w-6 mb-2 text-indigo-600" />
+                <div className="font-medium">Manifests</div>
+                <div className="text-sm text-muted-foreground">Passenger lists</div>
+              </button>
+              <button 
+                onClick={() => navigate('/operations/driver-shifts')}
+                className="p-4 border rounded-lg hover:bg-accent transition-colors text-left"
+              >
+                <Clock className="h-6 w-6 mb-2 text-orange-600" />
+                <div className="font-medium">Driver Shifts</div>
+                <div className="text-sm text-muted-foreground">Shift calendar</div>
+              </button>
+              <button 
+                onClick={() => navigate('/operations/live-tracking')}
+                className="p-4 border rounded-lg hover:bg-accent transition-colors text-left"
+              >
+                <TrendingUp className="h-6 w-6 mb-2 text-cyan-600" />
+                <div className="font-medium">Live Tracking</div>
+                <div className="text-sm text-muted-foreground">Real-time GPS</div>
+              </button>
+            </div>
           </CardContent>
         </Card>
       </div>

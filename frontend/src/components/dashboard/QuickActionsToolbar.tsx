@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import supabaseApi from '@/lib/supabase-api';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ import {
 import { toast } from 'sonner';
 
 export default function QuickActionsToolbar() {
+  const navigate = useNavigate();
   const [addBusOpen, setAddBusOpen] = useState(false);
   const [scheduleTripOpen, setScheduleTripOpen] = useState(false);
   const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
@@ -151,6 +153,10 @@ export default function QuickActionsToolbar() {
           <DropdownMenuSeparator />
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => navigate('/admin/trips')}>
+            <Bus className="mr-2 h-4 w-4" />
+            Assign Bus to Trip
+          </DropdownMenuItem>
           <DropdownMenuItem>
             <DollarSign className="mr-2 h-4 w-4" />
             Approve Expense

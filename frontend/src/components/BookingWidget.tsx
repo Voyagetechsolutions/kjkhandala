@@ -101,11 +101,15 @@ export default function BookingWidget() {
           status: 'SCHEDULED',
           total_seats: schedule.buses?.seating_capacity || 60,
           available_seats: schedule.buses?.seating_capacity || 60,
+          route_id: schedule.route_id,
+          bus_id: schedule.bus_id,
           route: {
+            id: schedule.route_id,
             origin: schedule.routes?.origin,
             destination: schedule.routes?.destination,
           },
           bus: {
+            id: schedule.bus_id,
             name: schedule.buses?.registration_number || schedule.buses?.name || 'TBA',
             bus_type: schedule.buses?.bus_type || 'Standard',
           },
@@ -319,7 +323,7 @@ export default function BookingWidget() {
         sessionStorage.setItem('selectedTrip', JSON.stringify(selectedTrip));
         sessionStorage.setItem('selectedReturnTrip', JSON.stringify(trip));
         sessionStorage.setItem('passengerCount', form.passengers.toString());
-        navigate('/booking');
+        navigate('/book/passenger-details');
       }
     } else {
       setSelectedTrip(trip);
@@ -327,13 +331,13 @@ export default function BookingWidget() {
       if (form.tripType === 'one-way') {
         sessionStorage.setItem('selectedTrip', JSON.stringify(trip));
         sessionStorage.setItem('passengerCount', form.passengers.toString());
-        navigate('/booking');
+        navigate('/book/passenger-details');
       } else if (selectedReturnTrip) {
         // If return trip already selected
         sessionStorage.setItem('selectedTrip', JSON.stringify(trip));
         sessionStorage.setItem('selectedReturnTrip', JSON.stringify(selectedReturnTrip));
         sessionStorage.setItem('passengerCount', form.passengers.toString());
-        navigate('/booking');
+        navigate('/book/passenger-details');
       } else {
         // Show return trips
         setShowingReturnTrips(true);

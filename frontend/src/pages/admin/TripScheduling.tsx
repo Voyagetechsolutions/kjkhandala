@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import AdminLayout from '@/components/admin/AdminLayout';
-import OperationsLayout from '@/components/operations/OperationsLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,9 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 
 export default function TripScheduling() {
-  const location = useLocation();
-  const isOperationsRoute = location.pathname.startsWith('/operations');
-  const Layout = isOperationsRoute ? OperationsLayout : AdminLayout;
+  const Layout = AdminLayout;
 
   const [showForm, setShowForm] = useState(false);
   const [editingTrip, setEditingTrip] = useState<any>(null);
@@ -471,7 +467,6 @@ export default function TripScheduling() {
             <TabsTrigger value="today">Trips Today</TabsTrigger>
             <TabsTrigger value="upcoming">Upcoming Trips</TabsTrigger>
             <TabsTrigger value="calendar">Calendar View</TabsTrigger>
-            <TabsTrigger value="live">Live Status</TabsTrigger>
           </TabsList>
 
           {/* Automated Schedules Tab (Primary) */}
@@ -796,271 +791,59 @@ export default function TripScheduling() {
           <TabsContent value="calendar">
             <TripCalendar trips={trips || []} selectedDate={selectedDate} onDateSelect={setSelectedDate} />
           </TabsContent>
-
-          {/* Live Status Tab */}
-          <TabsContent value="live" className="space-y-4">
-            {/* Live Stats Summary */}
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Active Now</p>
-                      <p className="text-2xl font-bold text-green-600">{liveTrips?.length || 0}</p>
-                    </div>
-                    <div className="p-3 bg-green-100 rounded-full">
-                      <Play className="h-6 w-6 text-green-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Boarding</p>
-                      <p className="text-2xl font-bold text-blue-600">
-                        {liveTrips?.filter((t: any) => t.status === 'BOARDING').length || 0}
-                      </p>
-                    </div>
-                    <div className="p-3 bg-blue-100 rounded-full">
-                      <Clock className="h-6 w-6 text-blue-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">In Transit</p>
-                      <p className="text-2xl font-bold text-orange-600">
-                        {liveTrips?.filter((t: any) => t.status === 'DEPARTED').length || 0}
-                      </p>
-                    </div>
-                    <div className="p-3 bg-orange-100 rounded-full">
-                      <Navigation className="h-6 w-6 text-orange-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Live Trips List */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Play className="h-5 w-5 text-green-500" />
-                    Live Trips - Currently Active
-                  </CardTitle>
-                  <Badge variant="outline" className="animate-pulse">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />
-                    Live
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {liveTripsLoading ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-                    <p>Loading live trips...</p>
-                  </div>
-                ) : liveTrips?.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Pause className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg font-semibold mb-2">No active trips at the moment</p>
-                    <p className="text-sm">Trips will appear here when they start boarding or depart</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {liveTrips?.map((trip: any) => {
-                      const statusConfig = {
-                        BOARDING: { color: 'bg-blue-500', icon: Clock, label: 'Boarding' },
-                        DEPARTED: { color: 'bg-green-500', icon: Play, label: 'Departed' },
-                        IN_PROGRESS: { color: 'bg-orange-500', icon: Navigation, label: 'In Transit' },
-                      };
-                      const config = statusConfig[trip.status as keyof typeof statusConfig] || statusConfig.DEPARTED;
-                      const StatusIcon = config.icon;
-
-                      return (
-                        <div key={trip.id} className="p-5 border-2 rounded-lg hover:shadow-md transition-all bg-gradient-to-r from-white to-gray-50">
-                          {/* Header */}
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                              <div className={`p-3 ${config.color} rounded-lg shadow-lg`}>
-                                <Bus className="h-6 w-6 text-white" />
-                              </div>
-                              <div>
-                                <p className="font-bold text-lg">
-                                  {trip.routes?.origin} → {trip.routes?.destination}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  Trip #{trip.trip_number || trip.id.slice(0, 8)}
-                                </p>
-                              </div>
-                            </div>
-                            <Badge className={`${config.color} text-white`}>
-                              <StatusIcon className="h-3 w-3 mr-1" />
-                              {config.label}
-                            </Badge>
-                          </div>
-
-                          {/* Details Grid */}
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Bus className="h-3 w-3" />
-                                Bus
-                              </p>
-                              <p className="font-semibold text-sm">{trip.buses?.registration_number || 'N/A'}</p>
-                              <p className="text-xs text-muted-foreground">{trip.buses?.model || ''}</p>
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                <User className="h-3 w-3" />
-                                Driver
-                              </p>
-                              <p className="font-semibold text-sm">
-                                {trip.drivers?.full_name || 'Unassigned'}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {trip.drivers?.phone || ''}
-                              </p>
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                Departure
-                              </p>
-                              <p className="font-semibold text-sm">
-                                {trip.scheduled_departure ? format(new Date(trip.scheduled_departure), 'HH:mm') : 'N/A'}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {trip.actual_departure ? `Left at ${format(new Date(trip.actual_departure), 'HH:mm')}` : 'Not departed'}
-                              </p>
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                ETA
-                              </p>
-                              <p className="font-semibold text-sm">
-                                {trip.scheduled_arrival ? format(new Date(trip.scheduled_arrival), 'HH:mm') : 'N/A'}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {trip.routes?.distance_km ? `${trip.routes.distance_km} km` : 'N/A'}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Progress Bar */}
-                          {trip.status !== 'BOARDING' && (
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                <span>Progress</span>
-                                <span>Estimated</span>
-                              </div>
-                              <div className="w-full bg-gray-200 rounded-full h-2">
-                                <div className="bg-green-500 h-2 rounded-full animate-pulse" style={{ width: '45%' }} />
-                              </div>
-                            </div>
-                          )}
-
-                          {/* GPS Tracking */}
-                          {trip.buses?.gps_device_id && (
-                            <div className="mt-3 pt-3 border-t flex items-center justify-between">
-                              <div className="flex items-center gap-2 text-sm">
-                                <Navigation className="h-4 w-4 text-green-500" />
-                                <span className="text-muted-foreground">GPS Tracking:</span>
-                                <span className="font-mono font-semibold">{trip.buses.gps_device_id}</span>
-                              </div>
-                              <Button variant="outline" size="sm">
-                                <Navigation className="h-3 w-3 mr-1" />
-                                Track Live
-                              </Button>
-                            </div>
-                          )}
-
-                          {/* Action Buttons */}
-                          <div className="mt-4 pt-4 border-t flex gap-2">
-                            {trip.status === 'BOARDING' && (
-                              <Button size="sm" onClick={() => startTripMutation.mutate(trip.id)}>
-                                <Play className="h-3 w-3 mr-1" />
-                                Start Trip
-                              </Button>
-                            )}
-                            {(trip.status === 'DEPARTED' || trip.status === 'IN_PROGRESS') && (
-                              <Button size="sm" variant="outline" onClick={() => completeTripMutation.mutate(trip.id)}>
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Mark Complete
-                              </Button>
-                            )}
-                            <Button size="sm" variant="outline">
-                              View Details
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
 
         {/* Trip Form Dialog */}
-        {showForm && (
-          <TripForm
-            trip={editingTrip}
-            onClose={() => { setShowForm(false); setEditingTrip(null); }}
-            onSuccess={() => {
-              setShowForm(false);
-              setEditingTrip(null);
-              queryClient.invalidateQueries({ queryKey: ['trips-scheduling'] });
-            }}
-          />
-        )}
+          {showForm && (
+            <TripForm
+              trip={editingTrip}
+              onClose={() => { setShowForm(false); setEditingTrip(null); }}
+              onSuccess={() => {
+                setShowForm(false);
+                setEditingTrip(null);
+                queryClient.invalidateQueries({ queryKey: ['trips-scheduling'] });
+              }}
+            />
+          )}
 
-        {/* Bus/Driver Assignment Dialog */}
-        <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Assign Bus & Driver</DialogTitle>
-              <DialogDescription>
-                Assign a bus and driver to this trip and select operating days
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-6 py-4">
-              {/* Trip Info */}
-              {selectedTrip && (
-                <div className="p-4 bg-muted rounded-lg">
-                  <p className="font-semibold mb-1">
-                    {selectedTrip.routes?.origin} → {selectedTrip.routes?.destination}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Departure: {selectedTrip.scheduled_departure ? format(new Date(selectedTrip.scheduled_departure), 'MMM dd, yyyy HH:mm') : 'N/A'}
-                  </p>
-                </div>
-              )}
+          {/* Bus/Driver Assignment Dialog */}
+          <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Assign Bus & Driver</DialogTitle>
+                <DialogDescription>
+                  Assign a bus and driver to this trip and select operating days
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                {/* Trip Info */}
+                {selectedTrip && (
+                  <div className="p-4 bg-muted rounded-lg">
+                    <p className="font-semibold mb-1">
+                      {selectedTrip.routes?.origin} → {selectedTrip.routes?.destination}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Departure: {selectedTrip.scheduled_departure ? format(new Date(selectedTrip.scheduled_departure), 'MMM dd, yyyy HH:mm') : 'N/A'}
+                    </p>
+                  </div>
+                )}
 
-              {/* Bus Selection */}
-              <div className="space-y-2">
-                <Label>Select Bus</Label>
-                <Select
-                  value={assignmentData.bus_id}
-                  onValueChange={(value) => setAssignmentData(prev => ({ ...prev, bus_id: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a bus" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {buses?.map((bus: any) => (
-                      <SelectItem key={bus.id} value={bus.id}>
-                        {bus.registration_number} - {bus.model}
-                      </SelectItem>
-                    ))}
+                {/* Bus Selection */}
+                <div className="space-y-2">
+                  <Label>Select Bus</Label>
+                  <Select
+                    value={assignmentData.bus_id}
+                    onValueChange={(value) => setAssignmentData(prev => ({ ...prev, bus_id: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a bus" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {buses?.map((bus: any) => (
+                        <SelectItem key={bus.id} value={bus.id}>
+                          {bus.registration_number} - {bus.model}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>

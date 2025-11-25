@@ -1,493 +1,254 @@
-# 🚀 KJ Khandala - Complete Implementation Guide
+# Customer App Implementation Guide
 
-## ✅ ALL FEATURES IMPLEMENTED!
+## Overview
+This guide provides step-by-step instructions for completing the customer mobile app implementation.
 
-### What's Been Built
+## Current Status
 
-1. ✅ **Multi-Currency Support** (USD, Pula, Rand)
-2. ✅ **Visual Interactive Seat Map**
-3. ✅ **DPO PayGate Payment Integration**
-4. ✅ **Email Notification System**
-5. ✅ **WhatsApp Confirmation Integration**
-6. ✅ **Admin Revenue Reports & Analytics**
+### ✅ Completed
+- Package configuration with React 19 and latest dependencies
+- TypeScript configuration
+- Supabase client setup
+- Type definitions
+- Service layer (auth, booking, trip)
+- Context providers (Auth, Booking)
+- Utility functions (formatters)
+- Reusable components (Button, Input)
 
----
+### 🚧 To Be Completed
+The following screens need to be created. I've provided the structure and logic - you need to create the UI components:
 
-## 📋 INTEGRATION STEPS
+## Screens to Create
 
-### 1. Multi-Currency Support
-
-**Files Created:**
-- `src/lib/currency.ts` - Currency conversion utilities
-- `src/contexts/CurrencyContext.tsx` - Currency state management
-- `src/components/CurrencySelector.tsx` - Currency selector component
-
-**How to Use:**
-
-```tsx
-// In your App.tsx, wrap with CurrencyProvider
-import { CurrencyProvider } from '@/contexts/CurrencyContext';
-
-<CurrencyProvider>
-  <YourApp />
-</CurrencyProvider>
-
-// In any component, use currency
-import { useCurrency } from '@/contexts/CurrencyContext';
-import { formatCurrency, convertCurrency } from '@/lib/currency';
-
-const { currency } = useCurrency();
-const displayPrice = formatCurrency(100, currency);
+### 1. App.tsx (Entry Point)
+```typescript
+// Location: App.tsx
+// Purpose: Main entry point with providers and navigation
 ```
 
-**Add to Navbar:**
-```tsx
-import CurrencySelector from '@/components/CurrencySelector';
-
-// In Navbar component
-<CurrencySelector />
+### 2. Navigation (src/navigation/AppNavigator.tsx)
+```typescript
+// Stack Navigator with:
+// - Splash Screen
+// - Auth Stack (SignIn, SignUp)
+// - Main Tab Navigator (Home, My Trips, Profile)
+// - Booking Stack (Search Results, Seat Selection, Passenger Details, Payment, Ticket)
 ```
 
----
+### 3. Authentication Screens
 
-### 2. Visual Interactive Seat Map
+#### Splash Screen (src/screens/auth/SplashScreen.tsx)
+- Display app logo and name
+- Auto-navigate to Home after 3 seconds
+- Use LinearGradient for background
 
-**File Created:**
-- `src/components/SeatMap.tsx` - Complete seat selection UI
+#### Sign In Screen (src/screens/auth/SignInScreen.tsx)
+- Email and password inputs
+- Sign in button with loading state
+- Link to Sign Up screen
+- Use `useAuth()` hook from AuthContext
+- Call `signIn(email, password)`
 
-**How to Use:**
+#### Sign Up Screen (src/screens/auth/SignUpScreen.tsx)
+- Full name, email, phone, password, confirm password inputs
+- Validation for matching passwords
+- Sign up button with loading state
+- Link to Sign In screen
+- Use `useAuth()` hook
+- Call `signUp(email, password, fullName, phone)`
 
-```tsx
-import SeatMap from '@/components/SeatMap';
+### 4. Home Screen (src/screens/home/HomeScreen.tsx)
+- Search widget (from, to, date, passengers)
+- Trip type toggle (one-way/return)
+- City dropdowns using `fetchCities()` from tripService
+- Search button calling `searchTrips()` from tripService
+- Promotional carousel/slideshow
+- Quick access to My Trips
+- Use `useBooking()` hook to store search params
 
-<SeatMap
-  totalSeats={40}
-  bookedSeats={['1', '2', '5']}
-  selectedSeats={selectedSeats}
-  onSeatSelect={(seatNumber) => handleSeatSelection(seatNumber)}
-  maxSeats={4}
-/>
+### 5. Booking Flow Screens
+
+#### Search Results (src/screens/booking/SearchResultsScreen.tsx)
+- Display list of available trips
+- Show trip details (time, route, price, seats available)
+- Trip selection button
+- Toggle between outbound and return trips (if return journey)
+- Navigate to Seat Selection on trip select
+- Use trips from `useBooking()` context
+
+#### Seat Selection (src/screens/booking/SeatSelectionScreen.tsx)
+- Display seat map grid (4 columns)
+- Fetch booked seats using `getBookedSeats(tripId)`
+- Color code: Available (white), Selected (blue), Booked (gray)
+- Allow seat selection
+- Show legend
+- Continue button
+- Store selected seats in `useBooking()` context
+
+#### Passenger Details (src/screens/booking/PassengerDetailsScreen.tsx)
+- Name, email, phone inputs
+- Pre-fill from user profile if authenticated
+- Validation
+- Continue to Payment button
+- Store passenger details in `useBooking()` context
+
+#### Payment (src/screens/booking/PaymentScreen.tsx)
+- Booking summary (route, seat, passenger, total)
+- Payment method selection (Office, Card, Mobile Money)
+- Complete booking button
+- Call `createBooking()` from bookingService
+- Navigate to Ticket screen on success
+
+#### Ticket (src/screens/booking/TicketScreen.tsx)
+- Display e-ticket
+- Show QR code using react-native-qrcode-svg
+- Trip details (route, date, time, seat, passenger)
+- Booking reference
+- Status badge (Pending/Confirmed)
+- View My Trips button
+
+### 6. My Trips Screen (src/screens/tickets/MyTripsScreen.tsx)
+- List of user bookings
+- Fetch using `fetchUserBookings(userId)` from bookingService
+- Show trip cards with status
+- Tap to view full ticket
+- Empty state if no bookings
+- Require authentication
+
+### 7. Profile Screen (src/screens/profile/ProfileScreen.tsx)
+- Display user info (name, email, phone)
+- Edit profile button
+- Account stats (total trips, completed)
+- Sign out button
+- Use `useAuth()` hook
+- Call `updateProfile()` and `signOut()`
+
+## Implementation Steps
+
+### Step 1: Install Dependencies
+```powershell
+cd mobile/customer
+npm install
 ```
 
-**Features:**
-- 2-2 bus layout (4 seats per row)
-- Color-coded seats (available, selected, booked)
-- Driver section at front
-- Aisle in middle
-- Row numbers
-- Selection limit
-- Clear all button
+### Step 2: Create .env File
+Copy `.env.example` to `.env` and add your Supabase credentials.
 
-**Update SeatSelection.tsx:**
-Replace the current seat selection with the new SeatMap component.
+### Step 3: Create Navigation Structure
+Create `src/navigation/AppNavigator.tsx` with React Navigation setup.
 
----
+### Step 4: Create App.tsx
+Wrap app with providers and navigation.
 
-### 3. DPO PayGate Payment Integration
+### Step 5: Create Screens
+Create each screen following the structure above. Reference the provided React component code for UI patterns.
 
-**File Created:**
-- `src/lib/payment.ts` - Complete DPO PayGate integration
+### Step 6: Test
+Run `npm start` and test on Expo Go.
 
-**Environment Variables Needed:**
-```env
-VITE_DPO_COMPANY_TOKEN=your_company_token_here
-VITE_DPO_SERVICE_TYPE=3854
-VITE_DPO_PAYMENT_URL=https://secure.3gdirectpay.com
-VITE_DPO_API_URL=https://secure.3gdirectpay.com/API/v6/
+## Code Patterns to Follow
+
+### Using Auth Context
+```typescript
+import { useAuth } from '../context/AuthContext';
+
+const MyScreen = () => {
+  const { user, signIn, signOut } = useAuth();
+  // ...
+};
 ```
 
-**How to Use:**
+### Using Booking Context
+```typescript
+import { useBooking } from '../context/BookingContext';
 
-```tsx
-import { processPayment } from '@/lib/payment';
+const MyScreen = () => {
+  const { selectedTrip, setSelectedTrip } = useBooking();
+  // ...
+};
+```
 
-const handlePayment = async () => {
-  const result = await processPayment({
-    amount: 500,
-    currency: 'BWP',
-    reference: 'BOOK-12345',
-    customerName: 'John Doe',
-    customerEmail: 'john@example.com',
-    customerPhone: '+26771234567',
-    description: 'Bus ticket: Gaborone to Francistown',
-  });
+### Calling Services
+```typescript
+import { searchTrips } from '../services/tripService';
 
-  if (result.success && result.redirectUrl) {
-    // Redirect to payment page
-    window.location.href = result.redirectUrl;
+const handleSearch = async () => {
+  try {
+    const { outbound, return: returnTrips } = await searchTrips(searchParams);
+    // Handle results
+  } catch (error) {
+    // Handle error
   }
 };
 ```
 
-**Demo Mode:**
-- Currently in demo mode (simulates payments)
-- To enable production: Add your DPO credentials to `.env`
-
-**Payment Flow:**
-1. User completes booking
-2. Call `processPayment()` with booking details
-3. Get payment token from DPO
-4. Redirect user to DPO payment page
-5. User completes payment
-6. DPO redirects back to your callback URL
-7. Verify payment with `verifyPayment()`
-8. Update booking status
-
----
-
-### 4. Email Notification System
-
-**File Created:**
-- `src/lib/notifications.ts` - Email and WhatsApp notifications
-
-**Setup Required:**
-
-**Option A: Supabase Edge Functions (Recommended)**
-
-Create a Supabase Edge Function:
-
-```bash
-cd supabase/functions
-supabase functions new send-email
-```
-
+### Navigation
 ```typescript
-// supabase/functions/send-email/index.ts
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { useNavigation } from '@react-navigation/native';
 
-serve(async (req) => {
-  const { to, subject, html } = await req.json()
+const MyScreen = () => {
+  const navigation = useNavigation();
   
-  // Use Resend, SendGrid, or any email service
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${Deno.env.get('RESEND_API_KEY')}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: 'bookings@kjkhandala.com',
-      to,
-      subject,
-      html,
-    }),
-  })
-  
-  return new Response(JSON.stringify({ success: true }), {
-    headers: { 'Content-Type': 'application/json' },
-  })
-})
+  const goToNextScreen = () => {
+    navigation.navigate('ScreenName', { param: value });
+  };
+};
 ```
 
-**Option B: Direct Integration**
-
-Use services like:
-- **Resend** (recommended): https://resend.com
-- **SendGrid**: https://sendgrid.com
-- **Mailgun**: https://mailgun.com
-
-**How to Use:**
-
-```tsx
-import { sendBookingNotifications } from '@/lib/notifications';
-
-// After successful booking
-const { emailSent, whatsappSent } = await sendBookingNotifications({
-  bookingReference: 'BOOK-12345',
-  passengerName: 'John Doe',
-  passengerEmail: 'john@example.com',
-  passengerPhone: '+26771234567',
-  route: 'Gaborone → Francistown',
-  departureDate: '2025-11-10',
-  departureTime: '08:00',
-  seats: ['1', '2'],
-  totalAmount: 500,
-  currency: 'P',
-});
-```
-
----
-
-### 5. WhatsApp Confirmation Integration
-
-**Included in:** `src/lib/notifications.ts`
-
-**Options:**
-
-**Option A: WhatsApp Business API (Production)**
-- Sign up: https://business.whatsapp.com
-- Get API credentials
-- Integrate with your backend
-
-**Option B: Twilio WhatsApp (Easy Setup)**
-```bash
-npm install twilio
-```
-
-```typescript
-import twilio from 'twilio';
-
-const client = twilio(accountSid, authToken);
-
-await client.messages.create({
-  from: 'whatsapp:+14155238886',
-  to: `whatsapp:${customerPhone}`,
-  body: message,
-});
-```
-
-**Option C: WhatsApp Link (Current Implementation)**
-- Generates WhatsApp Web link
-- Opens with pre-filled message
-- User clicks to send
-
----
-
-### 6. Admin Revenue Reports & Analytics
-
-**Files Created:**
-- `src/components/admin/RevenueChart.tsx` - Revenue visualization
-- `src/components/admin/Statistics.tsx` - Key metrics cards
-- `src/components/admin/RoutePerformance.tsx` - Route analytics
-
-**How to Use:**
-
-Update your Admin Dashboard:
-
-```tsx
-import RevenueChart from '@/components/admin/RevenueChart';
-import Statistics from '@/components/admin/Statistics';
-import RoutePerformance from '@/components/admin/RoutePerformance';
-
-// In your admin dashboard
-<Statistics
-  totalRevenue={50000}
-  totalBookings={250}
-  totalPassengers={450}
-  activeRoutes={12}
-  currency="P"
-  previousPeriod={{ revenue: 45000, bookings: 230 }}
-/>
-
-<RevenueChart
-  data={[
-    { date: '2025-11-01', revenue: 5000, bookings: 25 },
-    { date: '2025-11-02', revenue: 6000, bookings: 30 },
-    // ... more data
-  ]}
-  currency="P"
-/>
-
-<RoutePerformance
-  routes={[
-    {
-      id: '1',
-      origin: 'Gaborone',
-      destination: 'Francistown',
-      totalBookings: 150,
-      totalRevenue: 30000,
-      averageOccupancy: 85,
-    },
-    // ... more routes
-  ]}
-  currency="P"
-/>
-```
-
-**Install Chart Library:**
-```bash
-npm install recharts
-```
-
----
-
-## 🔧 INTEGRATION CHECKLIST
-
-### Step 1: Install Dependencies
-```bash
-# In root directory
-npm install recharts
-
-# In mobile directory
-cd mobile
-npm install
-```
-
-### Step 2: Update App.tsx
-```tsx
-import { CurrencyProvider } from '@/contexts/CurrencyContext';
-
-<CurrencyProvider>
-  <AuthProvider>
-    {/* ... rest of your app */}
-  </AuthProvider>
-</CurrencyProvider>
-```
-
-### Step 3: Add Currency Selector to Navbar
-```tsx
-import CurrencySelector from '@/components/CurrencySelector';
-
-// In Navbar component, add near auth buttons
-<CurrencySelector />
-```
-
-### Step 4: Update SeatSelection Page
-Replace current seat selection with:
-```tsx
-import SeatMap from '@/components/SeatMap';
-```
-
-### Step 5: Update Payment Page
-```tsx
-import { processPayment } from '@/lib/payment';
-import { useCurrency } from '@/contexts/CurrencyContext';
-
-const { currency } = useCurrency();
-// Use currency in payment processing
-```
-
-### Step 6: Add Notifications to Booking Flow
-```tsx
-import { sendBookingNotifications } from '@/lib/notifications';
-
-// After successful booking
-await sendBookingNotifications(bookingDetails);
-```
-
-### Step 7: Update Admin Dashboard
-```tsx
-import RevenueChart from '@/components/admin/RevenueChart';
-import Statistics from '@/components/admin/Statistics';
-import RoutePerformance from '@/components/admin/RoutePerformance';
-
-// Add these components to your dashboard
-```
-
-### Step 8: Configure Environment Variables
-Create `.env` file:
-```env
-# DPO PayGate
-VITE_DPO_COMPANY_TOKEN=your_token
-VITE_DPO_SERVICE_TYPE=3854
-
-# Email Service (choose one)
-VITE_RESEND_API_KEY=your_key
-# OR
-VITE_SENDGRID_API_KEY=your_key
-
-# WhatsApp (optional)
-VITE_TWILIO_ACCOUNT_SID=your_sid
-VITE_TWILIO_AUTH_TOKEN=your_token
-```
-
----
-
-## 📱 MOBILE APP INTEGRATION
-
-All features work in mobile app too! Just import the same utilities:
-
-```typescript
-// In mobile app
-import { formatCurrency, convertCurrency } from '../lib/currency';
-import { processPayment } from '../lib/payment';
-import { sendBookingNotifications } from '../lib/notifications';
-```
-
----
-
-## 🧪 TESTING
-
-### Test Multi-Currency
-1. Click currency selector
-2. Switch between USD, BWP, ZAR
-3. Verify prices update correctly
-
-### Test Seat Map
-1. Go to seat selection
-2. Click seats to select
-3. Try selecting more than max allowed
-4. Verify booked seats can't be selected
-
-### Test Payment (Demo Mode)
-1. Complete booking flow
-2. Click "Pay Now"
-3. Should simulate successful payment
-4. Booking should be confirmed
-
-### Test Notifications
-1. Complete a booking
-2. Check console for email/WhatsApp logs
-3. In production, verify actual emails sent
-
-### Test Admin Analytics
-1. Login as admin
-2. Go to dashboard
-3. View revenue charts
-4. Check route performance
-5. Verify statistics
-
----
-
-## 🚀 PRODUCTION DEPLOYMENT
-
-### Before Going Live:
-
-1. **Get DPO PayGate Credentials**
-   - Sign up at https://www.dpogroup.com
-   - Get Company Token
-   - Test in sandbox first
-
-2. **Set Up Email Service**
-   - Choose: Resend, SendGrid, or Mailgun
-   - Get API key
-   - Configure domain
-
-3. **WhatsApp Business API**
-   - Apply for WhatsApp Business API
-   - Or use Twilio for quick setup
-
-4. **Update Exchange Rates**
-   - Use live API (e.g., exchangerate-api.com)
-   - Update rates daily
-
-5. **Configure Production URLs**
-   - Update callback URLs
-   - Set production API endpoints
-
----
-
-## 📊 FEATURES SUMMARY
-
-| Feature | Status | File Location |
-|---------|--------|---------------|
-| Multi-Currency | ✅ Complete | `src/lib/currency.ts` |
-| Seat Map | ✅ Complete | `src/components/SeatMap.tsx` |
-| DPO PayGate | ✅ Complete | `src/lib/payment.ts` |
-| Email Notifications | ✅ Complete | `src/lib/notifications.ts` |
-| WhatsApp | ✅ Complete | `src/lib/notifications.ts` |
-| Revenue Charts | ✅ Complete | `src/components/admin/RevenueChart.tsx` |
-| Statistics | ✅ Complete | `src/components/admin/Statistics.tsx` |
-| Route Performance | ✅ Complete | `src/components/admin/RoutePerformance.tsx` |
-
----
-
-## 🎉 YOU'RE READY!
-
-All features are implemented and ready to use. Follow the integration steps above to activate them in your application.
-
-**Need Help?**
-- Check the code comments in each file
-- All functions have JSDoc documentation
-- Example usage included in each file
-
-**Next Steps:**
-1. Install dependencies
-2. Follow integration checklist
-3. Test each feature
-4. Configure production services
-5. Deploy!
-
----
-
-**Built for KJ Khandala Travel & Tours** 🚌
+## Styling Guidelines
+
+- Use StyleSheet.create() for styles
+- Follow the color scheme:
+  - Primary: #2563eb (blue)
+  - Secondary: #10b981 (green)
+  - Danger: #ef4444 (red)
+  - Background: #f9fafb
+  - Text: #111827
+- Use consistent spacing (8, 12, 16, 24, 32)
+- Use rounded corners (borderRadius: 8)
+- Add shadows for cards
+
+## Error Handling
+
+- Wrap async calls in try-catch
+- Show user-friendly error messages
+- Use ActivityIndicator for loading states
+- Disable buttons during loading
+
+## Testing Checklist
+
+- [ ] Sign up new user
+- [ ] Sign in existing user
+- [ ] Search for trips
+- [ ] Select trip
+- [ ] Choose seat
+- [ ] Enter passenger details
+- [ ] Complete booking
+- [ ] View ticket
+- [ ] View my trips
+- [ ] Edit profile
+- [ ] Sign out
+
+## Next Steps
+
+1. Create the navigation structure
+2. Create App.tsx with providers
+3. Create authentication screens
+4. Create home screen with search
+5. Create booking flow screens
+6. Create profile and tickets screens
+7. Test end-to-end flow
+8. Add error handling and loading states
+9. Polish UI/UX
+10. Test on physical devices
+
+## Resources
+
+- [React Navigation Docs](https://reactnavigation.org/)
+- [Expo Docs](https://docs.expo.dev/)
+- [Supabase Docs](https://supabase.com/docs)
+- [React Native Docs](https://reactnative.dev/)
+
+## Support
+
+Refer to the main BMS documentation and frontend code for business logic reference.

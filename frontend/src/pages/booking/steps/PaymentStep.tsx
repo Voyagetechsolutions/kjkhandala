@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { ensureTripExists } from '@/lib/trip-utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,12 +53,15 @@ export default function PaymentStep({
     setProcessing(true);
 
     try {
+      // Ensure trip exists in database (handles projected trips)
+      const actualTrip = await ensureTripExists(trip);
+      
       const isOfficePayment = paymentMethod === 'pay_at_office';
       const reservationExpiry = isOfficePayment ? calculateReservationExpiry() : null;
 
       // Create bookings for each passenger
       const bookings = passengers.map((passenger, index) => ({
-        trip_id: trip.id,
+        trip_id: actualTrip.id,
         passenger_name: passenger.fullName,
         passenger_email: passenger.email,
         passenger_phone: passenger.mobile || passenger.phone,

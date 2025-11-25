@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "KJ Khandala Travel",
+    "slug": "kj-khandala",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "backgroundColor": "#2563eb",
+      "resizeMode": "contain"
+    },
+    "icon": "./assets/logo.png",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kjkhandala.customer"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/logo.png",
+        "backgroundColor": "#2563eb"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.kjkhandala.customer"
+    },
+    "plugins": [
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "42ba93c7-6802-4a9d-b090-641134ae4123"
+      }
+    },
+    "owner": "voyagetechsolutions"
+  }
+}

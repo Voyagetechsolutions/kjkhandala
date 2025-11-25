@@ -136,11 +136,15 @@ export default function SearchTrips() {
           status: 'SCHEDULED',
           total_seats: schedule.buses?.seating_capacity || 60,
           available_seats: schedule.buses?.seating_capacity || 60,
+          route_id: schedule.route_id,
+          bus_id: schedule.bus_id,
           routes: {
+            id: schedule.route_id,
             origin: schedule.routes?.origin,
             destination: schedule.routes?.destination,
           },
           buses: {
+            id: schedule.bus_id,
             name: schedule.buses?.registration_number || schedule.buses?.name || 'TBA',
             bus_type: schedule.buses?.bus_type || 'Standard',
           },

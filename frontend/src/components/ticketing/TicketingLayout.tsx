@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { 
   Bus, LayoutDashboard, LogOut, Ticket, CreditCard, Users, FileText,
-  RefreshCw, AlertTriangle, BarChart3, Search, Clock
+  RefreshCw, AlertTriangle, BarChart3, Search, Clock, Menu, X, ClipboardList
 } from "lucide-react";
 
 interface TicketingLayoutProps {
@@ -14,6 +14,7 @@ interface TicketingLayoutProps {
 export default function TicketingLayout({ children }: TicketingLayoutProps) {
   const location = useLocation();
   const { signOut } = useAuth();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const menuItems = [
     { path: "/ticketing", icon: LayoutDashboard, label: "Control Panel" },
@@ -27,14 +28,35 @@ export default function TicketingLayout({ children }: TicketingLayoutProps) {
     { path: "/ticketing/modify-booking", icon: RefreshCw, label: "Modify Booking" },
     { path: "/ticketing/cancel-refund", icon: AlertTriangle, label: "Cancel & Refund" },
     { path: "/ticketing/customer-lookup", icon: Users, label: "Customer Lookup" },
+    { path: "/ticketing/passenger-manifest", icon: ClipboardList, label: "Passenger Manifest" },
     { path: "/ticketing/reports", icon: BarChart3, label: "Reports" },
   ];
 
   return (
     <div className="min-h-screen flex">
+      {/* Mobile Menu Button */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-card border-b px-4 py-3 flex items-center justify-between">
+        <Link to="/ticketing" className="flex items-center gap-2">
+          <Bus className="h-6 w-6 text-primary" />
+          <span className="font-bold text-lg">KJ Khandala</span>
+        </Link>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        >
+          {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        </Button>
+      </div>
+
       {/* Sidebar */}
-      <aside className="w-64 bg-card border-r flex flex-col">
-        <div className="p-6 border-b">
+      <aside className={`
+        fixed lg:static inset-y-0 left-0 z-40
+        w-64 bg-card border-r flex flex-col
+        transform transition-transform duration-300 ease-in-out
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        <div className="p-6 border-b hidden lg:block">
           <Link to="/ticketing" className="flex items-center gap-2">
             <Bus className="h-6 w-6 text-primary" />
             <div>
@@ -77,9 +99,17 @@ export default function TicketingLayout({ children }: TicketingLayoutProps) {
         </div>
       </aside>
 
+      {/* Overlay for mobile */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        <div className="container mx-auto px-6 py-8">
+        <div className="container mx-auto px-4 sm:px-6 py-8 mt-16 lg:mt-0">
           {children}
         </div>
       </main>

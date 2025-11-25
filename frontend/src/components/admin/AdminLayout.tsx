@@ -8,7 +8,8 @@ import {
   ChevronDown, ChevronRight, Ticket, CreditCard, UserCheck, Receipt, 
   AlertTriangle, Clock, BarChart3, Warehouse, CalendarClock, ClipboardCheck,
   Package, Coins, UserPlus, Calendar, Award, FileCheck, Wallet, TrendingUp,
-  Calculator, Fuel, FileSpreadsheet, RefreshCw, Search, Plus, UserCog, Activity
+  Calculator, Fuel, FileSpreadsheet, RefreshCw, Search, Plus, UserCog, Activity,
+  Menu, X, ClipboardList
 } from "lucide-react";
 import {
   Collapsible,
@@ -24,7 +25,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const location = useLocation();
   const { signOut } = useAuth();
 
-  // State for collapsible sections
+  // State for collapsible sections and mobile menu
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openSections, setOpenSections] = useState({
     operations: false,
     finance: false,
@@ -57,6 +59,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         { path: "/admin", icon: LayoutDashboard, label: "Command Center" },
         { path: "/admin/trips", icon: Activity, label: "Trip Scheduling" },
         { path: "/admin/trip-management", icon: Calendar, label: "Trip Management" },
+        { path: "/admin/assign-bus", icon: Bus, label: "Assign Bus" },
         { path: "/admin/driver-shifts", icon: UserCog, label: "Driver Shifts" },
         { path: "/admin/fleet", icon: Truck, label: "Fleet Management" },
         { path: "/admin/drivers", icon: Users, label: "Driver Management" },
@@ -65,6 +68,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         { path: "/admin/route-management", icon: MapPin, label: "Route Management" },
         { path: "/admin/incidents", icon: AlertTriangle, label: "Incident Management" },
         { path: "/admin/delays", icon: Clock, label: "Delay Management" },
+        { path: "/admin/passenger-manifest", icon: ClipboardList, label: "Passenger Manifest" },
         { path: "/admin/reports", icon: BarChart3, label: "Reports and Analytics" },
         { path: "/admin/terminal", icon: Building2, label: "Terminal Operations" },
       ]
@@ -142,9 +146,29 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="min-h-screen flex">
+      {/* Mobile Menu Button */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-card border-b px-4 py-3 flex items-center justify-between">
+        <Link to="/admin" className="flex items-center gap-2">
+          <Bus className="h-6 w-6 text-primary" />
+          <span className="font-bold text-lg">KJ Khandala</span>
+        </Link>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        >
+          {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        </Button>
+      </div>
+
       {/* Sidebar */}
-      <aside className="w-64 bg-card border-r flex flex-col">
-        <div className="p-6 border-b">
+      <aside className={`
+        fixed lg:static inset-y-0 left-0 z-40
+        w-64 bg-card border-r flex flex-col
+        transform transition-transform duration-300 ease-in-out
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        <div className="p-6 border-b hidden lg:block">
           <Link to="/admin" className="flex items-center gap-2">
             <Bus className="h-6 w-6 text-primary" />
             <div>
@@ -332,9 +356,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </div>
       </aside>
 
+      {/* Overlay for mobile */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        <div className="container mx-auto px-6 py-8">
+        <div className="container mx-auto px-4 sm:px-6 py-8 mt-16 lg:mt-0">
           {children}
         </div>
       </main>

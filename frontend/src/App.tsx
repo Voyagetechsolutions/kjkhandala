@@ -46,11 +46,16 @@ import ReportsAnalytics from "./pages/admin/ReportsAnalytics";
 import UserManagement from "./pages/admin/UserManagement";
 import SystemSettings from "./pages/admin/SystemSettings";
 import PassengerManifest from "./pages/admin/PassengerManifest";
+import AssignBus from "./pages/admin/AssignBus";
 import OperationsDashboard from "./pages/operations/OperationsDashboard";
+import OperationsAssignBus from "./pages/operations/AssignBus";
 import OperationsManifest from "./pages/operations/PassengerManifest";
+import OperationsTripScheduling from "./pages/operations/TripScheduling";
 import TripManagement from "./pages/operations/TripManagement";
 import AutomatedTripManagement from "./pages/operations/AutomatedTripManagement";
 import ShiftCalendar from "./pages/operations/ShiftCalendar";
+import AdminShiftCalendar from "./pages/admin/ShiftCalendar";
+import AdminAutomatedTripManagement from "./pages/admin/AutomatedTripManagement";
 import FleetOperations from "./pages/operations/FleetOperations";
 import OperationsFleetManagement from "./pages/operations/FleetManagement";
 import DriverOperations from "./pages/operations/DriverOperations";
@@ -187,8 +192,8 @@ const App = () => (
             <Route path="/admin/drivers" element={<DriverManagement />} />
             <Route path="/admin/route-management" element={<RouteManagement />} />
             <Route path="/admin/trips" element={<TripScheduling />} />
-            <Route path="/admin/trip-management" element={<AutomatedTripManagement />} />
-            <Route path="/admin/driver-shifts" element={<ShiftCalendar />} />
+            <Route path="/admin/trip-management" element={<AdminAutomatedTripManagement />} />
+            <Route path="/admin/driver-shifts" element={<AdminShiftCalendar />} />
             <Route path="/admin/manifest" element={<PassengerManifest />} />
             <Route path="/admin/finance" element={<FinanceManagement />} />
             <Route path="/admin/hr" element={<HRManagement />} />
@@ -204,6 +209,8 @@ const App = () => (
             <Route path="/admin/offices" element={<AdminOffices />} />
             <Route path="/admin/incidents" element={<IncidentManagement />} />
             <Route path="/admin/delays" element={<DelayManagement />} />
+            <Route path="/admin/passenger-manifest" element={<PassengerManifest />} />
+            <Route path="/admin/assign-bus" element={<AssignBus />} />
             <Route path="/admin/terminal" element={<TerminalOperations />} />
             <Route path="/book" element={<TripSearch />} />
             <Route path="/book/passengers" element={<PassengerDetails />} />
@@ -212,7 +219,7 @@ const App = () => (
             <Route path="/book/eticket" element={<ETicket />} />
             <Route path="/operations" element={<OperationsDashboard />} />
             <Route path="/operations/test" element={<RoutingTest />} />
-            <Route path="/operations/trips" element={<TripScheduling />} />
+            <Route path="/operations/trips" element={<OperationsTripScheduling />} />
             <Route path="/operations/trip-management" element={<AutomatedTripManagement />} />
             <Route path="/operations/driver-shifts" element={<ShiftCalendar />} />
             <Route path="/operations/fleet" element={<FleetManagement />} />
@@ -222,6 +229,8 @@ const App = () => (
             <Route path="/operations/routes" element={<RouteManagement />} />
             <Route path="/operations/incidents" element={<IncidentManagement />} />
             <Route path="/operations/delays" element={<DelayManagement />} />
+            <Route path="/operations/passenger-manifest" element={<OperationsManifest />} />
+            <Route path="/operations/assign-bus" element={<OperationsAssignBus />} />
             <Route path="/operations/reports" element={<ReportsAnalytics />} />
             <Route path="/operations/terminal" element={<TerminalOperations />} />
             <Route path="/operations/settings" element={<OperationsSettings />} />
@@ -240,6 +249,7 @@ const App = () => (
             <Route path="/ticketing/modify-booking" element={<ModifyBooking />} />
             <Route path="/ticketing/cancel-refund" element={<CancelRefund />} />
             <Route path="/ticketing/customer-lookup" element={<CustomerLookup />} />
+            <Route path="/ticketing/passenger-manifest" element={<TicketingManifest />} />
             <Route path="/ticketing/trip-management" element={<TicketingTripManagement />} />
             <Route path="/ticketing/office-admin" element={<OfficeAdmin />} />
             <Route path="/ticketing/reserved" element={<ReservedTickets />} />
