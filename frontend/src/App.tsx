@@ -356,6 +356,7 @@ const App = () => (
             <Route path="/admin/hr/compliance" element={<Compliance />} />
             <Route path="/admin/hr/recruitment" element={<AdminRecruitment />} />
             <Route path="/admin/hr/performance" element={<Performance />} />
+            <Route path="/admin/hr/payroll" element={<HRPayroll />} />
             <Route path="/admin/hr/support" element={<AdminSupport />} />
             <Route path="/admin/hr/reports" element={<HRReports />} />
             <Route path="/admin/hr/settings" element={<HRSettings />} />
