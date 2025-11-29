@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Users, UserPlus, DollarSign, Calendar, TrendingUp, AlertCircle, CheckCircle, Upload } from 'lucide-react';
+import { Users, UserPlus, DollarSign, Calendar, TrendingUp, AlertCircle, CheckCircle, Upload, Eye, EyeOff } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import {
@@ -30,6 +30,8 @@ export default function HRManagement() {
   const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [createDashboardAccount, setCreateDashboardAccount] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
@@ -686,52 +688,98 @@ export default function HRManagement() {
               Add New Employee
             </DialogTitle>
             <DialogDescription>
-              Register a new employee or staff member
+              Create a new employee account. Login credentials will be sent to their email.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleAddEmployee} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="full_name">Full Name</Label>
-                <Input id="full_name" name="full_name" placeholder="John Doe" required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" name="email" type="email" placeholder="john@example.com" required />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email *</Label>
+              <Input id="email" name="email" type="email" placeholder="employee@example.com" required />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" name="phone" placeholder="+267 1234567" required />
+            
+            <div className="space-y-2">
+              <Label htmlFor="password">Password (optional)</Label>
+              <div className="relative">
+                <Input 
+                  id="password" 
+                  name="password" 
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Leave blank to auto-generate"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="position">Position</Label>
-                <Input id="position" name="position" placeholder="e.g., Manager" required />
-              </div>
+              <p className="text-xs text-muted-foreground">
+                If left blank, a secure password will be generated and sent to the employee's email.
+              </p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="department">Department</Label>
-                <select id="department" name="department" className="w-full px-3 py-2 border rounded-lg" required>
-                  <option value="">Select department</option>
-                  <option value="operations">Operations</option>
-                  <option value="finance">Finance</option>
-                  <option value="hr">Human Resources</option>
-                  <option value="maintenance">Maintenance</option>
-                  <option value="customer_service">Customer Service</option>
-                  <option value="management">Management</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="salary">Monthly Salary (BWP)</Label>
-                <Input id="salary" name="salary" type="number" step="0.01" placeholder="5000.00" required />
-              </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="full_name">Full Name *</Label>
+              <Input id="full_name" name="full_name" placeholder="John Doe" required />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number</Label>
+              <Input id="phone" name="phone" placeholder="+267 1234567" />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="department">Department</Label>
+              <select id="department" name="department" className="w-full px-3 py-2 border rounded-lg">
+                <option value="">Select department</option>
+                <option value="Operations">Operations</option>
+                <option value="Finance">Finance</option>
+                <option value="Human Resources">Human Resources</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Ticketing">Ticketing</option>
+                <option value="Management">Management</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="position">Position</Label>
+              <select id="position" name="position" className="w-full px-3 py-2 border rounded-lg">
+                <option value="">Select position</option>
+                <option value="Manager">Manager</option>
+                <option value="Supervisor">Supervisor</option>
+                <option value="Officer">Officer</option>
+                <option value="Agent">Agent</option>
+                <option value="Technician">Technician</option>
+                <option value="Driver">Driver</option>
+              </select>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="hire_date">Hire Date</Label>
-              <Input id="hire_date" name="hire_date" type="date" required />
+              <Input id="hire_date" name="hire_date" type="date" />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="salary">Salary (P)</Label>
+              <Input id="salary" name="salary" type="number" step="0.01" placeholder="0.00" />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="create_dashboard"
+                checked={createDashboardAccount}
+                onChange={(e) => setCreateDashboardAccount(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="create_dashboard" className="font-normal cursor-pointer">
+                Create Dashboard Account
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground ml-6">
+              Enable this to give the employee access to the system dashboard
+            </p>
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="outline" onClick={() => setAddEmployeeOpen(false)}>
                 Cancel

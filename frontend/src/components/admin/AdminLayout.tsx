@@ -9,7 +9,7 @@ import {
   AlertTriangle, Clock, BarChart3, Warehouse, CalendarClock, ClipboardCheck,
   Package, Coins, UserPlus, Calendar, Award, FileCheck, Wallet, TrendingUp,
   Calculator, Fuel, FileSpreadsheet, RefreshCw, Search, Plus, UserCog, Activity,
-  Menu, X, ClipboardList
+  Menu, X, ClipboardList, Headphones, PieChart
 } from "lucide-react";
 import {
   Collapsible,
@@ -37,16 +37,22 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const toggleSection = (section: keyof typeof openSections) => {
     setOpenSections(prev => {
-      // Close all sections first
-      const allClosed = {
-        operations: false,
-        finance: false,
-        ticketing: false,
-        hr: false,
-        maintenance: false,
-      };
-      // Then open only the clicked section (toggle behavior)
-      return { ...allClosed, [section]: !prev[section] };
+      const isCurrentlyOpen = prev[section];
+      
+      if (isCurrentlyOpen) {
+        // If clicking on an open section, just close it
+        return { ...prev, [section]: false };
+      } else {
+        // If opening a new section, close all others and open this one
+        const allClosed = {
+          operations: false,
+          finance: false,
+          ticketing: false,
+          hr: false,
+          maintenance: false,
+        };
+        return { ...allClosed, [section]: true };
+      }
     });
   };
 
@@ -71,6 +77,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         { path: "/admin/passenger-manifest", icon: ClipboardList, label: "Passenger Manifest" },
         { path: "/admin/reports", icon: BarChart3, label: "Reports and Analytics" },
         { path: "/admin/terminal", icon: Building2, label: "Terminal Operations" },
+        { path: "/admin/terminal-management", icon: Building2, label: "Terminal Management" },
       ]
     },
     finance: {
@@ -80,6 +87,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         { path: "/admin/finance", icon: LayoutDashboard, label: "Finance Home" },
         { path: "/admin/finance/income", icon: TrendingUp, label: "Income Management" },
         { path: "/admin/finance/expenses", icon: Receipt, label: "Expense Management" },
+        { path: "/admin/finance/revenue-analysis", icon: PieChart, label: "Revenue Analysis" },
         { path: "/admin/finance/payroll", icon: Wallet, label: "Payroll Management" },
         { path: "/admin/finance/fuel-allowance", icon: Fuel, label: "Fuel and Allowance" },
         { path: "/admin/finance/invoices", icon: FileText, label: "Invoice and Billing" },
@@ -94,15 +102,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       items: [
         { path: "/admin/ticketing", icon: LayoutDashboard, label: "Control Panel" },
         { path: "/admin/ticketing/search-trips", icon: Search, label: "Search Trips" },
-        { path: "/admin/ticketing/seat-selection", icon: LayoutDashboard, label: "Seat Selection" },
-        { path: "/admin/ticketing/passenger-details", icon: Users, label: "Passenger Details" },
-        { path: "/admin/ticketing/payment", icon: CreditCard, label: "Payment" },
-        { path: "/admin/ticketing/booking-summary", icon: FileText, label: "Booking Summary" },
-        { path: "/admin/ticketing/issue-ticket", icon: Ticket, label: "Issue Ticket" },
+        { path: "/admin/ticketing/reserved", icon: Clock, label: "Reserved Seats" },
         { path: "/admin/ticketing/modify-booking", icon: RefreshCw, label: "Modify Booking" },
         { path: "/admin/ticketing/cancel-refund", icon: AlertTriangle, label: "Cancel & Refund" },
         { path: "/admin/ticketing/customer-lookup", icon: Users, label: "Customer Lookup" },
-        { path: "/admin/ticketing/office-admin", icon: Settings, label: "Office Admin" },
         { path: "/admin/ticketing/reports", icon: BarChart3, label: "Reports" },
       ]
     },
@@ -118,6 +121,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         { path: "/admin/hr/performance", icon: Award, label: "Performance" },
         { path: "/admin/hr/compliance", icon: FileCheck, label: "Compliance" },
         { path: "/admin/hr/leave", icon: Calendar, label: "Leave" },
+        { path: "/admin/hr/support", icon: Headphones, label: "Customer Support" },
         { path: "/admin/hr/reports", icon: BarChart3, label: "Reports" },
         { path: "/admin/hr/settings", icon: Settings, label: "Settings" },
         { path: "/admin/hr/documents", icon: FileText, label: "Documents" },

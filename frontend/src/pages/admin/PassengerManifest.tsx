@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -79,21 +80,43 @@ export default function PassengerManifest() {
     },
   });
 
-  // Fetch bookings for selected trip
+  // Fetch bookings for selected trip (includes all passengers who booked for that route on that date)
   const { data: bookings, isLoading: isBookingsLoading } = useQuery({
     queryKey: ['trip-bookings', selectedTrip],
     queryFn: async () => {
       if (!selectedTrip) return [];
+      
+      // Get the selected trip details
+      const selectedTripData = trips?.find(t => t.id === selectedTrip);
+      if (!selectedTripData) return [];
+      
+      // Extract date from scheduled_departure
+      const tripDate = new Date(selectedTripData.scheduled_departure).toISOString().split('T')[0];
+      
+      // Fetch all bookings for this route on this date
+      const { data: tripsOnDate, error: tripsError } = await supabase
+        .from('trips')
+        .select('id')
+        .eq('route_id', selectedTripData.routes ? (selectedTripData.routes as any).id : null)
+        .gte('scheduled_departure', `${tripDate}T00:00:00`)
+        .lte('scheduled_departure', `${tripDate}T23:59:59`);
+      
+      if (tripsError) throw tripsError;
+      
+      const tripIds = tripsOnDate?.map(t => t.id) || [selectedTrip];
+      
+      // Fetch all bookings for these trips
       const { data, error } = await supabase
         .from('bookings')
         .select('*')
-        .eq('trip_id', selectedTrip)
+        .in('trip_id', tripIds)
         .in('payment_status', ['completed', 'paid'])
         .order('seat_number');
+      
       if (error) throw error;
       return data as Booking[];
     },
-    enabled: !!selectedTrip,
+    enabled: !!selectedTrip && !!trips,
   });
 
   // Get selected trip data
@@ -217,7 +240,8 @@ export default function PassengerManifest() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <AdminLayout>
+      <div className="space-y-6 p-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold mb-2">Passenger Manifests</h1>
@@ -451,6 +475,7 @@ export default function PassengerManifest() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </AdminLayout>
   );
 }

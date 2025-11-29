@@ -18,11 +18,23 @@ export default function LiveTracking({ Layout = AdminLayout }) {
   const [selectedBus, setSelectedBus] = useState<string | null>(null);
   const [mapView, setMapView] = useState<'all' | 'active' | 'alerts'>('all');
 
-  // Fetch GPS tracking data
+  // Fetch all buses with their tracking data
   const { data: trackingData, isLoading } = useQuery({
     queryKey: ['live-tracking'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Fetch all buses in the system
+      const { data: busesData, error: busesError } = await supabase
+        .from('buses')
+        .select(`
+          *,
+          gps_tracking:gps_tracking(latitude, longitude, speed, timestamp, fuel_level)
+        `)
+        .order('registration_number');
+      
+      if (busesError) throw busesError;
+      
+      // Fetch active trips for additional context
+      const { data: tripsData, error: tripsError } = await supabase
         .from('trips')
         .select(`
           *,
@@ -30,10 +42,27 @@ export default function LiveTracking({ Layout = AdminLayout }) {
           bus:buses(*),
           driver:drivers(*)
         `)
-        .eq('status', 'in_progress')
-        .order('scheduled_departure');
-      if (error) throw error;
-      return { trips: data || [] };
+        .in('status', ['SCHEDULED', 'BOARDING', 'DEPARTED', 'IN_PROGRESS'])
+        .order('departure_date');
+      
+      if (tripsError) throw tripsError;
+      
+      // Merge bus data with trip data
+      const buses = (busesData || []).map(bus => {
+        const activeTrip = (tripsData || []).find(trip => trip.bus_id === bus.id);
+        const latestTracking = bus.gps_tracking?.[0] || {};
+        return {
+          ...bus,
+          latitude: latestTracking.latitude,
+          longitude: latestTracking.longitude,
+          speed: latestTracking.speed || 0,
+          timestamp: latestTracking.timestamp,
+          fuel_level: latestTracking.fuel_level,
+          activeTrip
+        };
+      });
+      
+      return { trips: buses, activeTrips: tripsData || [] };
     },
     refetchInterval: 10000, // Refresh every 10 seconds
   });
@@ -75,10 +104,10 @@ export default function LiveTracking({ Layout = AdminLayout }) {
   // Calculate stats
   const trips = trackingData?.trips || [];
   const totalBuses = trips.length || 0;
-  const activeBuses = trips.filter((t: any) => t.location && t.location.speed > 0).length || 0;
-  const idleBuses = trips.filter((t: any) => !t.location || t.location.speed === 0).length || 0;
+  const activeBuses = trips.filter((t: any) => t.speed > 0).length || 0;
+  const idleBuses = trips.filter((t: any) => t.speed === 0 || !t.speed).length || 0;
   const alertBuses = trips.filter((t: any) => 
-    (t.location?.speed && t.location.speed > 120) // Speeding
+    (t.speed && t.speed > 120) || (t.fuel_level && t.fuel_level < 20) // Speeding or low fuel
   ).length || 0;
 
   const getSpeedColor = (speed: number) => {
@@ -229,14 +258,17 @@ export default function LiveTracking({ Layout = AdminLayout }) {
                       <div key={tracking.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border">
                         <span className="text-2xl">{getBusStatusIcon(tracking)}</span>
                         <div className="flex-1">
-                          <p className="font-medium text-sm">{tracking.buses?.bus_number}</p>
+                          <p className="font-medium text-sm">{tracking.registration_number}</p>
                           <p className="text-xs text-muted-foreground">
-                            Lat: {tracking.latitude?.toFixed(6)}, Lng: {tracking.longitude?.toFixed(6)}
+                            {tracking.latitude && tracking.longitude ? 
+                              `Lat: ${tracking.latitude.toFixed(6)}, Lng: ${tracking.longitude.toFixed(6)}` :
+                              'No GPS data'
+                            }
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className={`font-bold ${getSpeedColor(tracking.speed)}`}>
-                            {tracking.speed} km/h
+                          <p className={`font-bold ${getSpeedColor(tracking.speed || 0)}`}>
+                            {tracking.speed || 0} km/h
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {tracking.timestamp ? format(new Date(tracking.timestamp), 'HH:mm:ss') : 'N/A'}
@@ -280,13 +312,18 @@ export default function LiveTracking({ Layout = AdminLayout }) {
                             <div className="flex items-center gap-3">
                               <span className="text-2xl">{getBusStatusIcon(tracking)}</span>
                               <div>
-                                <p className="font-semibold">{tracking.buses?.bus_number}</p>
-                                <p className="text-sm text-muted-foreground">{tracking.buses?.model}</p>
+                                <p className="font-semibold">{tracking.registration_number}</p>
+                                <p className="text-sm text-muted-foreground">{tracking.model || 'N/A'}</p>
+                                {tracking.activeTrip && (
+                                  <p className="text-xs text-green-600 font-medium mt-1">
+                                    On Trip: {tracking.activeTrip.routes?.origin} → {tracking.activeTrip.routes?.destination}
+                                  </p>
+                                )}
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className={`text-lg font-bold ${getSpeedColor(tracking.speed)}`}>
-                                {tracking.speed} km/h
+                              <p className={`text-lg font-bold ${getSpeedColor(tracking.speed || 0)}`}>
+                                {tracking.speed || 0} km/h
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 {tracking.timestamp ? format(new Date(tracking.timestamp), 'HH:mm:ss') : 'N/A'}
@@ -298,12 +335,15 @@ export default function LiveTracking({ Layout = AdminLayout }) {
                             <div>
                               <p className="text-muted-foreground">Location</p>
                               <p className="font-mono text-xs">
-                                {tracking.latitude?.toFixed(4)}, {tracking.longitude?.toFixed(4)}
+                                {tracking.latitude && tracking.longitude ? 
+                                  `${tracking.latitude.toFixed(4)}, ${tracking.longitude.toFixed(4)}` :
+                                  'No GPS data'
+                                }
                               </p>
                             </div>
                             <div>
                               <p className="text-muted-foreground">Fuel Level</p>
-                              <p className={tracking.fuel_level < 20 ? 'text-red-600 font-bold' : ''}>
+                              <p className={tracking.fuel_level && tracking.fuel_level < 20 ? 'text-red-600 font-bold' : ''}>
                                 {tracking.fuel_level ? `${tracking.fuel_level}%` : 'N/A'}
                               </p>
                             </div>

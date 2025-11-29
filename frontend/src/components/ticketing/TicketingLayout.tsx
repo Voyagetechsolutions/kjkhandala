@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { 
   Bus, LayoutDashboard, LogOut, Ticket, CreditCard, Users, FileText,
-  RefreshCw, AlertTriangle, BarChart3, Search, Clock, Menu, X, ClipboardList
+  RefreshCw, AlertTriangle, BarChart3, Search, Clock, Menu, X, ClipboardList, Building2
 } from "lucide-react";
 
 interface TicketingLayoutProps {
@@ -18,17 +18,12 @@ export default function TicketingLayout({ children }: TicketingLayoutProps) {
 
   const menuItems = [
     { path: "/ticketing", icon: LayoutDashboard, label: "Control Panel" },
+    { path: "/ticketing/terminal-screen", icon: Building2, label: "Terminal Screen" },
     { path: "/ticketing/search-trips", icon: Search, label: "Search Trips" },
-    { path: "/ticketing/reserved", icon: Clock, label: "Reserved Tickets" },
-    { path: "/ticketing/seat-selection", icon: LayoutDashboard, label: "Seat Selection" },
-    { path: "/ticketing/passenger-details", icon: Users, label: "Passenger Details" },
-    { path: "/ticketing/payment", icon: CreditCard, label: "Payment" },
-    { path: "/ticketing/booking-summary", icon: FileText, label: "Booking Summary" },
-    { path: "/ticketing/issue-ticket", icon: Ticket, label: "Issue Ticket" },
+    { path: "/ticketing/reserved", icon: Clock, label: "Reserved Seats" },
     { path: "/ticketing/modify-booking", icon: RefreshCw, label: "Modify Booking" },
     { path: "/ticketing/cancel-refund", icon: AlertTriangle, label: "Cancel & Refund" },
     { path: "/ticketing/customer-lookup", icon: Users, label: "Customer Lookup" },
-    { path: "/ticketing/passenger-manifest", icon: ClipboardList, label: "Passenger Manifest" },
     { path: "/ticketing/reports", icon: BarChart3, label: "Reports" },
   ];
 

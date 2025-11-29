@@ -66,6 +66,7 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/tracking', require('./routes/tracking'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/payments', require('./routes/payments')); // Payment routes
 // Centralized bridge API
 app.use('/api/bridge', require('./routes/bridge'));
 // Also expose at /bridge for frontend compatibility

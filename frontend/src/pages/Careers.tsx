@@ -34,7 +34,7 @@ export default function Careers() {
         .from('job_postings')
         .select('*')
         .eq('status', 'active')
-        .order('created_at', { ascending: false });
+        .order('posted_at', { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -70,10 +70,9 @@ export default function Careers() {
           phone: applicationData.phone,
           resume_url: resumeUrl,
           cover_letter: applicationData.coverLetter,
-          linkedin_url: applicationData.linkedIn,
-          portfolio_url: applicationData.portfolio,
-          status: 'submitted',
-          application_date: new Date().toISOString()
+          experience: '', // Can be added to form if needed
+          status: 'pending',
+          applied_at: new Date().toISOString()
         }])
         .select()
         .single();
@@ -87,7 +86,14 @@ export default function Careers() {
       setShowApplicationDialog(false);
       setSelectedJob(null);
       setResumeFile(null);
-      setFormData({ fullName: '', email: '', phone: '', coverLetter: '', linkedIn: '', portfolio: '' });
+      setFormData({
+        fullName: '',
+        email: '',
+        phone: '',
+        coverLetter: '',
+        linkedIn: '',
+        portfolio: ''
+      });
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to submit application');

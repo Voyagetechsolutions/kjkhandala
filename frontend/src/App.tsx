@@ -9,7 +9,6 @@ import { CurrencyProvider } from './contexts/CurrencyContext';
 import Navbar from "./components/Navbar";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import RoutesPage from "./pages/Routes";
 import OurCoaches from "./pages/OurCoaches";
 import BookingOffices from "./pages/BookingOffices";
 import Contact from "./pages/Contact";
@@ -56,6 +55,8 @@ import AutomatedTripManagement from "./pages/operations/AutomatedTripManagement"
 import ShiftCalendar from "./pages/operations/ShiftCalendar";
 import AdminShiftCalendar from "./pages/admin/ShiftCalendar";
 import AdminAutomatedTripManagement from "./pages/admin/AutomatedTripManagement";
+import AdminSupport from "./pages/admin/Support";
+import AdminRecruitment from "./pages/admin/Recruitment";
 import FleetOperations from "./pages/operations/FleetOperations";
 import OperationsFleetManagement from "./pages/operations/FleetManagement";
 import DriverOperations from "./pages/operations/DriverOperations";
@@ -64,6 +65,9 @@ import IncidentManagement from "./pages/operations/IncidentManagement";
 import DelayManagement from "./pages/operations/DelayManagement";
 import OperationsReports from "./pages/operations/OperationsReports";
 import TerminalOperations from "./pages/operations/TerminalOperations";
+import TerminalManagement from "./pages/admin/TerminalManagement";
+import AdminTerminalOperations from "./pages/admin/TerminalOperations";
+import TerminalScreen from "./pages/ticketing/TerminalScreen";
 import OperationsSettings from "./pages/operations/OperationsSettings";
 import RoutingTest from "./pages/operations/RoutingTest";
 import OperationsLiveTracking from "./pages/operations/LiveTracking";
@@ -106,6 +110,7 @@ import Fuel from "./pages/finance/Fuel";
 import Invoice from "./pages/finance/Invoice";
 import Refund from "./pages/finance/Refund";
 import FinanceReports from "./pages/finance/FinanceReports";
+import RevenueAnalysis from "./pages/finance/RevenueAnalysis";
 import BankAccounts from "./pages/finance/BankAccounts";
 import FinanceSettings from "./pages/finance/Settings";
 import MaintenanceDashboard from "./pages/maintenance/MaintenanceDashboard";
@@ -157,7 +162,6 @@ const App = () => (
             <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/routes" element={<RoutesPage />} />
             
             {/* New Booking Flow - Widget Based */}
             <Route path="/book/passenger-details" element={<PassengerDetailsPage />} />
@@ -211,7 +215,8 @@ const App = () => (
             <Route path="/admin/delays" element={<DelayManagement />} />
             <Route path="/admin/passenger-manifest" element={<PassengerManifest />} />
             <Route path="/admin/assign-bus" element={<AssignBus />} />
-            <Route path="/admin/terminal" element={<TerminalOperations />} />
+            <Route path="/admin/terminal" element={<AdminTerminalOperations />} />
+            <Route path="/admin/terminal-management" element={<TerminalManagement />} />
             <Route path="/book" element={<TripSearch />} />
             <Route path="/book/passengers" element={<PassengerDetails />} />
             <Route path="/book/seats" element={<SeatSelection />} />
@@ -235,32 +240,9 @@ const App = () => (
             <Route path="/operations/terminal" element={<TerminalOperations />} />
             <Route path="/operations/settings" element={<OperationsSettings />} />
             <Route path="/admin/delays" element={<DelayManagement />} />
-            <Route path="/admin/terminal" element={<TerminalOperations />} />
+            <Route path="/admin/terminal" element={<AdminTerminalOperations />} />
             <Route path="/operations/manifest" element={<OperationsManifest />} />
             <Route path="/operations/live-tracking" element={<OperationsLiveTracking />} />
-            {/* Ticketing Routes */}
-            <Route path="/ticketing" element={<TicketingDashboard />} />
-            <Route path="/ticketing/search-trips" element={<SearchTrips />} />
-            <Route path="/ticketing/seat-selection" element={<TicketingSeatSelection />} />
-            <Route path="/ticketing/passenger-details" element={<TicketingPassengerDetails />} />
-            <Route path="/ticketing/payment" element={<TicketingPayment />} />
-            <Route path="/ticketing/booking-summary" element={<BookingSummary />} />
-            <Route path="/ticketing/issue-ticket" element={<IssueTicket />} />
-            <Route path="/ticketing/modify-booking" element={<ModifyBooking />} />
-            <Route path="/ticketing/cancel-refund" element={<CancelRefund />} />
-            <Route path="/ticketing/customer-lookup" element={<CustomerLookup />} />
-            <Route path="/ticketing/passenger-manifest" element={<TicketingManifest />} />
-            <Route path="/ticketing/trip-management" element={<TicketingTripManagement />} />
-            <Route path="/ticketing/office-admin" element={<OfficeAdmin />} />
-            <Route path="/ticketing/reserved" element={<ReservedTickets />} />
-            {/* Legacy Ticketing Routes */}
-            <Route path="/ticketing/sell" element={<SellTicket />} />
-            <Route path="/ticketing/check-in" element={<CheckIn />} />
-            <Route path="/ticketing/find" element={<FindTicket />} />
-            <Route path="/ticketing/payments" element={<Payments />} />
-            <Route path="/ticketing/manifest" element={<TicketingManifest />} />
-            <Route path="/ticketing/reports" element={<TicketingReports />} />
-            <Route path="/ticketing/settings" element={<TicketingSettings />} />
             {/* Admin Ticketing Routes */}
             <Route path="/admin/ticketing" element={<TicketingDashboard />} />
             <Route path="/admin/ticketing/search-trips" element={<SearchTrips />} />
@@ -281,9 +263,34 @@ const App = () => (
             <Route path="/admin/ticketing/payments" element={<Payments />} />
             <Route path="/admin/ticketing/reports" element={<TicketingReports />} />
             <Route path="/admin/ticketing/settings" element={<TicketingSettings />} />
+            {/* Ticketing Routes */}
+            <Route path="/ticketing" element={<TicketingDashboard />} />
+            <Route path="/ticketing/search-trips" element={<SearchTrips />} />
+            <Route path="/ticketing/seat-selection" element={<TicketingSeatSelection />} />
+            <Route path="/ticketing/passenger-details" element={<TicketingPassengerDetails />} />
+            <Route path="/ticketing/payment" element={<TicketingPayment />} />
+            <Route path="/ticketing/booking-summary" element={<BookingSummary />} />
+            <Route path="/ticketing/issue-ticket" element={<IssueTicket />} />
+            <Route path="/ticketing/modify-booking" element={<ModifyBooking />} />
+            <Route path="/ticketing/cancel-refund" element={<CancelRefund />} />
+            <Route path="/ticketing/customer-lookup" element={<CustomerLookup />} />
+            <Route path="/ticketing/passenger-manifest" element={<TicketingManifest />} />
+            <Route path="/ticketing/trip-management" element={<TicketingTripManagement />} />
+            <Route path="/ticketing/office-admin" element={<OfficeAdmin />} />
+            <Route path="/ticketing/reserved" element={<ReservedTickets />} />
+            <Route path="/ticketing/terminal-screen" element={<TerminalScreen />} />
+            {/* Legacy Ticketing Routes */}
+            <Route path="/ticketing/sell" element={<SellTicket />} />
+            <Route path="/ticketing/check-in" element={<CheckIn />} />
+            <Route path="/ticketing/find" element={<FindTicket />} />
+            <Route path="/ticketing/payments" element={<Payments />} />
+            <Route path="/ticketing/manifest" element={<TicketingManifest />} />
+            <Route path="/ticketing/reports" element={<TicketingReports />} />
+            <Route path="/ticketing/settings" element={<TicketingSettings />} />
             <Route path="/admin/finance" element={<FinanceDashboard />} />
             <Route path="/admin/finance/income" element={<Income />} />
             <Route path="/admin/finance/expenses" element={<Expense />} />
+            <Route path="/admin/finance/revenue-analysis" element={<RevenueAnalysis />} />
             <Route path="/admin/finance/payroll" element={<PayrollManagement />} />
             <Route path="/admin/finance/fuel-allowance" element={<Fuel />} />
             <Route path="/admin/finance/invoices" element={<Invoice />} />
@@ -347,9 +354,9 @@ const App = () => (
             <Route path="/admin/hr/attendance" element={<Attendance />} />
             <Route path="/admin/hr/leave" element={<Leave />} />
             <Route path="/admin/hr/compliance" element={<Compliance />} />
-            <Route path="/admin/hr/recruitment" element={<Recruitment />} />
+            <Route path="/admin/hr/recruitment" element={<AdminRecruitment />} />
             <Route path="/admin/hr/performance" element={<Performance />} />
-            <Route path="/admin/hr/payroll" element={<HRPayroll />} />
+            <Route path="/admin/hr/support" element={<AdminSupport />} />
             <Route path="/admin/hr/reports" element={<HRReports />} />
             <Route path="/admin/hr/settings" element={<HRSettings />} />
             <Route path="/admin/hr/documents" element={<Documents />} />

@@ -10,14 +10,15 @@ import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 
 // Import routes
-import authRoutes from './routes/auth.routes.js';
-import userRoutes from './routes/user.routes.js';
-import bookingRoutes from './routes/booking.routes.js';
-import routeRoutes from './routes/route.routes.js';
-import scheduleRoutes from './routes/schedule.routes.js';
-import busRoutes from './routes/bus.routes.js';
-import staffRoutes from './routes/staff.routes.js';
-import driverRoutes from './routes/driver.routes.js';
+import authRoutes from './routes/auth.js';
+import userRoutes from './routes/users.js';
+import bookingRoutes from './routes/bookings.js';
+import routeRoutes from './routes/routes.js';
+import scheduleRoutes from './routes/schedules.js';
+import busRoutes from './routes/buses.js';
+import staffRoutes from './routes/staff.js';
+import driverRoutes from './routes/drivers.js';
+import paymentRoutes from './routes/payments.js';
 
 // Load environment variables
 dotenv.config();
@@ -72,6 +73,7 @@ app.use('/api/schedules', scheduleRoutes);
 app.use('/api/buses', busRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/drivers', driverRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {
@@ -97,6 +99,7 @@ app.get('/api', (req: Request, res: Response) => {
       buses: '/api/buses',
       staff: '/api/staff',
       drivers: '/api/drivers',
+      payments: '/api/payments',
     },
   });
 });

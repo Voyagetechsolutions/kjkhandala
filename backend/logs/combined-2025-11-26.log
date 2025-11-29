@@ -1,0 +1,33 @@
+{"level":"info","message":"🚀 Server running on port 3001","service":"bus-management-api","timestamp":"2025-11-26 01:50:12"}
+{"level":"info","message":"📡 WebSocket server ready","service":"bus-management-api","timestamp":"2025-11-26 01:50:12"}
+{"level":"info","message":"🌍 Environment: development","service":"bus-management-api","timestamp":"2025-11-26 01:50:12"}
+{"level":"info","message":"🔒 Security: httpOnly cookies, input sanitization, rate limiting enabled","service":"bus-management-api","timestamp":"2025-11-26 01:50:12"}
+{"level":"info","message":"⏰ Scheduler temporarily disabled (Prisma migration pending)","service":"bus-management-api","timestamp":"2025-11-26 01:50:12"}
+{"level":"info","message":"📨 Queue processor temporarily disabled (Prisma migration pending)","service":"bus-management-api","timestamp":"2025-11-26 01:50:12"}
+{"level":"info","message":"::1 - - [25/Nov/2025:23:59:13 +0000] \"GET /health HTTP/1.1\" 200 54 \"-\" \"Mozilla/5.0 (Windows NT; Windows NT 10.0; en-ZA) WindowsPowerShell/5.1.26100.7019\"","service":"bus-management-api","timestamp":"2025-11-26 01:59:13"}
+{"level":"info","message":"::1 - - [25/Nov/2025:23:59:38 +0000] \"GET /api HTTP/1.1\" 404 142 \"-\" \"Mozilla/5.0 (Windows NT; Windows NT 10.0; en-ZA) WindowsPowerShell/5.1.26100.7019\"","service":"bus-management-api","timestamp":"2025-11-26 01:59:38"}
+{"level":"info","message":"::1 - - [26/Nov/2025:00:00:10 +0000] \"GET /api/payments HTTP/1.1\" 404 151 \"-\" \"Mozilla/5.0 (Windows NT; Windows NT 10.0; en-ZA) WindowsPowerShell/5.1.26100.7019\"","service":"bus-management-api","timestamp":"2025-11-26 02:00:10"}
+{"level":"info","message":"🚀 Server running on port 3001","service":"bus-management-api","timestamp":"2025-11-26 02:06:34"}
+{"level":"info","message":"📡 WebSocket server ready","service":"bus-management-api","timestamp":"2025-11-26 02:06:34"}
+{"level":"info","message":"🌍 Environment: development","service":"bus-management-api","timestamp":"2025-11-26 02:06:34"}
+{"level":"info","message":"🔒 Security: httpOnly cookies, input sanitization, rate limiting enabled","service":"bus-management-api","timestamp":"2025-11-26 02:06:34"}
+{"level":"info","message":"⏰ Scheduler temporarily disabled (Prisma migration pending)","service":"bus-management-api","timestamp":"2025-11-26 02:06:34"}
+{"level":"info","message":"📨 Queue processor temporarily disabled (Prisma migration pending)","service":"bus-management-api","timestamp":"2025-11-26 02:06:34"}
+{"level":"info","message":"🚀 Server running on port 3001","service":"bus-management-api","timestamp":"2025-11-26 02:12:56"}
+{"level":"info","message":"📡 WebSocket server ready","service":"bus-management-api","timestamp":"2025-11-26 02:12:56"}
+{"level":"info","message":"🌍 Environment: development","service":"bus-management-api","timestamp":"2025-11-26 02:12:56"}
+{"level":"info","message":"🔒 Security: httpOnly cookies, input sanitization, rate limiting enabled","service":"bus-management-api","timestamp":"2025-11-26 02:12:56"}
+{"level":"info","message":"⏰ Scheduler temporarily disabled (Prisma migration pending)","service":"bus-management-api","timestamp":"2025-11-26 02:12:56"}
+{"level":"info","message":"📨 Queue processor temporarily disabled (Prisma migration pending)","service":"bus-management-api","timestamp":"2025-11-26 02:12:56"}
+{"level":"info","message":"::1 - - [26/Nov/2025:00:14:29 +0000] \"POST /api/payments/initialize HTTP/1.1\" 500 61 \"-\" \"axios/1.13.2\"","service":"bus-management-api","timestamp":"2025-11-26 02:14:29"}
+{"level":"info","message":"::1 - - [26/Nov/2025:00:24:03 +0000] \"POST /api/payments/initialize HTTP/1.1\" 500 61 \"-\" \"axios/1.13.2\"","service":"bus-management-api","timestamp":"2025-11-26 02:24:03"}
+{"level":"info","message":"::1 - - [26/Nov/2025:00:25:17 +0000] \"POST /api/payments/initialize HTTP/1.1\" 500 61 \"-\" \"axios/1.13.2\"","service":"bus-management-api","timestamp":"2025-11-26 02:25:17"}
+{"level":"info","message":"::1 - - [26/Nov/2025:00:25:34 +0000] \"POST /api/payments/initialize HTTP/1.1\" 500 61 \"-\" \"axios/1.13.2\"","service":"bus-management-api","timestamp":"2025-11-26 02:25:34"}
+{"level":"info","message":"::1 - - [26/Nov/2025:00:25:45 +0000] \"POST /api/payments/initialize HTTP/1.1\" 500 61 \"-\" \"axios/1.13.2\"","service":"bus-management-api","timestamp":"2025-11-26 02:25:45"}
+{"level":"info","message":"🚀 Server running on port 3001","service":"bus-management-api","timestamp":"2025-11-26 02:26:45"}
+{"level":"info","message":"📡 WebSocket server ready","service":"bus-management-api","timestamp":"2025-11-26 02:26:45"}
+{"level":"info","message":"🌍 Environment: development","service":"bus-management-api","timestamp":"2025-11-26 02:26:45"}
+{"level":"info","message":"🔒 Security: httpOnly cookies, input sanitization, rate limiting enabled","service":"bus-management-api","timestamp":"2025-11-26 02:26:45"}
+{"level":"info","message":"⏰ Scheduler temporarily disabled (Prisma migration pending)","service":"bus-management-api","timestamp":"2025-11-26 02:26:45"}
+{"level":"info","message":"📨 Queue processor temporarily disabled (Prisma migration pending)","service":"bus-management-api","timestamp":"2025-11-26 02:26:45"}
+{"level":"info","message":"::1 - - [26/Nov/2025:00:27:00 +0000] \"POST /api/payments/initialize HTTP/1.1\" 500 64 \"-\" \"axios/1.13.2\"","service":"bus-management-api","timestamp":"2025-11-26 02:27:00"}

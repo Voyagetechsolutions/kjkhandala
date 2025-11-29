@@ -3,12 +3,12 @@ import { supabase } from '@/lib/supabase';
 import { ensureTripExists } from '@/lib/trip-utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { CreditCard, Smartphone, Building2, Loader2, MapPin, Clock, AlertCircle } from 'lucide-react';
+import { MapPin, Clock, AlertCircle, CreditCard, Smartphone } from 'lucide-react';
+import BotswanaPayment from '@/components/payment/BotswanaPayment';
 
 interface PaymentStepProps {
   trip: any;
@@ -27,14 +27,7 @@ export default function PaymentStep({
 }: PaymentStepProps) {
   const [paymentMethod, setPaymentMethod] = useState(paymentData?.method || 'pay_at_office');
   const [processing, setProcessing] = useState(false);
-  const [paymentDetails, setPaymentDetails] = useState({
-    cardNumber: '',
-    cardName: '',
-    expiryDate: '',
-    cvv: '',
-    mobileNumber: '',
-    bankAccount: '',
-  });
+  const [showOnlinePayment, setShowOnlinePayment] = useState(false);
 
   const totalAmount = seats.length * (trip?.fare || trip?.base_fare || 0);
 
@@ -47,6 +40,12 @@ export default function PaymentStep({
   const handlePayment = async () => {
     if (!trip || seats.length === 0 || passengers.length === 0) {
       toast.error('Missing booking information');
+      return;
+    }
+
+    // If online payment selected, show payment component
+    if (paymentMethod === 'online_payment') {
+      setShowOnlinePayment(true);
       return;
     }
 
@@ -106,25 +105,6 @@ export default function PaymentStep({
 
       if (bookingError) throw bookingError;
 
-      // Create payment record (only for online payments)
-      let payment = null;
-      if (!isOfficePayment) {
-        const { data: paymentData, error: paymentError } = await supabase
-          .from('payments')
-          .insert({
-            booking_id: createdBookings[0].id,
-            amount: totalAmount,
-            payment_method: paymentMethod,
-            payment_status: 'settled',
-            paid_at: new Date().toISOString(),
-          })
-          .select()
-          .single();
-
-        if (paymentError) throw paymentError;
-        payment = paymentData;
-      }
-
       // Update trip available seats
       const { error: updateError } = await supabase
         .from('trips')
@@ -155,12 +135,77 @@ export default function PaymentStep({
       onPaymentComplete({
         bookingId: createdBookings[0].id,
         bookings: createdBookings,
-        payment: payment,
+        payment: null,
         method: paymentMethod,
       });
     } catch (error: any) {
       console.error('Payment error:', error);
       toast.error(error.message || 'Payment failed. Please try again.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleOnlinePaymentSuccess = async (paymentData: any) => {
+    // Create booking after successful online payment
+    setProcessing(true);
+    
+    try {
+      const actualTrip = await ensureTripExists(trip);
+      
+      // Create bookings for each passenger
+      const bookings = passengers.map((passenger, index) => ({
+        trip_id: actualTrip.id,
+        passenger_name: passenger.fullName,
+        passenger_email: passenger.email,
+        passenger_phone: passenger.mobile || passenger.phone,
+        passenger_id_number: passenger.idNumber,
+        seat_number: passenger.seatNumber,
+        booking_status: 'confirmed',
+        payment_status: 'paid',
+        payment_method: 'online_payment',
+        payment_id: paymentData.id,
+        total_amount: trip.fare || trip.base_fare,
+        booking_reference: `BK${Date.now()}${index}`,
+        flow_step: 'confirmation',
+        passenger_title: passenger.title,
+        passenger_gender: passenger.gender,
+        alternate_phone: passenger.alternateNumber,
+        id_type: passenger.idType,
+        emergency_contact_name: passenger.emergencyName,
+        emergency_contact_phone: passenger.emergencyPhone,
+        passenger_country: passenger.country,
+        passenger_address: passenger.address,
+      }));
+
+      const { data: createdBookings, error: bookingError } = await supabase
+        .from('bookings')
+        .insert(bookings)
+        .select();
+
+      if (bookingError) throw bookingError;
+
+      // Update trip available seats
+      const { error: updateError } = await supabase
+        .from('trips')
+        .update({ 
+          available_seats: actualTrip.available_seats - seats.length 
+        })
+        .eq('id', actualTrip.id);
+
+      if (updateError) throw updateError;
+
+      toast.success('Payment successful! Your tickets are confirmed.');
+      
+      onPaymentComplete({
+        bookingId: createdBookings[0].id,
+        bookings: createdBookings,
+        payment: paymentData,
+        method: 'online_payment',
+      });
+    } catch (error: any) {
+      console.error('Booking creation error:', error);
+      toast.error(error.message || 'Failed to create booking after payment');
     } finally {
       setProcessing(false);
     }
@@ -235,34 +280,12 @@ export default function PaymentStep({
               </div>
 
               <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover:bg-gray-50">
-                <RadioGroupItem value="mobile_money" id="mobile_money" />
-                <Label htmlFor="mobile_money" className="flex items-center gap-2 cursor-pointer flex-1">
-                  <Smartphone className="h-5 w-5" />
-                  <div>
-                    <p className="font-medium">Mobile Money</p>
-                    <p className="text-sm text-muted-foreground">Orange Money, Mascom MyZaka</p>
-                  </div>
-                </Label>
-              </div>
-
-              <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover:bg-gray-50">
-                <RadioGroupItem value="card" id="card" />
-                <Label htmlFor="card" className="flex items-center gap-2 cursor-pointer flex-1">
+                <RadioGroupItem value="online_payment" id="online_payment" />
+                <Label htmlFor="online_payment" className="flex items-center gap-2 cursor-pointer flex-1">
                   <CreditCard className="h-5 w-5" />
                   <div>
-                    <p className="font-medium">Credit/Debit Card</p>
-                    <p className="text-sm text-muted-foreground">Visa, Mastercard</p>
-                  </div>
-                </Label>
-              </div>
-
-              <div className="flex items-center space-x-3 border rounded-lg p-4 cursor-pointer hover:bg-gray-50">
-                <RadioGroupItem value="bank_transfer" id="bank_transfer" />
-                <Label htmlFor="bank_transfer" className="flex items-center gap-2 cursor-pointer flex-1">
-                  <Building2 className="h-5 w-5" />
-                  <div>
-                    <p className="font-medium">Bank Transfer</p>
-                    <p className="text-sm text-muted-foreground">Direct bank transfer</p>
+                    <p className="font-medium">Online Payment</p>
+                    <p className="text-sm text-muted-foreground">Pay now with card or mobile money</p>
                   </div>
                 </Label>
               </div>
@@ -321,115 +344,44 @@ export default function PaymentStep({
         </Alert>
       )}
 
-      {/* Payment Details */}
-      {paymentMethod !== 'pay_at_office' && (
-      <Card>
-        <CardContent className="p-6">
-          <h3 className="font-semibold text-lg mb-4">Payment Details</h3>
-          
-          {paymentMethod === 'mobile_money' && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="mobileNumber">Mobile Number</Label>
-                <Input
-                  id="mobileNumber"
-                  type="tel"
-                  placeholder="+267 7X XXX XXX"
-                  value={paymentDetails.mobileNumber}
-                  onChange={(e) => setPaymentDetails({ ...paymentDetails, mobileNumber: e.target.value })}
-                />
-              </div>
-              <p className="text-sm text-muted-foreground">
-                You will receive a payment prompt on your mobile device
-              </p>
-            </div>
-          )}
-
-          {paymentMethod === 'card' && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="cardNumber">Card Number</Label>
-                <Input
-                  id="cardNumber"
-                  placeholder="1234 5678 9012 3456"
-                  value={paymentDetails.cardNumber}
-                  onChange={(e) => setPaymentDetails({ ...paymentDetails, cardNumber: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cardName">Cardholder Name</Label>
-                <Input
-                  id="cardName"
-                  placeholder="John Doe"
-                  value={paymentDetails.cardName}
-                  onChange={(e) => setPaymentDetails({ ...paymentDetails, cardName: e.target.value })}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="expiryDate">Expiry Date</Label>
-                  <Input
-                    id="expiryDate"
-                    placeholder="MM/YY"
-                    value={paymentDetails.expiryDate}
-                    onChange={(e) => setPaymentDetails({ ...paymentDetails, expiryDate: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cvv">CVV</Label>
-                  <Input
-                    id="cvv"
-                    placeholder="123"
-                    maxLength={3}
-                    value={paymentDetails.cvv}
-                    onChange={(e) => setPaymentDetails({ ...paymentDetails, cvv: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {paymentMethod === 'bank_transfer' && (
-            <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="font-medium mb-2">Bank Details:</p>
-                <p className="text-sm">Bank: First National Bank</p>
-                <p className="text-sm">Account: 1234567890</p>
-                <p className="text-sm">Branch: Gaborone Main</p>
-                <p className="text-sm mt-2 text-muted-foreground">
-                  Reference: {trip.trip_number}
-                </p>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Please complete the transfer and upload proof of payment
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Online Payment Component */}
+      {showOnlinePayment && (
+        <BotswanaPayment
+          bookingId={`temp-${Date.now()}`} // Temporary booking ID
+          amount={totalAmount}
+          currency="BWP"
+          customerEmail={passengers[0]?.email || ''}
+          customerFirstName={passengers[0]?.fullName?.split(' ')[0] || ''}
+          customerLastName={passengers[0]?.fullName?.split(' ')[1] || ''}
+          customerPhone={passengers[0]?.mobile || passengers[0]?.phone || ''}
+          onSuccess={handleOnlinePaymentSuccess}
+          onCancel={() => setShowOnlinePayment(false)}
+        />
       )}
 
       {/* Pay/Reserve Button */}
-      <Button 
-        onClick={handlePayment} 
-        disabled={processing}
-        className="w-full h-12 text-lg"
-        size="lg"
-      >
-        {processing ? (
-          <>
-            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-            {paymentMethod === 'pay_at_office' ? 'Creating Reservation...' : 'Processing Payment...'}
-          </>
-        ) : (
-          <>
-            {paymentMethod === 'pay_at_office' 
-              ? `Reserve Tickets (P ${totalAmount.toFixed(2)})` 
-              : `Pay P ${totalAmount.toFixed(2)}`
-            }
-          </>
-        )}
-      </Button>
+      {!showOnlinePayment && (
+        <Button 
+          onClick={handlePayment} 
+          disabled={processing}
+          className="w-full h-12 text-lg"
+          size="lg"
+        >
+          {processing ? (
+            <>
+              <Clock className="h-5 w-5 mr-2 animate-spin" />
+              {paymentMethod === 'pay_at_office' ? 'Creating Reservation...' : 'Processing...'}
+            </>
+          ) : (
+            <>
+              {paymentMethod === 'pay_at_office' 
+                ? `Reserve Tickets (P ${totalAmount.toFixed(2)})` 
+                : `Continue to Payment (P ${totalAmount.toFixed(2)})`
+              }
+            </>
+          )}
+        </Button>
+      )}
 
       <p className="text-xs text-center text-muted-foreground">
         By proceeding, you agree to our terms and conditions

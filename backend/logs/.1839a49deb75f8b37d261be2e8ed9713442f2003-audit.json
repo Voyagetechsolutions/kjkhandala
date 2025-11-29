@@ -6,26 +6,6 @@
     "auditLog": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\.1839a49deb75f8b37d261be2e8ed9713442f2003-audit.json",
     "files": [
         {
-            "date": 1762725424806,
-            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-09.log",
-            "hash": "887783be8973b0cd59240b9cf9c716359e7d3d6e8fe8bda4577074b7efb4f0a3"
-        },
-        {
-            "date": 1762726107511,
-            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-10.log",
-            "hash": "34752b1f9742bdb8f0214d49e8d482636e2994d781c81976f05cd9718252204c"
-        },
-        {
-            "date": 1762814377957,
-            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-11.log",
-            "hash": "52e95278848077e2a2e3ae3f9a2adbd9b421982daaf65376fb00e68d6405e063"
-        },
-        {
-            "date": 1762900576762,
-            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-12.log",
-            "hash": "40d108f1edec00c3149a5efd48c81a39962a23ca35f29aa28369c7ecdc3f7fc5"
-        },
-        {
             "date": 1762984805366,
             "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-13.log",
             "hash": "eeb82e8a2a68d22aefc6122c46e0f5c8136c17856491ce665ca5b7fc37b0f900"
@@ -54,6 +34,11 @@
             "date": 1763766598003,
             "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-22.log",
             "hash": "75082eb6c9c8ccc5c3e6dd5312f7277c70c3d7031cb215d5ff6bd299f54fa72e"
+        },
+        {
+            "date": 1764114612343,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-26.log",
+            "hash": "ef2668063b6dadbc24debe8b80423119372122219df3cad6e29160e7ce84d941"
         }
     ],
     "hashType": "sha256"
