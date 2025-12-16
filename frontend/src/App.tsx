@@ -57,6 +57,8 @@ import AdminShiftCalendar from "./pages/admin/ShiftCalendar";
 import AdminAutomatedTripManagement from "./pages/admin/AutomatedTripManagement";
 import AdminSupport from "./pages/admin/Support";
 import AdminRecruitment from "./pages/admin/Recruitment";
+import DeveloperDashboard from "./pages/admin/DeveloperDashboard";
+import ApiDocumentation from "./pages/admin/ApiDocumentation";
 import FleetOperations from "./pages/operations/FleetOperations";
 import OperationsFleetManagement from "./pages/operations/FleetManagement";
 import DriverOperations from "./pages/operations/DriverOperations";
@@ -217,6 +219,9 @@ const App = () => (
             <Route path="/admin/assign-bus" element={<AssignBus />} />
             <Route path="/admin/terminal" element={<AdminTerminalOperations />} />
             <Route path="/admin/terminal-management" element={<TerminalManagement />} />
+            <Route path="/admin/developer" element={<DeveloperDashboard />} />
+            <Route path="/admin/api" element={<DeveloperDashboard />} />
+            <Route path="/admin/api-docs" element={<ApiDocumentation />} />
             <Route path="/book" element={<TripSearch />} />
             <Route path="/book/passengers" element={<PassengerDetails />} />
             <Route path="/book/seats" element={<SeatSelection />} />

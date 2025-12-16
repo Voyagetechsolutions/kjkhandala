@@ -6,39 +6,19 @@
     "auditLog": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\.1839a49deb75f8b37d261be2e8ed9713442f2003-audit.json",
     "files": [
         {
-            "date": 1762984805366,
-            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-13.log",
-            "hash": "eeb82e8a2a68d22aefc6122c46e0f5c8136c17856491ce665ca5b7fc37b0f900"
-        },
-        {
-            "date": 1763072809105,
-            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-14.log",
-            "hash": "044ebf3cee05d028ccb6e6b7e29d254de697f558009886cef5176927de034468"
-        },
-        {
-            "date": 1763223425163,
-            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-15.log",
-            "hash": "8ac918c0d4d285434a224889b6dcd1b4f338e1a308392ea61972aadd08b431c6"
-        },
-        {
-            "date": 1763302746704,
-            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-16.log",
-            "hash": "ff5f58add833e281831fc42bc277876aa770a58253fd8a307badafc851b52e73"
-        },
-        {
-            "date": 1763338547332,
-            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-17.log",
-            "hash": "170b5f61269ae8c768678d7b0ff78c0085625f5d17f5eaabe916e9ab737e419e"
-        },
-        {
-            "date": 1763766598003,
-            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-22.log",
-            "hash": "75082eb6c9c8ccc5c3e6dd5312f7277c70c3d7031cb215d5ff6bd299f54fa72e"
-        },
-        {
             "date": 1764114612343,
             "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-11-26.log",
             "hash": "ef2668063b6dadbc24debe8b80423119372122219df3cad6e29160e7ce84d941"
+        },
+        {
+            "date": 1765090824998,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-12-07.log",
+            "hash": "60ac7359497e84e0d19c85450f259bf7e45253df9c910a44a3eda0ddddb0d5cd"
+        },
+        {
+            "date": 1765264960684,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\combined-2025-12-09.log",
+            "hash": "503ace562ba2295fb0f2ee4b74d875dbe51e9224cb9d8cc5358109964d9615f9"
         }
     ],
     "hashType": "sha256"

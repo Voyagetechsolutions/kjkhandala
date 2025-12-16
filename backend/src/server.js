@@ -98,6 +98,9 @@ app.use('/api/manifests', require('./routes/manifests'));
 // Module 10: Reports & Analytics
 app.use('/api/analytics', require('./routes/analytics'));
 
+// Public API v1 - For external website integration (SaaS)
+app.use('/api/v1', require('./routes/public'));
+
 app.get('/api/user_roles', (req, res) => {
   res.json({ 
     data: [

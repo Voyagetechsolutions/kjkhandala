@@ -1,0 +1,935 @@
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
+import OperationsLayout from '@/components/operations/OperationsLayout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Plus, Calendar, Clock, MapPin, Bus, User, Play, Pause, CheckCircle, UserCog, Navigation, AlertCircle, TrendingUp, Edit } from 'lucide-react';
+import { format } from 'date-fns';
+import { toast } from 'sonner';
+import TripForm from '@/components/trips/TripForm';
+import TripCalendar from '@/components/trips/TripCalendar';
+import RouteFrequencyManager from '@/components/trips/RouteFrequencyManager';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+
+export default function TripScheduling() {
+  const Layout = OperationsLayout;
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingTrip, setEditingTrip] = useState<any>(null);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [selectedTrip, setSelectedTrip] = useState<any>(null);
+  const [assignmentData, setAssignmentData] = useState({
+    bus_id: '',
+    driver_id: '',
+    days: [] as string[],
+  });
+  const queryClient = useQueryClient();
+
+  // Auto-generate trips from shifts for today
+  const generateTripsFromShiftsMutation = useMutation({
+    mutationFn: async (dateRange: { start_date?: string; end_date?: string } = {}) => {
+      const startDate = dateRange?.start_date || format(new Date(), 'yyyy-MM-dd');
+      const endDate = dateRange?.end_date || format(new Date(), 'yyyy-MM-dd');
+      
+      const { error } = await supabase.rpc('generate_trips_from_frequencies', {
+        start_date: startDate,
+        end_date: endDate,
+      });
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Trips generated from shifts successfully');
+      queryClient.invalidateQueries({ queryKey: ['trips'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to generate trips from shifts');
+    },
+  });
+
+  // Fetch all trips/schedules with route, bus, and driver info
+  const { data: tripsData, isLoading } = useQuery({
+    queryKey: ['trips'],
+    queryFn: async () => {
+      // Auto-generate trips for today if none exist
+      const today = format(new Date(), 'yyyy-MM-dd');
+      
+      // Check if trips exist for today
+      const { data: todayTrips } = await supabase
+        .from('trips')
+        .select('id')
+        .gte('scheduled_departure', today)
+        .lt('scheduled_departure', format(new Date(Date.now() + 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
+      
+      // If no trips for today, try to generate them
+      if (!todayTrips || todayTrips.length === 0) {
+        try {
+          await generateTripsFromShiftsMutation.mutateAsync({ start_date: today, end_date: today });
+        } catch (error) {
+          console.warn('Could not auto-generate trips:', error);
+        }
+      }
+
+      const { data, error } = await supabase
+        .from('trips')
+        .select(`
+          *,
+          routes!route_id (id, origin, destination),
+          buses!bus_id (id, registration_number, model),
+          drivers!driver_id (id, full_name, phone)
+        `)
+        .order('scheduled_departure', { ascending: false });
+      if (error) throw error;
+      return { trips: data || [] };
+    },
+  });
+
+  // Fetch buses for assignment
+  const { data: buses } = useQuery({
+    queryKey: ['buses-active'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('buses')
+        .select('id, registration_number, model, status')
+        .eq('status', 'ACTIVE')
+        .order('registration_number');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Fetch drivers for assignment
+  const { data: drivers } = useQuery({
+    queryKey: ['drivers-active'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('*')
+        .order('full_name');
+      if (error) {
+        console.error('Error fetching drivers:', error);
+        throw error;
+      }
+      console.log('Fetched drivers:', data);
+      return data || [];
+    },
+  });
+
+  // Fetch live trips (currently active) with full details
+  const { data: liveTrips, isLoading: liveTripsLoading } = useQuery({
+    queryKey: ['live-trips'],
+    queryFn: async () => {
+      const now = new Date();
+      
+      // Query with joins for complete trip information
+      const { data, error } = await supabase
+        .from('trips')
+        .select(`
+          *,
+          routes!route_id (id, origin, destination, distance_km),
+          buses!bus_id (id, registration_number, model, gps_device_id),
+          drivers!driver_id (id, full_name, phone, license_number)
+        `)
+        .order('scheduled_departure', { ascending: true });
+      
+      if (error) {
+        console.error('Error fetching live trips:', error);
+        return [];
+      }
+      
+      // Filter trips that are:
+      // 1. BOARDING (within 30 mins before departure)
+      // 2. Between departure and arrival time (DEPARTED/IN_TRANSIT)
+      const liveTripsFiltered = (data || []).filter((trip: any) => {
+        const departure = new Date(trip.scheduled_departure);
+        const arrival = new Date(trip.scheduled_arrival);
+        
+        // BOARDING: 30 minutes before departure to departure time
+        if (trip.status === 'BOARDING') {
+          const boardingStart = new Date(departure.getTime() - 30 * 60 * 1000);
+          return now >= boardingStart && now <= departure;
+        }
+        
+        // DEPARTED/IN_TRANSIT: between departure and arrival
+        if (trip.status === 'DEPARTED' || trip.status === 'IN_TRANSIT') {
+          return now >= departure && now <= arrival;
+        }
+        
+        return false;
+      });
+      
+      return liveTripsFiltered;
+    },
+    refetchInterval: 15000, // Refresh every 15 seconds for live updates
+  });
+
+  // Trip Actions
+  const startTripMutation = useMutation({
+    mutationFn: async (tripId: string) => {
+      const { error } = await supabase
+        .from('trips')
+        .update({ status: 'DEPARTED', actual_departure: new Date().toISOString() })
+        .eq('id', tripId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Trip started successfully');
+      queryClient.invalidateQueries({ queryKey: ['trips-scheduling'] });
+    },
+  });
+
+  const completeTripMutation = useMutation({
+    mutationFn: async (tripId: string) => {
+      const { error } = await supabase
+        .from('trips')
+        .update({ status: 'COMPLETED', actual_arrival: new Date().toISOString() })
+        .eq('id', tripId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Trip completed successfully');
+      queryClient.invalidateQueries({ queryKey: ['trips-scheduling'] });
+    },
+  });
+
+  const cancelTripMutation = useMutation({
+    mutationFn: async ({ tripId, reason }: { tripId: string; reason: string }) => {
+      const { error } = await supabase
+        .from('trips')
+        .update({ status: 'CANCELLED', cancellation_reason: reason })
+        .eq('id', tripId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Trip cancelled');
+      queryClient.invalidateQueries({ queryKey: ['trips-scheduling'] });
+    },
+  });
+
+  // Assign bus and driver mutation with auto-population for 3 months
+  const assignBusDriverMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedTrip || !assignmentData.bus_id || !assignmentData.driver_id) {
+        throw new Error('Missing required fields');
+      }
+
+      // Update trip with bus and driver
+      const { error: tripError } = await supabase
+        .from('trips')
+        .update({
+          bus_id: assignmentData.bus_id,
+          driver_id: assignmentData.driver_id,
+          operating_days: assignmentData.days.length > 0 ? assignmentData.days : null,
+        })
+        .eq('id', selectedTrip.id);
+
+      if (tripError) throw tripError;
+
+      // Auto-populate trips for 3 months if operating days are selected
+      if (assignmentData.days.length > 0) {
+        const tripsToCreate = [];
+        const startDate = new Date(selectedTrip.scheduled_departure);
+        const endDate = new Date();
+        endDate.setMonth(endDate.getMonth() + 3); // 3 months from now
+
+        const dayMap: { [key: string]: number } = {
+          'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+          'Thursday': 4, 'Friday': 5, 'Saturday': 6
+        };
+
+        // Generate trips for each selected day within 3 months
+        let currentDate = new Date(startDate);
+        currentDate.setDate(currentDate.getDate() + 1); // Start from next day
+
+        while (currentDate <= endDate) {
+          const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][currentDate.getDay()];
+          
+          if (assignmentData.days.includes(dayName)) {
+            // Calculate departure and arrival times
+            const departure = new Date(currentDate);
+            departure.setHours(startDate.getHours(), startDate.getMinutes(), 0, 0);
+            
+            const arrival = selectedTrip.scheduled_arrival ? new Date(departure) : null;
+            if (arrival && selectedTrip.scheduled_arrival) {
+              const originalArrival = new Date(selectedTrip.scheduled_arrival);
+              arrival.setHours(originalArrival.getHours(), originalArrival.getMinutes(), 0, 0);
+            }
+
+            tripsToCreate.push({
+              route_id: selectedTrip.route_id,
+              bus_id: assignmentData.bus_id,
+              driver_id: assignmentData.driver_id,
+              scheduled_departure: departure.toISOString(),
+              scheduled_arrival: arrival?.toISOString(),
+              status: 'SCHEDULED',
+              operating_days: assignmentData.days,
+              total_seats: selectedTrip.total_seats,
+              available_seats: selectedTrip.total_seats,
+              fare: selectedTrip.fare,
+            });
+          }
+          
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        // Insert all generated trips
+        if (tripsToCreate.length > 0) {
+          const { data: createdTrips, error: createError } = await supabase
+            .from('trips')
+            .insert(tripsToCreate)
+            .select();
+
+          if (createError) throw createError;
+        }
+      }
+    },
+    onSuccess: () => {
+      const message = assignmentData.days.length > 0 
+        ? `Bus and driver assigned! ${assignmentData.days.length} day(s) selected - trips auto-populated for 3 months.`
+        : 'Bus and driver assigned successfully';
+      toast.success(message);
+      setShowAssignDialog(false);
+      setSelectedTrip(null);
+      setAssignmentData({ bus_id: '', driver_id: '', days: [] });
+      queryClient.invalidateQueries({ queryKey: ['trips'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to assign bus and driver');
+    },
+  });
+
+  // Summary stats
+  const trips = tripsData?.trips || [];
+  const today = new Date();
+
+  // Debug: Log trips data
+  console.log('Trips fetched:', trips.length, trips.slice(0, 2));
+  console.log('Status values in DB:', [...new Set(trips.map((t: any) => t.status))]);
+
+  // Trips Today - compare dates properly
+  const todayTrips = trips.filter((t: any) => {
+    if (!t.scheduled_departure) return false;
+    const depDate = new Date(t.scheduled_departure);
+    return depDate.getDate() === today.getDate() &&
+           depDate.getMonth() === today.getMonth() &&
+           depDate.getFullYear() === today.getFullYear();
+  }).length;
+
+  // Active Trips - check actual status values from DB
+  const activeTrips = trips.filter((t: any) => 
+    t.status === 'DEPARTED' || t.status === 'IN_TRANSIT' || t.status === 'BOARDING'
+  ).length;
+
+  // Completed Trips
+  const completedTrips = trips.filter((t: any) => t.status === 'COMPLETED').length;
+
+  // Upcoming Trips - fixed field name from departureDate to scheduled_departure
+  const upcomingTrips = trips.filter((t: any) => {
+    if (!t.scheduled_departure) return false;
+    return new Date(t.scheduled_departure) > today && t.status === 'SCHEDULED';
+  }).length;
+
+  const handleEdit = (trip: any) => {
+    setEditingTrip(trip);
+    setShowForm(true);
+  };
+
+  const handleEditTrip = (trip: any) => {
+    setEditingTrip(trip);
+    setShowAssignDialog(true);
+  };
+
+  const handleAssign = (trip: any) => {
+    setSelectedTrip(trip);
+    setAssignmentData({
+      bus_id: trip.bus_id || '',
+      driver_id: '',
+      days: trip.operating_days || [],
+    });
+    setShowAssignDialog(true);
+  };
+
+  const toggleDay = (day: string) => {
+    setAssignmentData(prev => ({
+      ...prev,
+      days: prev.days.includes(day)
+        ? prev.days.filter(d => d !== day)
+        : [...prev.days, day],
+    }));
+  };
+
+  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'scheduled': return 'bg-blue-500';
+      case 'active': return 'bg-green-500';
+      case 'completed': return 'bg-gray-500';
+      case 'cancelled': return 'bg-red-500';
+      default: return 'bg-gray-500';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'scheduled': return <Clock className="h-3 w-3" />;
+      case 'active': return <Play className="h-3 w-3" />;
+      case 'completed': return <CheckCircle className="h-3 w-3" />;
+      case 'cancelled': return <Pause className="h-3 w-3" />;
+      default: return <Clock className="h-3 w-3" />;
+    }
+  };
+
+  return (
+    <Layout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Trip Scheduling</h1>
+            <p className="text-muted-foreground">Manage trip schedules and monitor live operations</p>
+          </div>
+          <Button 
+            onClick={() => generateTripsFromShiftsMutation.mutate({})}
+            disabled={generateTripsFromShiftsMutation.isPending}
+          >
+            {generateTripsFromShiftsMutation.isPending ? 'Generating...' : 'Generate Trips from Shifts'}
+          </Button>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Trips Today
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{todayTrips}</p>
+              <p className="text-xs text-muted-foreground">{activeTrips} currently active</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Play className="h-4 w-4" />
+                Active Trips
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-green-600">{activeTrips}</p>
+              <p className="text-xs text-muted-foreground">On the road now</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <CheckCircle className="h-4 w-4" />
+                Completed
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{completedTrips}</p>
+              <p className="text-xs text-muted-foreground">All time</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Upcoming
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-blue-600">{upcomingTrips}</p>
+              <p className="text-xs text-muted-foreground">Scheduled ahead</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Tabs */}
+        <Tabs defaultValue="schedules" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="schedules">Automated Schedules</TabsTrigger>
+            <TabsTrigger value="today">Trips Today</TabsTrigger>
+            <TabsTrigger value="upcoming">Upcoming Trips</TabsTrigger>
+            <TabsTrigger value="calendar">Calendar View</TabsTrigger>
+          </TabsList>
+
+          {/* Automated Schedules Tab (Primary) */}
+          <TabsContent value="schedules">
+            <RouteFrequencyManager />
+          </TabsContent>
+
+          {/* Trips Today Tab */}
+          <TabsContent value="today" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Trips Today</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Route</TableHead>
+                      <TableHead>Bus</TableHead>
+                      <TableHead>Driver</TableHead>
+                      <TableHead>Departure</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Seats</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {trips?.filter((trip: any) => {
+                      if (!trip.scheduled_departure) return false;
+                      const tripDate = new Date(trip.scheduled_departure);
+                      const today = new Date();
+                      // Show trips for selected date (from calendar or today)
+                      const targetDate = selectedDate || today;
+                      return tripDate.toDateString() === targetDate.toDateString();
+                    }).map((trip: any) => (
+                      <TableRow key={trip.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">
+                              {trip.routes?.origin} → {trip.routes?.destination}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {trip.buses ? (
+                            <div className="flex items-center gap-2">
+                              <Bus className="h-4 w-4 text-muted-foreground" />
+                              <span>{trip.buses.registration_number}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">Not assigned</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {trip.drivers ? (
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span>{trip.drivers.full_name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">Not assigned</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(trip.scheduled_departure).toLocaleTimeString('en-GB', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            trip.status === 'SCHEDULED' ? 'secondary' :
+                            trip.status === 'BOARDING' ? 'default' :
+                            trip.status === 'DEPARTED' ? 'default' :
+                            trip.status === 'COMPLETED' ? 'outline' :
+                            'destructive'
+                          }>
+                            {trip.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">
+                            {trip.available_seats}/{trip.total_seats}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditTrip(trip)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Upcoming Trips Tab */}
+          <TabsContent value="upcoming" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Upcoming Trips</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Route</TableHead>
+                      <TableHead>Bus</TableHead>
+                      <TableHead>Driver</TableHead>
+                      <TableHead>Departure</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Seats</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {trips?.filter((trip: any) => {
+                      if (!trip.scheduled_departure) return false;
+                      const tripDate = new Date(trip.scheduled_departure);
+                      const today = new Date();
+                      const threeDaysFromNow = new Date(today);
+                      threeDaysFromNow.setDate(today.getDate() + 3);
+                      // Show trips for next 3 days only
+                      return tripDate > today && tripDate <= threeDaysFromNow && trip.status === 'SCHEDULED';
+                    }).map((trip: any) => (
+                      <TableRow key={trip.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">
+                              {trip.routes?.origin} → {trip.routes?.destination}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {trip.buses ? (
+                            <div className="flex items-center gap-2">
+                              <Bus className="h-4 w-4 text-muted-foreground" />
+                              <span>{trip.buses.registration_number}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">Not assigned</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {trip.drivers ? (
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span>{trip.drivers.full_name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">Not assigned</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(trip.scheduled_departure).toLocaleDateString('en-GB')} {' '}
+                          {new Date(trip.scheduled_departure).toLocaleTimeString('en-GB', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{trip.status}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">
+                            {trip.available_seats}/{trip.total_seats}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditTrip(trip)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Trip Table Tab */}
+          <TabsContent value="table" className="space-y-4">
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Route</TableHead>
+                      <TableHead>Bus</TableHead>
+                      <TableHead>Driver</TableHead>
+                      <TableHead>Departure</TableHead>
+                      <TableHead>Arrival</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          Loading trips...
+                        </TableCell>
+                      </TableRow>
+                    ) : trips?.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                          No trips scheduled
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      trips?.slice(0, 50).map((trip: any) => (
+                        <TableRow key={trip.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-3 w-3 text-muted-foreground" />
+                              <div>
+                                <p className="text-sm font-medium">
+                                  {trip.routes?.origin} → {trip.routes?.destination}
+                                </p>
+                                {trip.operating_days && trip.operating_days.length > 0 && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {trip.operating_days.join(', ')}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {trip.buses ? (
+                              <div className="flex items-center gap-2">
+                                <Bus className="h-3 w-3 text-muted-foreground" />
+                                <div>
+                                  <p className="text-sm font-medium">{trip.buses.registration_number}</p>
+                                  <p className="text-xs text-muted-foreground">{trip.buses.model}</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground italic">Not assigned</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {trip.drivers ? (
+                              <div className="flex items-center gap-2">
+                                <User className="h-3 w-3 text-muted-foreground" />
+                                <div>
+                                  <p className="text-sm font-medium">
+                                    {trip.drivers.full_name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {trip.drivers.phone}
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground italic">Not assigned</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              {trip.scheduled_departure ? (
+                                <>
+                                  <p>{format(new Date(trip.scheduled_departure), 'MMM dd, yyyy')}</p>
+                                  <p className="text-xs text-muted-foreground">{format(new Date(trip.scheduled_departure), 'HH:mm')}</p>
+                                </>
+                              ) : (
+                                <span className="text-muted-foreground">N/A</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              {trip.scheduled_arrival ? (
+                                <>
+                                  <p>{format(new Date(trip.scheduled_arrival), 'MMM dd, yyyy')}</p>
+                                  <p className="text-xs text-muted-foreground">{format(new Date(trip.scheduled_arrival), 'HH:mm')}</p>
+                                </>
+                              ) : (
+                                <span className="text-muted-foreground">N/A</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={`${getStatusColor(trip.status)} gap-1`}>
+                              {getStatusIcon(trip.status)}
+                              {trip.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex gap-2 justify-end">
+                              <Button variant="outline" size="sm" onClick={() => handleAssign(trip)}>
+                                <UserCog className="h-3 w-3 mr-1" />
+                                Assign
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => handleEdit(trip)}>
+                                View
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Calendar View Tab */}
+          <TabsContent value="calendar">
+            <TripCalendar trips={trips || []} selectedDate={selectedDate} onDateSelect={setSelectedDate} />
+          </TabsContent>
+        </Tabs>
+
+        {/* Trip Form Dialog */}
+          {showForm && (
+            <TripForm
+              trip={editingTrip}
+              onClose={() => { setShowForm(false); setEditingTrip(null); }}
+              onSuccess={() => {
+                setShowForm(false);
+                setEditingTrip(null);
+                queryClient.invalidateQueries({ queryKey: ['trips-scheduling'] });
+              }}
+            />
+          )}
+
+          {/* Bus/Driver Assignment Dialog */}
+          <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Assign Bus & Driver</DialogTitle>
+                <DialogDescription>
+                  Assign a bus and driver to this trip and select operating days
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                {/* Trip Info */}
+                {selectedTrip && (
+                  <div className="p-4 bg-muted rounded-lg">
+                    <p className="font-semibold mb-1">
+                      {selectedTrip.routes?.origin} → {selectedTrip.routes?.destination}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Departure: {selectedTrip.scheduled_departure ? format(new Date(selectedTrip.scheduled_departure), 'MMM dd, yyyy HH:mm') : 'N/A'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Bus Selection */}
+                <div className="space-y-2">
+                  <Label>Select Bus</Label>
+                  <Select
+                    value={assignmentData.bus_id}
+                    onValueChange={(value) => setAssignmentData(prev => ({ ...prev, bus_id: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a bus" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {buses?.map((bus: any) => (
+                        <SelectItem key={bus.id} value={bus.id}>
+                          {bus.registration_number} - {bus.model}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Driver Selection */}
+              <div className="space-y-2">
+                <Label>Select Driver</Label>
+                <Select
+                  value={assignmentData.driver_id}
+                  onValueChange={(value) => setAssignmentData(prev => ({ ...prev, driver_id: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a driver" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {drivers && drivers.length > 0 ? (
+                      drivers.map((driver: any) => (
+                        <SelectItem key={driver.id} value={driver.id}>
+                          {driver.full_name || driver.name || 'Unknown Driver'}
+                          {driver.license_number && ` - ${driver.license_number}`}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-drivers" disabled>
+                        No drivers available
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Operating Days */}
+              <div className="space-y-3">
+                <Label>Operating Days</Label>
+                <p className="text-sm text-muted-foreground">
+                  Select days to auto-populate trips for 3 months. Leave empty for one-time trip.
+                </p>
+                {assignmentData.days.length > 0 && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800 font-medium">
+                      ✓ Trips will be created for {assignmentData.days.length} day(s) over the next 3 months
+                    </p>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  {daysOfWeek.map((day) => (
+                    <div key={day} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={day}
+                        checked={assignmentData.days.includes(day)}
+                        onCheckedChange={() => toggleDay(day)}
+                      />
+                      <label
+                        htmlFor={day}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        {day}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 justify-end pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowAssignDialog(false);
+                    setSelectedTrip(null);
+                    setAssignmentData({ bus_id: '', driver_id: '', days: [] });
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => assignBusDriverMutation.mutate()}
+                  disabled={!assignmentData.bus_id || !assignmentData.driver_id || assignBusDriverMutation.isPending}
+                >
+                  {assignBusDriverMutation.isPending ? 'Assigning...' : 'Assign'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </Layout>
+  );
+}

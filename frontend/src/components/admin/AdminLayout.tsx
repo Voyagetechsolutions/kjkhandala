@@ -9,7 +9,7 @@ import {
   AlertTriangle, Clock, BarChart3, Warehouse, CalendarClock, ClipboardCheck,
   Package, Coins, UserPlus, Calendar, Award, FileCheck, Wallet, TrendingUp,
   Calculator, Fuel, FileSpreadsheet, RefreshCw, Search, Plus, UserCog, Activity,
-  Menu, X, ClipboardList, Headphones, PieChart
+  Menu, X, ClipboardList, Headphones, PieChart, Code2
 } from "lucide-react";
 import {
   Collapsible,
@@ -330,6 +330,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             </Collapsible>
 
             <div className="h-2" />
+
+            {/* Developer Dashboard */}
+            <Link
+              to="/admin/developer"
+              className={`
+                flex items-center gap-3 px-4 py-2 rounded-lg transition-colors text-sm
+                ${location.pathname === "/admin/developer" || location.pathname === "/admin/api"
+                  ? "bg-primary text-white"
+                  : "hover:bg-muted"
+                }
+              `}
+            >
+              <Code2 className="h-4 w-4" />
+              <span>Developer / API</span>
+            </Link>
 
             {/* System Settings */}
             <Link

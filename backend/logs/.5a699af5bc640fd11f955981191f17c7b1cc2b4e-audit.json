@@ -59,6 +59,16 @@
             "date": 1764114612371,
             "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\rejections-2025-11-26.log",
             "hash": "cf8d99a9b6392f023ab230e4474e740b725713d9f2341df54a5d8e488d849674"
+        },
+        {
+            "date": 1765090825020,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\rejections-2025-12-07.log",
+            "hash": "9cb08de4c0525f2e1cbb0edc58aa009c255c712db7d7a07dd6542258176bf046"
+        },
+        {
+            "date": 1765264960699,
+            "name": "C:\\Users\\Mthokozisi\\Downloads\\BMS\\voyage-onboard-now\\backend\\logs\\rejections-2025-12-09.log",
+            "hash": "d18b56880111f45ee5c7e9ee136eddc08733c3a882c499bdef1d0016439d05f2"
         }
     ],
     "hashType": "sha256"
